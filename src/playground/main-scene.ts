@@ -71,7 +71,7 @@ export default class MainScene {
       if (rootMesh) {
         rootMesh.position = new Vector3(0, 0, 4);
         rootMesh.rotationQuaternion = null; // then you may use usual rotation
-        rootMesh.scaling = new Vector3(1.25, 1.25, 1.25);
+        rootMesh.scaling = new Vector3(2.25, 2.25, 2.25);
         getSceneRuntimeState(this.scene).demoModelRootMesh = rootMesh;
       }
     }

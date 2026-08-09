@@ -7,17 +7,23 @@ import "@babylonjs/core/Physics/physicsEngineComponent";
 import { HavokPlugin } from "@babylonjs/core/Physics/v2/Plugins/havokPlugin";
 
 import { templateConfig } from "./config/template-config";
-import MainScene from "./playground/main-scene";
 import { getSceneRuntimeState } from "./playground/scene-runtime";
+import { SceneSelector } from "./scene-selector/scene-selector";
+import { Poc } from "./poc/types";
+import { pocRegistry } from "./poc/poc-registry";
+
 
 class App {
   public engine: Engine | WebGPUEngine;
-  public scene: Scene;
+  public scene: Scene | null = null;
 
   private canvas: HTMLCanvasElement;
+  private selector: SceneSelector;
+
+  private activePoc: Poc | null = null;
+  private renderLoopBound = false;
 
   constructor() {
-    // create the canvas html element and attach it to the webpage
     this.canvas = document.createElement("canvas");
     this.canvas.style.width = "100%";
     this.canvas.style.height = "100%";
@@ -29,16 +35,54 @@ class App {
 
   async bootstrap(): Promise<void> {
     this.engine = await this._createEngine();
+
+    this.selector = new SceneSelector(
+      pocRegistry,
+      (id) => void this.loadPoc(id),
+      () => this.backToSelector(),
+    );
+
+    this._bindEvent();
+    this._startRenderLoop();
+  }
+
+  /** Descarta la escena actual (si hay) y arma una nueva para el POC seleccionado. */
+  async loadPoc(id: string): Promise<void> {
+    const definition = pocRegistry.find((poc) => poc.id === id);
+    if (!definition) {
+      console.warn(`POC "${id}" no encontrado en el registro.`);
+      return;
+    }
+
+    this._disposeCurrent();
+
+    const { default: PocClass } = await definition.load();
+    this.activePoc = new PocClass();
+
     this.scene = new Scene(this.engine);
 
     if (templateConfig.features.physics) {
-      await this._setPhysics();
+      await this._setPhysics(this.scene);
     }
 
-    new MainScene(this.scene, this.canvas);
+    await this.activePoc.build(this.engine, this.canvas);
+    this._config(this.scene);
 
-    this._config();
-    this._renderer();
+    this.selector.showBackButton();
+  }
+
+  /** Vuelve a la pantalla de selección, descartando la escena del POC activo. */
+  backToSelector(): void {
+    this._disposeCurrent();
+    this.selector.showMenu();
+  }
+
+  private _disposeCurrent(): void {
+    this.activePoc?.dispose?.();
+    this.activePoc = null;
+
+    this.scene?.dispose();
+    this.scene = null;
   }
 
   async _createEngine(): Promise<Engine | WebGPUEngine> {
@@ -64,12 +108,12 @@ class App {
     });
   }
 
-  async _setPhysics(): Promise<void> {
+  async _setPhysics(scene: Scene): Promise<void> {
     const gravity = new Vector3(0, -9.81, 0);
     const { default: HavokPhysics } = await import("@babylonjs/havok");
     const hk = await HavokPhysics();
     const plugin = new HavokPlugin(true, hk);
-    if (!this.scene.enablePhysics(gravity, plugin)) {
+    if (!scene.enablePhysics(gravity, plugin)) {
       throw new Error("Failed to initialize the Havok physics engine.");
     }
   }
@@ -90,51 +134,48 @@ class App {
     }
   }
 
-  async _bindEvent(): Promise<void> {
-    // Imports and hide/show the Inspector
-    // Works only in DEV mode to reduce the size of the PRODUCTION build
-    // Comment IF statement to work in both modes
+  _config(scene: Scene): void {
+    if (templateConfig.features.axesViewer) {
+      const axesViewer = new AxesViewer(scene, 2);
+      getSceneRuntimeState(scene).axesViewer = axesViewer;
+    }
+  }
+
+  _bindEvent(): void {
+    if (this.renderLoopBound) return;
+    this.renderLoopBound = true;
+
     if (templateConfig.debug.inspectorInDevOnly && import.meta.env.DEV) {
-      await Promise.all([import("@babylonjs/core/Debug/debugLayer"), import("@babylonjs/inspector")]);
-
-      window.addEventListener("keydown", (ev) => {
-        // Shift+Ctrl+Alt+I
-        if (ev.shiftKey && ev.ctrlKey && ev.altKey && ev.key.toLowerCase() === "i") {
-          if (this.scene.debugLayer.isVisible()) {
-            this.scene.debugLayer.hide();
-          } else {
-            this.scene.debugLayer.show();
+      void Promise.all([import("@babylonjs/core/Debug/debugLayer"), import("@babylonjs/inspector")]).then(() => {
+        window.addEventListener("keydown", (ev) => {
+          // Shift+Ctrl+Alt+I
+          if (ev.shiftKey && ev.ctrlKey && ev.altKey && ev.key.toLowerCase() === "i") {
+            if (!this.scene) return;
+            if (this.scene.debugLayer.isVisible()) {
+              this.scene.debugLayer.hide();
+            } else {
+              this.scene.debugLayer.show();
+            }
           }
-        }
+        });
       });
-    } // End of IF statement
+    }
 
-    // resize window
     window.addEventListener("resize", () => {
       this.engine.resize();
     });
 
     window.addEventListener("beforeunload", () => {
-      this.scene.dispose();
+      this.activePoc?.dispose?.();
+      this.scene?.dispose();
       this.engine.dispose();
     });
   }
 
-  // Auxiliary Class Configuration
-  _config(): void {
-    if (templateConfig.features.axesViewer) {
-      const axesViewer = new AxesViewer(this.scene, 2);
-      getSceneRuntimeState(this.scene).axesViewer = axesViewer;
-    }
-
-    // Inspector and other stuff
-    void this._bindEvent();
-  }
-
-  _renderer(): void {
+  private _startRenderLoop(): void {
     this.engine.runRenderLoop(() => {
       this._fps();
-      this.scene.render();
+      this.scene?.render();
     });
   }
 }

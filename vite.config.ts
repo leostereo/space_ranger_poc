@@ -26,7 +26,7 @@ export default ({ mode }: any) => {
     },
     // server config
     server: {
-      // host: '192.168.0.0',
+      host: '10.0.0.2',
       port: 8088,
       open: true, // auto open
       hmr: true,
