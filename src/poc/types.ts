@@ -1,15 +1,13 @@
-import type { Engine } from "@babylonjs/core/Engines/engine";
-import type { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import type { Scene } from "@babylonjs/core/scene";
 
 /**
  * Contrato que debe cumplir cada POC.
- * Cada POC recibe el engine y el canvas ya creados por App,
- * y es responsable de armar su propia Scene desde cero.
+ * App crea el engine, la Scene y (si corresponde) habilita la física;
+ * cada POC solo la puebla con su contenido.
  */
 export interface Poc {
-  /** Arma la escena del POC. Se llama una vez al seleccionarlo. */
-  build(engine: Engine | WebGPUEngine, canvas: HTMLCanvasElement): Promise<Scene>;
+  /** Puebla la Scene ya creada por App (cámara, luces, meshes, física propia del POC). */
+  build(scene: Scene, canvas: HTMLCanvasElement): Promise<void>;
 
   /** Hook opcional para liberar recursos que no dependan de scene.dispose() (listeners globales, etc). */
   dispose?(): void;

@@ -1,37 +1,45 @@
-import { Scene } from "@babylonjs/core/scene";
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
-import type { Engine } from "@babylonjs/core/Engines/engine";
-import type { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
+import type { Scene } from "@babylonjs/core/scene";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
+import { PhysicsShapeType } from "@babylonjs/core/Physics/v2/IPhysicsEnginePlugin";
 
 import type { Poc } from "../types";
-import { FloatingBoardController } from "./floating-board-controller";
 import { poc1Config } from "./config";
+import { FloatingBoardController } from "./floating-board-controller";
 
 export default class FloatingBoardPoc implements Poc {
   private scene: Scene;
+
+  private groundMesh: Mesh;
+  private groundAggregate: PhysicsAggregate;
+
   private boardMesh: Mesh;
+  private boardAggregate: PhysicsAggregate;
+
   private controller: FloatingBoardController;
 
-  async build(engine: Engine | WebGPUEngine, canvas: HTMLCanvasElement): Promise<Scene> {
-    this.scene = new Scene(engine);
+  async build(scene: Scene, canvas: HTMLCanvasElement): Promise<void> {
+    this.scene = scene;
 
     this._buildCamera(canvas);
     this._buildLights();
     this._buildGround();
-    this.boardMesh = this._buildBoardPlaceholder();
+    this._buildBoard();
 
-    this.controller = new FloatingBoardController(this.scene, this.boardMesh);
-    this.scene.onBeforeRenderObservable.add(() => this.controller.update());
-
-    return this.scene;
+    this.controller = new FloatingBoardController(this.scene, this.boardMesh, this.boardAggregate);
+    this.scene.onBeforePhysicsObservable.add(() => this.controller.update());
   }
 
   dispose(): void {
     this.controller?.dispose();
+    this.boardAggregate?.dispose();
+    this.groundAggregate?.dispose();
   }
 
   private _buildCamera(canvas: HTMLCanvasElement): void {
@@ -52,14 +60,38 @@ export default class FloatingBoardPoc implements Poc {
   }
 
   private _buildGround(): void {
-    const { width, height } = poc1Config.ground;
-    MeshBuilder.CreateGround("poc1-ground", { width, height }, this.scene);
+    const { width, depth, thickness, friction, color } = poc1Config.ground;
+    this.groundMesh = MeshBuilder.CreateBox("poc1-ground", { width, depth, height: thickness }, this.scene);
+    this.groundMesh.position.y = -thickness / 2;
+
+    const material = new StandardMaterial("poc1-ground-material", this.scene);
+    material.diffuseColor = Color3.FromHexString(color);
+    material.specularColor = Color3.Black(); // sin brillo especular, look opaco/mate
+    this.groundMesh.material = material;
+
+    this.groundAggregate = new PhysicsAggregate(
+      this.groundMesh,
+      PhysicsShapeType.BOX,
+      { mass: 0, friction, restitution: 0 },
+      this.scene,
+    );
   }
 
-  private _buildBoardPlaceholder(): Mesh {
-    const { width, height, depth } = poc1Config.board;
-    const board = MeshBuilder.CreateBox("poc1-board", { width, height, depth }, this.scene);
-    board.position.y = 1;
-    return board;
+  private _buildBoard(): void {
+    const { width, height, depth, mass, friction, restitution, color, emissiveColor, spawn } = poc1Config.board;
+    this.boardMesh = MeshBuilder.CreateBox("poc1-board", { width, height, depth }, this.scene);
+    this.boardMesh.position.set(spawn.x, 10, spawn.z);
+
+    const material = new StandardMaterial("poc1-board-material", this.scene);
+    material.diffuseColor = Color3.FromHexString(color);
+    material.emissiveColor = Color3.FromHexString(emissiveColor); // leve brillo propio, look sci-fi
+    this.boardMesh.material = material;
+
+    this.boardAggregate = new PhysicsAggregate(
+      this.boardMesh,
+      PhysicsShapeType.BOX,
+      { mass, friction, restitution },
+      this.scene,
+    );
   }
 }

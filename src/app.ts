@@ -8,10 +8,9 @@ import { HavokPlugin } from "@babylonjs/core/Physics/v2/Plugins/havokPlugin";
 
 import { templateConfig } from "./config/template-config";
 import { getSceneRuntimeState } from "./playground/scene-runtime";
-import { SceneSelector } from "./scene-selector/scene-selector";
-import { Poc } from "./poc/types";
 import { pocRegistry } from "./poc/poc-registry";
-
+import type { Poc } from "./poc/types";
+import { SceneSelector } from "./scene-selector/scene-selector";
 
 class App {
   public engine: Engine | WebGPUEngine;
@@ -44,6 +43,11 @@ class App {
 
     this._bindEvent();
     this._startRenderLoop();
+
+    const latestPoc = pocRegistry[pocRegistry.length - 1];
+    if (latestPoc) {
+      void this.loadPoc(latestPoc.id);
+    }
   }
 
   /** Descarta la escena actual (si hay) y arma una nueva para el POC seleccionado. */
@@ -57,16 +61,19 @@ class App {
     this._disposeCurrent();
 
     const { default: PocClass } = await definition.load();
-    this.activePoc = new PocClass();
+    const poc = new PocClass();
 
-    this.scene = new Scene(this.engine);
+    const scene = new Scene(this.engine);
 
     if (templateConfig.features.physics) {
-      await this._setPhysics(this.scene);
+      await this._setPhysics(scene);
     }
 
-    await this.activePoc.build(this.engine, this.canvas);
-    this._config(this.scene);
+    await poc.build(scene, this.canvas);
+    this._config(scene);
+
+    this.activePoc = poc;
+    this.scene = scene;
 
     this.selector.showBackButton();
   }
@@ -149,7 +156,7 @@ class App {
       void Promise.all([import("@babylonjs/core/Debug/debugLayer"), import("@babylonjs/inspector")]).then(() => {
         window.addEventListener("keydown", (ev) => {
           // Shift+Ctrl+Alt+I
-          if (ev.shiftKey && ev.ctrlKey && ev.altKey && ev.key.toLowerCase() === "i") {
+        if (ev.shiftKey && ev.ctrlKey && ev.altKey) {
             if (!this.scene) return;
             if (this.scene.debugLayer.isVisible()) {
               this.scene.debugLayer.hide();
