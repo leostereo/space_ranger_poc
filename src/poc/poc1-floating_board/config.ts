@@ -6,8 +6,8 @@ export const poc1Config = {
     target: { x: 0, y: 1, z: 0 },
   },
   ground: {
-    width: 40,
-    depth: 40,
+    width: 150,
+    depth: 150,
     thickness: 0.4,
     friction: 0.6,
     color: "#33383f",
@@ -45,5 +45,15 @@ export const poc1Config = {
     // salto en Grounded / GliderBoost en Falling (mismo botón, distinto efecto)
     impulse: 6, // m/s
     successiveDecay: 0.6,
+  },
+  movement: {
+    forwardForce: 150, // N, aplicada en la dirección forward del board mientras se mantiene Shift
+    maxRollAngle: Math.PI / 6, // 30°, banco máximo al mantener A/D
+    rollLerpSpeed: 6, // qué tan rápido alcanza el banco objetivo (y vuelve a 0 al soltar)
+    yawFromRollFactor: -1.8, // rad/s de yaw por cada radián de banco — viraje coordinado, como un avión
+  },
+  testImpulse: {
+    // Simula el peso del personaje al saltar sobre el board (tecla T)
+    downwardVelocityKick: 3, // m/s de cambio instantáneo de velocidad vertical
   },
 };
