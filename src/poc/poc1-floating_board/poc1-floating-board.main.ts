@@ -36,9 +36,9 @@ export default class FloatingBoardPoc implements Poc {
     this._buildLights();
     this._buildGround();
     this._buildBoard();
-    // this._buildArcCamera(canvas);
+    //this._buildArcCamera(canvas);
     this._buildFollowCamera();
-    // this._buildNoseMarker();
+    this._buildNoseMarker();
 
     this.input = new BoardInput();
     this.controller = new FloatingBoardController(this.scene, this.boardMesh, this.boardAggregate, this.input);
@@ -64,45 +64,68 @@ export default class FloatingBoardPoc implements Poc {
       this.scene,
     );
     camera.attachControl(canvas, true);
-    }
+  }
 
-    private _buildFollowCamera(){
+  private _buildFollowCamera() {
 
-      const camera = new FollowCamera("boardCamera", new Vector3(0, 5, 10), this.scene);
-      camera.lockedTarget = this.boardMesh;
-      camera.radius = 6;          // Distancia horizontal (hacia atrás) en unidades de Babylon
-      camera.heightOffset = 2.0;  // Altura vertical por encima de la patineta
-      camera.rotationOffset = 180;// 180 grados para que mire exactamente desde atrás (0 la miraría de frente)
-  
-      // 4. Configurar la elasticidad/suavidad del seguimiento
-      camera.cameraAcceleration = 0.05; // Velocidad de aceleración para alcanzar al objetivo (0.0 a 1.0)
-      camera.maxCameraSpeed = 20;       // Velocidad máxima permitida para la cámara
-     
-    }
+    const camera = new FollowCamera("boardCamera", new Vector3(0, 5, 10), this.scene);
+    camera.lockedTarget = this.boardMesh;
+    camera.radius = 6;          // Distancia horizontal (hacia atrás) en unidades de Babylon
+    camera.heightOffset = 2.0;  // Altura vertical por encima de la patineta
+    camera.rotationOffset = 180;// 180 grados para que mire exactamente desde atrás (0 la miraría de frente)
+
+    // 4. Configurar la elasticidad/suavidad del seguimiento
+    camera.cameraAcceleration = 0.05; // Velocidad de aceleración para alcanzar al objetivo (0.0 a 1.0)
+    camera.maxCameraSpeed = 20;       // Velocidad máxima permitida para la cámara
+
+  }
 
   private _buildLights(): void {
     new HemisphericLight("poc1-light", new Vector3(0, 1, 0), this.scene);
   }
 
   private _buildGround(): void {
-    const { width, depth, thickness, friction, color } = poc1Config.ground;
-    this.groundMesh = MeshBuilder.CreateBox("poc1-ground", { width, depth, height: thickness }, this.scene);
-    this.groundMesh.position.y = -thickness / 2;
+    const { width, thickness, friction, color } = poc1Config.ground;
 
+    // 1. Material común opaco/mate para todos los suelos
     const material = new StandardMaterial("poc1-ground-material", this.scene);
     material.diffuseColor = Color3.FromHexString(color);
-    material.specularColor = Color3.Black(); // sin brillo especular, look opaco/mate
-    this.groundMesh.material = material;
+    material.specularColor = Color3.Black();
 
-    this.groundAggregate = new PhysicsAggregate(
-      this.groundMesh,
-      PhysicsShapeType.BOX,
-      { mass: 0, friction, restitution: 0 },
-      this.scene,
-    );
+    // Definimos las dimensiones y posiciones de las 3 plataformas consecutivas en el eje Z
+    // Configuradas de más alta a más baja para probar el planeo y la caída
+    const platformsData = [
+      { name: "ground-alta", depth: 40, heightOffset: 0.0, zStart: 0 },   // Plataforma de inicio (Alta)
+      { name: "ground-media", depth: 40, heightOffset: -15.0, zStart: 155 },  // Segunda plataforma (Media, tras un hueco de 15 unidades)
+      { name: "ground-baja", depth: 60, heightOffset: -30.0, zStart: 210 }  // Tercera plataforma (Baja, tras otro hueco de 15 unidades)
+    ];
+
+    platformsData.forEach((data) => {
+      // A) Crear el Mesh de la plataforma individual
+      const groundMesh = MeshBuilder.CreateBox(data.name, {
+        width: width,
+        depth: data.depth,
+        height: thickness
+      }, this.scene);
+
+      // B) Posicionar la plataforma. 
+      // Ajustamos la Y para que la parte superior de la caja quede exactamente en la altura deseada (heightOffset)
+      groundMesh.position.set(0, data.heightOffset - (thickness / 2), data.zStart);
+      groundMesh.material = material;
+
+      // Hacemos que sea explícitamente detectable por el Raycast del controlador
+      groundMesh.isPickable = true;
+
+      // C) Crear su cuerpo físico estático independiente en Havok
+      // Al usar mass: 0, el motor físico sabe que es un objeto inamovible (suelo)
+      new PhysicsAggregate(
+        groundMesh,
+        PhysicsShapeType.BOX,
+        { mass: 0, friction, restitution: 0 },
+        this.scene,
+      );
+    });
   }
-
-
 
   private _buildBoard(): void {
     const { width, height, depth, mass, friction, restitution, color, emissiveColor, spawn } = poc1Config.board;
@@ -126,7 +149,7 @@ export default class FloatingBoardPoc implements Poc {
     }, this.scene);
 
     // Posicionar en el punto de spawn configurado
-    this.boardMesh.position.set(spawn.x, poc1Config.hover.height, spawn.z);
+    this.boardMesh.position.set(spawn.x, spawn.y, spawn.z);
     this.boardMesh.material = material;
 
 

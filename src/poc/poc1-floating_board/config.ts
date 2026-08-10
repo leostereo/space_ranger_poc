@@ -22,7 +22,7 @@ export const poc1Config = {
     restitution: 0,
     color: "#00e5ff",
     emissiveColor: "#0a4a52",
-    spawn: { x: 2, z: 0 }, // offset horizontal para no tapar el gizmo/ejes en el centro
+    spawn: { x: 2, y:5, z: 0 }, // offset horizontal para no tapar el gizmo/ejes en el centro
   },
   hover: {
     // Paso 2: efecto de levitación en idle

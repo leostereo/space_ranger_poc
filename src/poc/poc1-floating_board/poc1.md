@@ -44,7 +44,7 @@ El board debe poder **flotar y moverse con o sin `ground` debajo**. Esto descart
 
 - [x] **Paso 1** — Crear el board: mesh + `PhysicsAggregate` (board dinámico, ground estático).
 - [x] **Paso 2** — Efecto de levitación en idle (cancelar gravedad + spring-damper hacia altura oscilante).
-- [ ] **Paso 3** — Fuerzas / input para movimiento horizontal y transición `Grounded` ↔ `Falling`.
+- [x] **Paso 3** — Fuerzas / input para movimiento horizontal y transición `Grounded` ↔ `Falling`.
   - [x] Giro (A/D) vía velocidad angular directa sobre el body.
   - [x] Fuerza forward (Shift) en la dirección hacia donde apunta la trompa del board (control tipo vehículo).
   - [x] Salto simple (Space) — impulso vertical sin decaimiento todavía.

@@ -6,6 +6,7 @@ import { Axis } from "@babylonjs/core/Maths/math.axis";
 
 import { poc1Config } from "./config";
 import type { BoardInput } from "./board-input";
+import { Ray } from "@babylonjs/core";
 
 /**
  * Controller de física del board flotante adaptado.
@@ -16,13 +17,16 @@ export class FloatingBoardController {
   private rollAngle = 0; // radianes, ángulo de banco visual actual
 
   // Reutilización de vectores en memoria para evitar Garbage Collection en cada frame
-  private _bodyRotationTemp = new Quaternion();
   private _forwardReference = Vector3.Forward(); // Vector estático de referencia (0,0,1)
   private _forwardTemp = new Vector3();
   private _rightReference = Vector3.Right(); // Vector estático (1,0,0)
   private _rightTemp = new Vector3();        // Contenedor para el eje lateral del mundo
   private _velocityTemp = new Vector3();
   private _forwardVelocityTemp = new Vector3();
+  private _ray = new Ray(Vector3.Zero(), Vector3.Up().scaleInPlace(-1), 10);
+  private _raycastPositionTemp = new Vector3();
+  private _debugTimer = 0;
+
   constructor(
     private scene: Scene,
     private boardMesh: Mesh,
@@ -40,45 +44,150 @@ export class FloatingBoardController {
     const dt = this.scene.getEngine().getDeltaTime() / 1000;
     this.elapsedTime += dt;
 
-    this._updateHover();
-    this._updateRollAndYaw(dt);
-    this._updateForwardForce();
-    this._applyLateralFriction();
-    this._updateJump();
-    this._updateTestImpulse();
-  }
+  // ✨ TRUCO DE SINCRO: Forzamos al mesh a sincronizar su matriz con la posición real del body físico de Havok,
+  // eliminando el residuo estético del applyVisualRoll del frame anterior.
+  this.boardMesh.computeWorldMatrix(true);
 
-  /** Se llama en `scene.onAfterPhysicsObservable` */
+  this._updateHover();
+  this._updateRollAndYaw(dt);
+  this._updateForwardForce();
+  this._applyLateralFriction();
+  this._updateJump();
+  this._updateTestImpulse();
+}
+
   applyVisualRoll(): void {
-    // El mesh ya fue sincronizado por Havok (solo hereda la rotación Yaw del body).
-    // Multiplicamos el banco visual sobre el eje Z local del mesh.
-    const rollQuat = Quaternion.RotationAxis(Axis.Z, -this.rollAngle);
-    this.boardMesh.rotationQuaternion = this.boardMesh.rotationQuaternion!.multiply(rollQuat);
-  }
+  // 1. Extraemos la rotación física real y limpia que Havok le acaba de otorgar al Body
+  // Para Physics V2, la forma más segura si el body ya sincronizó al mesh es usar el quaternion actual del mesh como base limpia
+
+  // 2. Calculamos el quat del Roll visual
+  const rollQuat = Quaternion.RotationAxis(Axis.Z, -this.rollAngle);
+
+  // 3. Aplicamos el Roll multiplicando de forma que NO se acumule frame a frame,
+  // sino que actúe como un offset local temporal para este renderizado.
+  this.boardMesh.rotationQuaternion = this.boardMesh.rotationQuaternion!.multiply(rollQuat);
+}
 
   private _updateHover(): void {
     const { height, springStrength, damping, bobAmplitude, bobFrequency } = poc1Config.hover;
     const mass = poc1Config.board.mass;
 
-    const angularFrequency = bobFrequency * 2 * Math.PI;
-    const targetHeight = height + bobAmplitude * Math.sin(this.elapsedTime * angularFrequency);
-    const currentHeight = this.boardMesh.position.y;
+    // 1. CONFIGURAR ORIGEN DEL RAYO
+    this._raycastPositionTemp.copyFrom(this.boardMesh.absolutePosition);
 
-    const shouldHover = currentHeight <= targetHeight;
+    const thicknessOffset = poc1Config.board.height * 0.5 + 0.05;
+    this._ray.origin.set(
+      this._raycastPositionTemp.x,
+      this._raycastPositionTemp.y - thicknessOffset,
+      this._raycastPositionTemp.z
+    );
 
-    if (shouldHover !== this.isHovering) {
-      this.isHovering = shouldHover;
-      this.boardAggregate.body.setGravityFactor(shouldHover ? 0 : 1);
+    this._ray.length = 100;
+
+    // 2. LANZAR RAYO FILTRANDO LA PATINETA
+    const hit = this.scene.pickWithRay(this._ray, (mesh) => {
+      return mesh.isPickable && mesh !== this.boardMesh && mesh.parent !== this.boardMesh;
+    });
+
+    const actualDistanceToGround = (hit && hit.hit) ? (hit.distance + thicknessOffset) : 999;
+
+    // Evaluamos el Hover estrictamente basándonos en la distancia de amortiguación real
+    const shouldHover = hit !== null && hit.hit && actualDistanceToGround <= height;
+    this.isHovering = shouldHover;
+
+    this.boardAggregate.body.setGravityFactor(1);
+
+    // Variables para el log de debug
+    let calculatedForceY = 0;
+    let debugMode = "AIRE";
+
+    // =========================================================================
+    // CASO A: LA PATINETA ESTÁ EN EL AIRE (Caída o Planeo)
+    // =========================================================================
+    if (!this.isHovering) {
+      this.boardAggregate.body.getLinearVelocityToRef(this._velocityTemp);
+
+      const horizontalVelocity = new Vector3(this._velocityTemp.x, 0, this._velocityTemp.z);
+      const forwardSpeed = horizontalVelocity.length();
+      const fallSpeed = this._velocityTemp.y;
+
+      if (fallSpeed < 0 && forwardSpeed > 1) {
+        debugMode = "AIRE_PLANEO";
+        const glideFactor = 0.08;
+        let liftAmount = mass * forwardSpeed * Math.abs(fallSpeed) * glideFactor;
+
+        const maxLiftLimit = mass * 9.81 * 0.95;
+        if (liftAmount > maxLiftLimit) {
+          liftAmount = maxLiftLimit;
+        }
+
+        calculatedForceY = liftAmount;
+
+        this.boardAggregate.body.applyForce(
+          new Vector3(0, liftAmount, 0),
+          this._raycastPositionTemp
+        );
+      } else {
+        debugMode = "AIRE_CAIDA_LIBRE";
+      }
+
+      // ---- LOG DE DEBUG CONTROLADO (1 VEZ POR SEGUNDO) ----
+      this._debugTimer += this.scene.getEngine().getDeltaTime() / 1000;
+      if (this._debugTimer >= 1.0) {
+        console.log(`[BOARD DEBUG - AIRE] 
+        Altura Y Actual: ${this.boardMesh.position.y.toFixed(2)}
+        Distancia Suelo: ${actualDistanceToGround.toFixed(2)}
+        Velocidad Vertical: ${this.boardAggregate.body.getLinearVelocity().y.toFixed(2)}
+        Fuerza Aplicada Y: ${calculatedForceY.toFixed(2)}
+        Modo: ${debugMode}
+      `);
+        this._debugTimer = 0;
+      }
+
+      return;
     }
 
-    if (!this.isHovering) return;
+    // =========================================================================
+    // CASO B: LA PATINETA ESTÁ EN TIERRA (Resorte Magnético de Hover)
+    // =========================================================================
+    debugMode = "TIERRA_HOVER";
+    const angularFrequency = bobFrequency * 2 * Math.PI;
+    const dynamicTargetHeight = height + bobAmplitude * Math.sin(this.elapsedTime * angularFrequency);
+    const error = dynamicTargetHeight - actualDistanceToGround;
 
     const verticalVelocity = this.boardAggregate.body.getLinearVelocity().y;
-    const error = targetHeight - currentHeight;
-    const springForce = mass * (error * springStrength - verticalVelocity * damping);
+    let finalForceY = mass * (error * springStrength - verticalVelocity * damping);
 
-    this.boardAggregate.body.applyForce(new Vector3(0, springForce, 0), this.boardMesh.getAbsolutePosition());
+    const gravityCompensation = mass * 9.81;
+    finalForceY += gravityCompensation;
+
+    if (finalForceY < 0) finalForceY = 0;
+
+    const maxForceLimit = mass * 9.81 * 8;
+    if (finalForceY > maxForceLimit) finalForceY = maxForceLimit;
+
+    calculatedForceY = finalForceY;
+
+    this.boardAggregate.body.applyForce(
+      new Vector3(0, finalForceY, 0),
+      this._raycastPositionTemp
+    );
+
+    // ---- LOG DE DEBUG CONTROLADO (1 VEZ POR SEGUNDO) ----
+    this._debugTimer += this.scene.getEngine().getDeltaTime() / 1000;
+    if (this._debugTimer >= 1.0) {
+      console.log(`[BOARD DEBUG - TIERRA] 
+      Altura Y Actual: ${this.boardMesh.position.y.toFixed(2)}
+      Distancia Suelo: ${actualDistanceToGround.toFixed(2)}
+      Error Resorte: ${error.toFixed(2)}
+      Velocidad Vertical: ${verticalVelocity.toFixed(2)}
+      Fuerza Aplicada Y: ${calculatedForceY.toFixed(2)}
+      Modo: ${debugMode}
+    `);
+      this._debugTimer = 0;
+    }
   }
+
 
   private _updateRollAndYaw(dt: number): void {
     const { turnLeft, turnRight } = this.input.current;
