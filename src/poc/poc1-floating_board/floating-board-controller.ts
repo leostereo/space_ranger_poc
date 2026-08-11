@@ -6,7 +6,7 @@ import { Axis } from "@babylonjs/core/Maths/math.axis";
 
 import { poc1Config } from "./config";
 import type { BoardInput } from "./board-input";
-import { Ray } from "@babylonjs/core";
+import { Ray, Tools } from "@babylonjs/core";
 
 /**
  * Controller de física del board flotante adaptado.
@@ -15,6 +15,7 @@ export class FloatingBoardController {
   private elapsedTime = 0;
   private isHovering = false;
   private rollAngle = 0; // radianes, ángulo de banco visual actual
+  private pitchAngle = 0;
 
   // Reutilización de vectores en memoria para evitar Garbage Collection en cada frame
   private _forwardReference = Vector3.Forward(); // Vector estático de referencia (0,0,1)
@@ -26,6 +27,7 @@ export class FloatingBoardController {
   private _ray = new Ray(Vector3.Zero(), Vector3.Up().scaleInPlace(-1), 10);
   private _raycastPositionTemp = new Vector3();
   private _debugTimer = 0;
+  private _airPitchVectorTemp = new Vector3();
 
   constructor(
     private scene: Scene,
@@ -52,142 +54,119 @@ export class FloatingBoardController {
   this._updateRollAndYaw(dt);
   this._updateForwardForce();
   this._applyLateralFriction();
+  this._updateAirPitch(dt); 
   this._updateJump();
   this._updateTestImpulse();
 }
 
-  applyVisualRoll(): void {
-  // 1. Extraemos la rotación física real y limpia que Havok le acaba de otorgar al Body
-  // Para Physics V2, la forma más segura si el body ya sincronizó al mesh es usar el quaternion actual del mesh como base limpia
-
-  // 2. Calculamos el quat del Roll visual
+applyVisualRoll(): void {
   const rollQuat = Quaternion.RotationAxis(Axis.Z, -this.rollAngle);
+  const pitchQuat = Quaternion.RotationAxis(Axis.X, this.pitchAngle);
 
-  // 3. Aplicamos el Roll multiplicando de forma que NO se acumule frame a frame,
-  // sino que actúe como un offset local temporal para este renderizado.
-  this.boardMesh.rotationQuaternion = this.boardMesh.rotationQuaternion!.multiply(rollQuat);
+  const visualOffset = rollQuat.multiply(pitchQuat); // probá el orden inverso si se ve raro
+  this.boardMesh.rotationQuaternion = this.boardMesh.rotationQuaternion!.multiply(visualOffset);
 }
 
   private _updateHover(): void {
     const { height, springStrength, damping, bobAmplitude, bobFrequency } = poc1Config.hover;
     const mass = poc1Config.board.mass;
 
-    // 1. CONFIGURAR ORIGEN DEL RAYO
-    this._raycastPositionTemp.copyFrom(this.boardMesh.absolutePosition);
+  // 1. CONFIGURAR ORIGEN DEL RAYO
+  this._raycastPositionTemp.copyFrom(this.boardMesh.absolutePosition);
 
-    const thicknessOffset = poc1Config.board.height * 0.5 + 0.05;
-    this._ray.origin.set(
-      this._raycastPositionTemp.x,
-      this._raycastPositionTemp.y - thicknessOffset,
-      this._raycastPositionTemp.z
-    );
+  const thicknessOffset = poc1Config.board.height * 0.5 + 0.05;
+  this._ray.origin.set(
+    this._raycastPositionTemp.x,
+    this._raycastPositionTemp.y - thicknessOffset,
+    this._raycastPositionTemp.z
+  );
 
-    this._ray.length = 100;
+  this._ray.length = 100;
 
-    // 2. LANZAR RAYO FILTRANDO LA PATINETA
-    const hit = this.scene.pickWithRay(this._ray, (mesh) => {
-      return mesh.isPickable && mesh !== this.boardMesh && mesh.parent !== this.boardMesh;
-    });
+  // 2. LANZAR RAYO
+  const hit = this.scene.pickWithRay(this._ray, (mesh) => {
+    return mesh.isPickable && mesh !== this.boardMesh && mesh.parent !== this.boardMesh;
+  }); 
 
-    const actualDistanceToGround = (hit && hit.hit) ? (hit.distance + thicknessOffset) : 999;
+  const actualDistanceToGround = (hit && hit.hit) ? (hit.distance + thicknessOffset) : 999;
 
-    // Evaluamos el Hover estrictamente basándonos en la distancia de amortiguación real
-    const shouldHover = hit !== null && hit.hit && actualDistanceToGround <= height;
-    this.isHovering = shouldHover;
+  // =========================================================================
+  // ✨ SISTEMA DE HISTÉRESIS (ZONA DE TOLERANCIA ANTI-PARPADEO)
+  // =========================================================================
+  // Definimos un "techo" de enganche más alto que la altura de flotación normal.
+  // Si la altura ideal es 1.2, permitimos que el resorte actúe hasta 1.8 metros del suelo.
+  const hoverEngagementThreshold = height * 1.5;
 
-    this.boardAggregate.body.setGravityFactor(1);
+  let shouldHover = this.isHovering; // Por defecto, mantiene el estado anterior
 
-    // Variables para el log de debug
-    let calculatedForceY = 0;
-    let debugMode = "AIRE";
-
-    // =========================================================================
-    // CASO A: LA PATINETA ESTÁ EN EL AIRE (Caída o Planeo)
-    // =========================================================================
-    if (!this.isHovering) {
-      this.boardAggregate.body.getLinearVelocityToRef(this._velocityTemp);
-
-      const horizontalVelocity = new Vector3(this._velocityTemp.x, 0, this._velocityTemp.z);
-      const forwardSpeed = horizontalVelocity.length();
-      const fallSpeed = this._velocityTemp.y;
-
-      if (fallSpeed < 0 && forwardSpeed > 1) {
-        debugMode = "AIRE_PLANEO";
-        const glideFactor = 0.08;
-        let liftAmount = mass * forwardSpeed * Math.abs(fallSpeed) * glideFactor;
-
-        const maxLiftLimit = mass * 9.81 * 0.95;
-        if (liftAmount > maxLiftLimit) {
-          liftAmount = maxLiftLimit;
-        }
-
-        calculatedForceY = liftAmount;
-
-        this.boardAggregate.body.applyForce(
-          new Vector3(0, liftAmount, 0),
-          this._raycastPositionTemp
-        );
-      } else {
-        debugMode = "AIRE_CAIDA_LIBRE";
-      }
-
-      // ---- LOG DE DEBUG CONTROLADO (1 VEZ POR SEGUNDO) ----
-      this._debugTimer += this.scene.getEngine().getDeltaTime() / 1000;
-      if (this._debugTimer >= 1.0) {
-        console.log(`[BOARD DEBUG - AIRE] 
-        Altura Y Actual: ${this.boardMesh.position.y.toFixed(2)}
-        Distancia Suelo: ${actualDistanceToGround.toFixed(2)}
-        Velocidad Vertical: ${this.boardAggregate.body.getLinearVelocity().y.toFixed(2)}
-        Fuerza Aplicada Y: ${calculatedForceY.toFixed(2)}
-        Modo: ${debugMode}
-      `);
-        this._debugTimer = 0;
-      }
-
-      return;
+  if (hit && hit.hit) {
+    if (actualDistanceToGround <= height) {
+      // Si se hunde por debajo de la altura ideal, SE ENGANCHA obligatoriamente al piso
+      shouldHover = true;
+    } else if (actualDistanceToGround > hoverEngagementThreshold) {
+      // SÓLO se desengancha y pasa a modo AIRE si supera el límite de tolerancia (se despegó de verdad)
+      shouldHover = false;
     }
-
-    // =========================================================================
-    // CASO B: LA PATINETA ESTÁ EN TIERRA (Resorte Magnético de Hover)
-    // =========================================================================
-    debugMode = "TIERRA_HOVER";
-    const angularFrequency = bobFrequency * 2 * Math.PI;
-    const dynamicTargetHeight = height + bobAmplitude * Math.sin(this.elapsedTime * angularFrequency);
-    const error = dynamicTargetHeight - actualDistanceToGround;
-
-    const verticalVelocity = this.boardAggregate.body.getLinearVelocity().y;
-    let finalForceY = mass * (error * springStrength - verticalVelocity * damping);
-
-    const gravityCompensation = mass * 9.81;
-    finalForceY += gravityCompensation;
-
-    if (finalForceY < 0) finalForceY = 0;
-
-    const maxForceLimit = mass * 9.81 * 8;
-    if (finalForceY > maxForceLimit) finalForceY = maxForceLimit;
-
-    calculatedForceY = finalForceY;
-
-    this.boardAggregate.body.applyForce(
-      new Vector3(0, finalForceY, 0),
-      this._raycastPositionTemp
-    );
-
-    // ---- LOG DE DEBUG CONTROLADO (1 VEZ POR SEGUNDO) ----
-    this._debugTimer += this.scene.getEngine().getDeltaTime() / 1000;
-    if (this._debugTimer >= 1.0) {
-      console.log(`[BOARD DEBUG - TIERRA] 
-      Altura Y Actual: ${this.boardMesh.position.y.toFixed(2)}
-      Distancia Suelo: ${actualDistanceToGround.toFixed(2)}
-      Error Resorte: ${error.toFixed(2)}
-      Velocidad Vertical: ${verticalVelocity.toFixed(2)}
-      Fuerza Aplicada Y: ${calculatedForceY.toFixed(2)}
-      Modo: ${debugMode}
-    `);
-      this._debugTimer = 0;
-    }
+  } else {
+    // Si el rayo ni siquiera toca el suelo, está en el aire de forma definitiva
+    shouldHover = false;
   }
 
+  this.isHovering = shouldHover;
+
+  // Forzamos la gravedad nativa de Havok siempre al 100%
+  this.boardAggregate.body.setGravityFactor(1);
+
+  // =========================================================================
+  // CASO A: LA PATINETA ESTÁ EN EL AIRE (Caída o Planeo)
+  // =========================================================================
+  if (!this.isHovering) {
+    this.boardAggregate.body.getLinearVelocityToRef(this._velocityTemp);
+
+    const horizontalVelocity = new Vector3(this._velocityTemp.x, 0, this._velocityTemp.z);
+    const forwardSpeed = horizontalVelocity.length();
+    const fallSpeed = this._velocityTemp.y;
+
+    if (fallSpeed < 0 && forwardSpeed > 1) {
+      const glideFactor = 0.08;
+      let liftAmount = mass * forwardSpeed * Math.abs(fallSpeed) * glideFactor;
+
+      const maxLiftLimit = mass * 9.81 * 0.95;
+      if (liftAmount > maxLiftLimit) {
+        liftAmount = maxLiftLimit;
+      }
+
+      this.boardAggregate.body.applyForce(
+        new Vector3(0, liftAmount, 0),
+        this._raycastPositionTemp
+      );
+    }
+    return;
+  }
+
+  // =========================================================================
+  // CASO B: LA PATINETA ESTÁ EN TIERRA (Resorte Magnético)
+  // =========================================================================
+  const angularFrequency = bobFrequency * 2 * Math.PI;
+  const dynamicTargetHeight = height + bobAmplitude * Math.sin(this.elapsedTime * angularFrequency);
+
+  const error = dynamicTargetHeight - actualDistanceToGround;
+  const verticalVelocity = this.boardAggregate.body.getLinearVelocity().y;
+
+  let finalForceY = mass * (error * springStrength - verticalVelocity * damping);
+  const gravityCompensation = mass * 9.81;
+  finalForceY += gravityCompensation;
+
+  if (finalForceY < 0) finalForceY = 0;
+
+  const maxForceLimit = mass * 9.81 * 8;
+  if (finalForceY > maxForceLimit) finalForceY = maxForceLimit;
+
+  this.boardAggregate.body.applyForce(
+    new Vector3(0, finalForceY, 0),
+    this._raycastPositionTemp
+  );
+}
 
   private _updateRollAndYaw(dt: number): void {
     const { turnLeft, turnRight } = this.input.current;
@@ -206,6 +185,31 @@ export class FloatingBoardController {
     // Forzamos la velocidad angular en Y. Mantenemos X y Z controlados para evitar que vuelque físicamente
     this.boardAggregate.body.setAngularVelocity(new Vector3(current.x * 0.9, yawRate, current.z * 0.9));
   }
+
+private _updateAirPitch(dt: number): void {
+  const isPlaneando = !this.isHovering;
+  const { pitchDown } = this.input.current;
+  const { pitchLerpSpeed, pitchDiveAcceleration } = poc1Config.movement;
+  const maxPitchAngle = Tools.ToRadians(poc1Config.movement.maxPitchAngle);
+
+  const targetPitch = (isPlaneando && pitchDown) ? maxPitchAngle : 0;
+
+  const lerpFactor = 1 - Math.exp(-pitchLerpSpeed * dt);
+  this.pitchAngle += (targetPitch - this.pitchAngle) * lerpFactor;
+
+  // --- Física del picado ---
+  if (isPlaneando && this.pitchAngle > 0.001) {
+    const diveIntensity = this.pitchAngle / maxPitchAngle; // 0 a 1
+    const mass = poc1Config.board.mass;
+    const diveForce = mass * pitchDiveAcceleration * diveIntensity;
+
+    this.boardAggregate.body.applyForce(
+      new Vector3(0, -diveForce, 0),
+      this.boardMesh.getAbsolutePosition()
+    );
+  }
+}
+
 
   private _updateForwardForce(): void {
     const { forwardForce } = poc1Config.movement;
@@ -248,7 +252,7 @@ export class FloatingBoardController {
   }
 
   private _applyLateralFriction(): void {
-    console.log('la')
+
     // 1. Obtener la velocidad lineal actual del cuerpo físico
     this.boardAggregate.body.getLinearVelocityToRef(this._velocityTemp);
 

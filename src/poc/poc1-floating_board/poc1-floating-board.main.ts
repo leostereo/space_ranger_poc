@@ -96,8 +96,8 @@ export default class FloatingBoardPoc implements Poc {
     // Configuradas de más alta a más baja para probar el planeo y la caída
     const platformsData = [
       { name: "ground-alta", depth: 40, heightOffset: 0.0, zStart: 0 },   // Plataforma de inicio (Alta)
-      { name: "ground-media", depth: 40, heightOffset: -15.0, zStart: 155 },  // Segunda plataforma (Media, tras un hueco de 15 unidades)
-      { name: "ground-baja", depth: 60, heightOffset: -30.0, zStart: 210 }  // Tercera plataforma (Baja, tras otro hueco de 15 unidades)
+      { name: "ground-media", depth: 40, heightOffset: -145.0, zStart: 155 },  // Segunda plataforma (Media, tras un hueco de 15 unidades)
+      { name: "ground-baja", depth: 60, heightOffset: -260.0, zStart: 210 }  // Tercera plataforma (Baja, tras otro hueco de 15 unidades)
     ];
 
     platformsData.forEach((data) => {
@@ -192,6 +192,11 @@ export default class FloatingBoardPoc implements Poc {
       { mass, friction, restitution },
       this.scene,
     );
+    const massProps = this.boardAggregate.body.getMassProperties();
+    massProps.inertia!.x = 0;
+    massProps.inertia!.z = 0;
+    this.boardAggregate.body.setMassProperties(massProps);
+
   }
 
   private _buildNoseMarker(): void {

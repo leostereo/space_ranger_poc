@@ -51,6 +51,9 @@ export const poc1Config = {
     maxRollAngle: Math.PI / 6, // 30°, banco máximo al mantener A/D
     rollLerpSpeed: 6, // qué tan rápido alcanza el banco objetivo (y vuelve a 0 al soltar)
     yawFromRollFactor: -1.8, // rad/s de yaw por cada radián de banco — viraje coordinado, como un avión
+    maxPitchAngle: 45, 
+    pitchLerpSpeed: 5,
+    pitchDiveAcceleration: 12,
   },
   testImpulse: {
     // Simula el peso del personaje al saltar sobre el board (tecla T)

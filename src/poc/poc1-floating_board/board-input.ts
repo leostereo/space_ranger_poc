@@ -7,10 +7,11 @@ export interface BoardInputState {
   forward: boolean; // Shift
   turnLeft: boolean; // A
   turnRight: boolean; // D
+  pitchDown: boolean; // W
 }
 
 export class BoardInput {
-  private state: BoardInputState = { forward: false, turnLeft: false, turnRight: false };
+  private state: BoardInputState = { forward: false, turnLeft: false, turnRight: false, pitchDown:false };
 
   private jumpRequested = false;
   private testImpulseRequested = false;
@@ -58,6 +59,9 @@ export class BoardInput {
       case "Space":
         this.jumpRequested = true;
         break;
+      case "KeyW":
+        this.state.pitchDown = true;
+        break;
       case "KeyT":
         this.testImpulseRequested = true;
         break;
@@ -76,6 +80,10 @@ export class BoardInput {
       case "KeyD":
         this.state.turnRight = false;
         break;
+      case "KeyW":
+        this.state.pitchDown = false;
+        break;
+
     }
   };
 }
