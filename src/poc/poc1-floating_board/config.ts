@@ -44,7 +44,9 @@ export const poc1Config = {
   boost: {
     // salto en Grounded / GliderBoost en Falling (mismo botón, distinto efecto)
     impulse: 6, // m/s
-    successiveDecay: 0.6,
+    gliderLiftImpulse: 6,       // impulso vertical base del glider boost (m/s)
+    gliderPitchKick: 20,        // grados de pitch-up instantáneo al boostear
+    gliderDecayFactor: 0.6,     // multiplicador de potencia por uso sucesivo
   },
   movement: {
     forwardForce: 150, // N, aplicada en la dirección forward del board mientras se mantiene Shift

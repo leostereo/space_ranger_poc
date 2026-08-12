@@ -49,6 +49,7 @@ El board debe poder **flotar y moverse con o sin `ground` debajo**. Esto descart
   - [x] Fuerza forward (Shift) en la dirección hacia donde apunta la trompa del board (control tipo vehículo).
   - [x] Salto simple (Space) — impulso vertical sin decaimiento todavía.
   - [x] Impulso de test (T) para simular el peso del personaje aterrizando.
-  - [ ] Estado `Falling` (sin ground detectado) + pendiente de caída controlada por input.
-  - [ ] Sub-estado `GliderBoost` con decaimiento sucesivo.
-  - [ ] FSM anidada formal (Grounded/Falling + sub-estados) documentada en Mermaid.
+  - [x] Estado `Falling` (sin ground detectado) + pendiente de caída controlada por input.
+  - [x] Sub-estado `GliderBoost` con decaimiento sucesivo.
+  - [ ] FSM anidada formal (Grounded/Falling + sub-estados) documentada en Mermaid. -> PASA A POC2
+  

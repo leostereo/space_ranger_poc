@@ -26,8 +26,8 @@ export class FloatingBoardController {
   private _forwardVelocityTemp = new Vector3();
   private _ray = new Ray(Vector3.Zero(), Vector3.Up().scaleInPlace(-1), 10);
   private _raycastPositionTemp = new Vector3();
-  private _debugTimer = 0;
-  private _airPitchVectorTemp = new Vector3();
+  private glideBoostChain = 0;
+
 
   constructor(
     private scene: Scene,
@@ -279,10 +279,34 @@ private _updateAirPitch(dt: number): void {
   private _updateJump(): void {
     if (!this.input.consumeJumpRequest()) return;
 
+    if (this.isHovering) {
+      this._doGroundJump();
+    } else {
+      this._doGliderBoost();
+    }
+  }
+
+  private _doGroundJump(): void {
+  const mass = poc1Config.board.mass;
+  const impulse = mass * poc1Config.boost.impulse;
+
+  this.boardAggregate.body.applyImpulse(new Vector3(0, impulse, 0), this.boardMesh.getAbsolutePosition());
+}
+
+  private _doGliderBoost(): void {
+    const { gliderLiftImpulse, gliderPitchKick, gliderDecayFactor } = poc1Config.boost;
     const mass = poc1Config.board.mass;
-    const impulse = mass * poc1Config.boost.impulse;
+
+    const powerMultiplier = Math.pow(gliderDecayFactor, this.glideBoostChain);
+    const impulse = mass * gliderLiftImpulse * powerMultiplier;
 
     this.boardAggregate.body.applyImpulse(new Vector3(0, impulse, 0), this.boardMesh.getAbsolutePosition());
+
+    // Pitch-up momentáneo: seteamos el ángulo directo (nariz arriba).
+    // El lerp normal de _updateAirPitch lo va devolviendo a 0 (o al target si siguen pisando pitchDown) frame a frame.
+    this.pitchAngle = -Tools.ToRadians(gliderPitchKick) * powerMultiplier;
+
+    this.glideBoostChain++;
   }
 
   private _updateTestImpulse(): void {
