@@ -9,6 +9,7 @@ import { poc2Config } from "./config";
 import { BoardFsm } from "./board-fsm/board.fsm";
 import { BoardFsmHovering } from "./board-fsm/board.fsm.hovering";
 import { BoardFsmFalling } from "./board-fsm/board.fsm.falling";
+import { generalConfig } from "../config.general";
 
 /**
  * Paso 4a: física mínima, sin input todavía. Sólo raycast + hover spring-damper
@@ -37,7 +38,7 @@ export class BoardController {
     this.fsm = new BoardFsm(
       () => this._groundDetected,
       () => this.groundLostTimer,
-      poc2Config.groundCheck.coyoteTime,
+      generalConfig.groundCheck.coyoteTime,
       () => this._onEnterHovering(),
       () => this._onEnterFalling(),
     );
@@ -82,7 +83,7 @@ export class BoardController {
 
   /** Un solo raycast por frame; el resultado se reutiliza en _applyHoverForce. */
   private _updateGroundDetection(): void {
-    const { height } = poc2Config.hover;
+    const { height } = generalConfig.hover;
 
     this._raycastOrigin.copyFrom(this.boardMesh.absolutePosition);
     this._ray.origin.copyFrom(this._raycastOrigin);
@@ -101,8 +102,8 @@ export class BoardController {
   }
 
   private _applyHoverForce(): void {
-    const { height, springStrength, damping, bobAmplitude, bobFrequency } = poc2Config.hover;
-    const mass = poc2Config.board.mass;
+    const { height, springStrength, damping, bobAmplitude, bobFrequency } = generalConfig.hover;
+    const mass = generalConfig.board.mass;
 
     const angularFrequency = bobFrequency * 2 * Math.PI;
     const dynamicTargetHeight = height + bobAmplitude * Math.sin(this.elapsedTime * angularFrequency);

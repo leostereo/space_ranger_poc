@@ -33,6 +33,7 @@ export const board_character_builder = (scene:Scene):{boardMesh:Mesh,boardAggreg
         if (boardMesh) {
             const { x, y, z } = generalConfig.board.spawn;
             boardMesh.position.set(x, y, z); // elevado del suelo a propósito: valida Falling -> Hovering
+            scene.getMeshByName('poc-board')?.dispose();
         }
         
         const skater = AssetManager.getMesh('character', 'character', scene);
