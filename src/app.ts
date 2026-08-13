@@ -11,6 +11,7 @@ import { getSceneRuntimeState } from "./playground/scene-runtime";
 import { pocRegistry } from "./poc/poc-registry";
 import type { Poc } from "./poc/types";
 import { SceneSelector } from "./scene-selector/scene-selector";
+import { AssetManager } from "./services/assets-manager"
 
 class App {
   public engine: Engine | WebGPUEngine;
@@ -34,10 +35,13 @@ class App {
 
   async bootstrap(): Promise<void> {
     this.engine = await this._createEngine();
+    const scene = new Scene(this.engine);
+    await AssetManager.cargarTodo(this.canvas,scene);
+
 
     this.selector = new SceneSelector(
       pocRegistry,
-      (id) => void this.loadPoc(id),
+      (id) => void this.loadPoc(id,scene),
       () => this.backToSelector(),
     );
 
@@ -46,24 +50,23 @@ class App {
 
     const latestPoc = pocRegistry[pocRegistry.length - 1];
     if (latestPoc) {
-      void this.loadPoc(latestPoc.id);
+      void this.loadPoc(latestPoc.id,scene);
     }
   }
 
   /** Descarta la escena actual (si hay) y arma una nueva para el POC seleccionado. */
-  async loadPoc(id: string): Promise<void> {
+  async loadPoc(id: string,scene:Scene): Promise<void> {
     const definition = pocRegistry.find((poc) => poc.id === id);
     if (!definition) {
       console.warn(`POC "${id}" no encontrado en el registro.`);
       return;
     }
-
+    
     this._disposeCurrent();
 
     const { default: PocClass } = await definition.load();
     const poc = new PocClass();
 
-    const scene = new Scene(this.engine);
 
     if (templateConfig.features.physics) {
       await this._setPhysics(scene);

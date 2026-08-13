@@ -11,9 +11,10 @@ export const pocRegistry: PocDefinition[] = [
     description: "Efecto visual + controller de física de la patineta flotante.",
     load: () => import("./poc1-floating_board/poc1-floating-board.main"),
   },
-  // {
-  //   id: "poc2-board_transition",
-  //   label: "POC 2 · Board Transition",
-  //   load: () => import("./poc2-board_transition/poc2-board-transition"),
-  // },
+  {
+    id: "poc2-board_fsm",
+    label: "POC 2 · Board FSM",
+    description: "Aplica una fsm anidad al board obtenido en poc1.",
+    load: () => import("./poc2-floating_board_fsm/board.main"),
+  },
 ];
