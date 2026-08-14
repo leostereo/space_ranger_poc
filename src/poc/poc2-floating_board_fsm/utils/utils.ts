@@ -33,14 +33,13 @@ export const board_character_builder = (scene:Scene):{boardMesh:Mesh,boardAggreg
         if (boardMesh) {
             const { x, y, z } = generalConfig.board.spawn;
             boardMesh.position.set(x, y, z); // elevado del suelo a propósito: valida Falling -> Hovering
-            scene.getMeshByName('poc-board')?.dispose();
+            // scene.getMeshByName('poc-board')?.dispose();
         }
         
         const skater = AssetManager.getMesh('character', 'character', scene);
         const  capsule = AssetManager.getMesh('character-capsule','character-capsule',scene);
         
         if (capsule && skater) {
-            console.log(skater)
             skater.setEnabled(true)
             capsule.setEnabled(true);
             capsule.isVisible = true;
@@ -49,7 +48,6 @@ export const board_character_builder = (scene:Scene):{boardMesh:Mesh,boardAggreg
             skater.position.copyFrom(capsule.position);
 
         const { mass, friction, restitution } = generalConfig.board;
-
         const boardAggregate = new PhysicsAggregate(
             boardMesh,
             PhysicsShapeType.CONVEX_HULL,

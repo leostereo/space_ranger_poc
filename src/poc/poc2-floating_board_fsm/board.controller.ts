@@ -3,7 +3,8 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { Scene } from "@babylonjs/core/scene";
 import type { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { Ray } from "@babylonjs/core/Culling/ray";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Vector3, Quaternion } from "@babylonjs/core/Maths/math.vector";
+import { Axis } from "@babylonjs/core/Maths/math.axis";
 import { Tools } from "@babylonjs/core/Misc/tools";
 
 import { BoardFsm } from "./board-fsm/board.fsm";
@@ -25,12 +26,21 @@ export class BoardController {
   private glideBoostChain = 0;
   private jumpSettleTimer = 0;
   private boostSettleTimer = 0;
+  private rollAngle = 0; // radianes, usado para el yaw físico (visual queda para cuando se porte applyVisualRoll)
   // Usado sólo por la fuerza de picado (Diving) por ahora — el lerp visual/continuo
-  // de _updateAirPitch (POC1) llega cuando se porten roll/yaw/forward.
+  // de _updateAirPitch (POC1) todavía no está portado (gap conocido, ver nota al final del archivo).
   private pitchAngle = 0;
 
   private _ray = new Ray(Vector3.Zero(), Vector3.Down(), 100);
   private _raycastOrigin = new Vector3();
+
+  // Vectores reutilizados para evitar Garbage Collection en cada frame
+  private _forwardReference = Vector3.Forward();
+  private _forwardTemp = new Vector3();
+  private _rightReference = Vector3.Right();
+  private _rightTemp = new Vector3();
+  private _velocityTemp = new Vector3();
+  private _forwardVelocityTemp = new Vector3();
 
   constructor(
     private scene: Scene,
@@ -38,6 +48,10 @@ export class BoardController {
     private boardAggregate: PhysicsAggregate,
     private input: BoardInput,
   ) {
+    if (!this.boardMesh.rotationQuaternion) {
+      this.boardMesh.rotationQuaternion = Quaternion.Identity();
+    }
+
     this.fsm = new BoardFsm({
       isGroundDetected: () => this._groundDetected,
       groundLostElapsed: () => this.groundLostTimer,
@@ -60,6 +74,10 @@ export class BoardController {
     const dt = this.scene.getEngine().getDeltaTime() / 1000;
     this.elapsedTime += dt;
 
+    // Sincroniza el mesh con la rotación real del body físico, eliminando el residuo
+    // estético que dejó applyVisualRoll() del frame anterior (roll/pitch son sólo visuales).
+    this.boardMesh.computeWorldMatrix(true);
+
     if (this.jumpSettleTimer > 0) this.jumpSettleTimer -= dt;
     if (this.boostSettleTimer > 0) this.boostSettleTimer -= dt;
 
@@ -79,6 +97,11 @@ export class BoardController {
       this._applyDiveForce();
     }
 
+    this._updateRollAndYaw(dt);
+    this._updateForwardForce();
+    this._applyLateralFriction();
+    this._updateAirPitch(dt);
+
     if (this.input.consumeJumpRequest()) {
       this.fsm.requestJump();
     }
@@ -86,6 +109,15 @@ export class BoardController {
     if (this.input.consumeTestImpulseRequest()) {
       this._applyTestImpulse();
     }
+  }
+
+  /** Llamar en `scene.onAfterPhysicsObservable`. Roll y pitch son 100% visuales, no tocan física. */
+  applyVisualRoll(): void {
+    const rollQuat = Quaternion.RotationAxis(Axis.Z, this.rollAngle);
+    const pitchQuat = Quaternion.RotationAxis(Axis.X, this.pitchAngle);
+    const visualOffset = rollQuat.multiply(pitchQuat);
+
+    this.boardMesh.rotationQuaternion = this.boardMesh.rotationQuaternion!.multiply(visualOffset);
   }
 
   /** Un solo raycast por frame; el resultado se reutiliza en _applyHoverForce. */
@@ -132,6 +164,19 @@ export class BoardController {
     this.boardAggregate.body.applyForce(new Vector3(0, forceY, 0), this._raycastOrigin);
   }
 
+  /** Lerp continuo de pitchAngle mientras se mantiene W en Falling. Ausente hasta ahora (gap conocido). */
+  private _updateAirPitch(dt: number): void {
+    const isFalling = this.fsm.getState() === "Falling";
+    const { pitchDown } = this.input.current;
+    const { pitchLerpSpeed, maxPitchAngle: maxPitchAngleDeg } = generalConfig.movement;
+    const maxPitchAngle = Tools.ToRadians(maxPitchAngleDeg);
+
+    const targetPitch = isFalling && pitchDown ? maxPitchAngle : 0;
+
+    const lerpFactor = 1 - Math.exp(-pitchLerpSpeed * dt);
+    this.pitchAngle += (targetPitch - this.pitchAngle) * lerpFactor;
+  }
+
   private _applyDiveForce(): void {
     const { maxPitchAngle: maxPitchAngleDeg, pitchDiveAcceleration } = generalConfig.movement;
     const maxPitchAngle = Tools.ToRadians(maxPitchAngleDeg);
@@ -147,6 +192,64 @@ export class BoardController {
 
   private _onEnterHovering(): void {
     this.glideBoostChain = 0;
+  }
+
+  private _updateRollAndYaw(dt: number): void {
+    const { turnLeft, turnRight } = this.input.current;
+    const { maxRollAngle, rollLerpSpeed, yawFromRollFactor } = generalConfig.movement;
+
+    let targetRoll = 0;
+    if (turnLeft) targetRoll += maxRollAngle;
+    if (turnRight) targetRoll -= maxRollAngle;
+
+    const lerpFactor = 1 - Math.exp(-rollLerpSpeed * dt);
+    this.rollAngle += (targetRoll - this.rollAngle) * lerpFactor;
+
+    const yawRate = -this.rollAngle * yawFromRollFactor;
+    const current = this.boardAggregate.body.getAngularVelocity();
+
+    // Forzamos la velocidad angular en Y. Mantenemos X y Z amortiguados (el lock de inercia
+    // en board.base.ts ya los bloquea del todo, esto es defensivo por si cambia más adelante).
+    this.boardAggregate.body.setAngularVelocity(new Vector3(current.x * 0.9, yawRate, current.z * 0.9));
+  }
+
+  private _updateForwardForce(): void {
+    const { forwardForce, brakingDragFactor } = generalConfig.movement;
+    const mass = generalConfig.board.mass;
+
+    Vector3.TransformNormalToRef(this._forwardReference, this.boardMesh.getWorldMatrix(), this._forwardTemp);
+
+    if (this.input.current.forward) {
+      this.boardAggregate.body.applyForce(
+        this._forwardTemp.scaleInPlace(forwardForce),
+        this.boardMesh.getAbsolutePosition(),
+      );
+      return;
+    }
+
+    // Soltó el input: frenar sólo si efectivamente se está moviendo hacia adelante
+    this.boardAggregate.body.getLinearVelocityToRef(this._velocityTemp);
+    const forwardSpeed = Vector3.Dot(this._velocityTemp, this._forwardTemp);
+
+    if (forwardSpeed > 0.05) {
+      this._forwardTemp.scaleToRef(-forwardSpeed * mass * brakingDragFactor, this._forwardVelocityTemp);
+      this.boardAggregate.body.applyForce(this._forwardVelocityTemp, this.boardMesh.getAbsolutePosition());
+    }
+  }
+
+  private _applyLateralFriction(): void {
+    const { driftGripFactor } = generalConfig.movement;
+    const mass = generalConfig.board.mass;
+
+    this.boardAggregate.body.getLinearVelocityToRef(this._velocityTemp);
+    Vector3.TransformNormalToRef(this._rightReference, this.boardMesh.getWorldMatrix(), this._rightTemp);
+
+    const lateralSpeed = Vector3.Dot(this._velocityTemp, this._rightTemp);
+
+    if (Math.abs(lateralSpeed) > 0.01) {
+      const counterForce = this._rightTemp.scaleInPlace(-lateralSpeed * mass * driftGripFactor);
+      this.boardAggregate.body.applyForce(counterForce, this.boardMesh.getAbsolutePosition());
+    }
   }
 
   private _onEnterJumping(): void {

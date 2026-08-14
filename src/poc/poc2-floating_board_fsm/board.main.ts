@@ -1,6 +1,8 @@
 // src/poc2-floating_board_fsm/board.base.ts
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { Scene } from "@babylonjs/core/scene";
+import type { Observer } from "@babylonjs/core/Misc/observable";
+import type { Nullable } from "@babylonjs/core/types";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { Poc } from "../types";
 import { BoardController } from "./board.controller";
@@ -20,6 +22,9 @@ export default class BoardBase implements Poc {
     private input: BoardInput;
     private controller: BoardController;
     private hud: BoardHud;
+
+    private beforePhysicsObserver: Nullable<Observer<Scene>> = null;
+    private afterPhysicsObserver: Nullable<Observer<Scene>> = null;
     
     async build(scene: Scene): Promise<void> {
         
@@ -39,12 +44,15 @@ export default class BoardBase implements Poc {
     }
 
     private bindObservables(){
-        this.scene.onBeforePhysicsObservable.add(() => this.controller.update());
+        this.beforePhysicsObserver = this.scene.onBeforePhysicsObservable.add(() => this.controller.update());
+        this.afterPhysicsObserver = this.scene.onAfterPhysicsObservable.add(() => this.controller.applyVisualRoll());
     }
 
     //API PUBLIC
 
     dispose?(): void {
+        this.scene?.onBeforePhysicsObservable.remove(this.beforePhysicsObserver);
+        this.scene?.onAfterPhysicsObservable.remove(this.afterPhysicsObserver);
         this.hud?.dispose();
         this.controller?.dispose();
         this.input?.dispose();

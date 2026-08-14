@@ -103,6 +103,7 @@ No se crean archivos para `A1`/`A2`/`B2` en este POC — se agregan cuando haya 
 - La lógica interna de cada guard/acción (raycast, timers, impulsos, fuerzas) se porta desde el `FloatingBoardController` de POC1, que ya está validado — este POC no reintroduce física nueva, sólo la reorganiza detrás de la FSM.
 - El HUD (`board.hud.ts`) se suscribe a `onStateChange` de las 3 FSMs (padre + 2 hijos) — sin polling.
 - A diferencia de POC1 (mesh armado a mano con `MeshBuilder`), en POC2 el mesh del board (y el del personaje/cápsula, para cuando se monten) se obtienen de un `AssetManager` compartido del repo. El `PhysicsAggregate` del board y del ground se crean en `board.base.ts`, igual que en POC1 se creaban junto al mesh — la diferencia es sólo de dónde sale la geometría, no de quién es dueño de la física.
+- **Gap conocido**: `pitchAngle` hoy sólo se escribe en `_onEnterGliderBoost` (el kick fijo). Falta portar el lerp continuo de `_updateAirPitch` (POC1) que lo acerca a `maxPitchAngle` mientras `pitchDown` está sostenido y lo devuelve a 0 al soltar — sin eso, `_applyDiveForce` usa un valor de `pitchAngle` desactualizado mientras se mantiene `W`. No bloquea nada (la FSM transiciona a `Diving` correctamente), pero la fuerza de picado no responde en tiempo real todavía.
 
 ## Progreso
 
@@ -111,6 +112,6 @@ No se crean archivos para `A1`/`A2`/`B2` en este POC — se agregan cuando haya 
 - [x] **Paso 3** — Implementar `board.fsm.ts` (padre) + `board.fsm.hovering.ts` + `board.fsm.falling.ts`.
 - [ ] **Paso 4** — Portar guards y acciones desde `FloatingBoardController` (POC1) a `board.controller.ts`.
   - [x] **4a** — Física mínima, sin input: `PhysicsAggregate` del board, ground real, raycast (`isGroundDetected`) y fuerza de hover (spring-damper). El board cae desde el spawn elevado (`Falling`) y llega solo a `Hovering`. Confirmado funcionando.
-  - [ ] **4b** — Input completo: roll/yaw, forward, pitchDown/Diving, jump/GliderBoost.
+  - [x] **4b** — Input completo: roll/yaw, forward, pitchDown/Diving, jump/GliderBoost. Pendiente: lerp continuo de pitchAngle (ver Notas de implementación) y applyVisualRoll (roll/pitch siguen sin reflejarse visualmente en el mesh, sólo afectan física).
 - [x] **Paso 5** — `board.hud.ts` — estado/sub-estado en pantalla vía `onStateChange`. Wireado en `board.base.ts`.
 - [ ] **Paso 6** — Registrar POC2 en el selector de POCs (`board.base.ts` + registry lazy-load).
