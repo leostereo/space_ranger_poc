@@ -9,19 +9,24 @@ import { BoardController } from "./board.controller";
 import { BoardHud } from "./board.hud";
 import { BoardInput } from "./board.input";
 import { board_character_builder, scene_builder } from "./utils/utils";
+import { SkaterAnimator } from "./utils/skater.animator";
+import { BoardFsm } from "./board-fsm/board.fsm";
+import { generalConfig } from "../config.general";
 
 
 export default class BoardBase implements Poc {
 
     private scene: Scene;
     
-    private groundAggregate: PhysicsAggregate;
+    private groundAggregates: PhysicsAggregate[];
     private boardMesh: Mesh;
     private boardAggregate: PhysicsAggregate;
     
+    private fsm:BoardFsm;
     private input: BoardInput;
     private controller: BoardController;
     private hud: BoardHud;
+    private skaterAnimator:SkaterAnimator;
 
     private beforePhysicsObserver: Nullable<Observer<Scene>> = null;
     private afterPhysicsObserver: Nullable<Observer<Scene>> = null;
@@ -29,13 +34,29 @@ export default class BoardBase implements Poc {
     async build(scene: Scene): Promise<void> {
         
         this.scene = scene;
-        this.groundAggregate = scene_builder(scene);
+        this.groundAggregates = scene_builder(scene);
 
         const {boardMesh,boardAggregate} = board_character_builder(scene);
         this.boardMesh = boardMesh;
         this.boardAggregate = boardAggregate;
 
+        this.fsm = new BoardFsm({
+                  isGroundDetected: () => true,
+                  groundLostElapsed: () => 0,
+                  coyoteTime: generalConfig.groundCheck.coyoteTime,
+                  onEnterHovering: () => {},
+                  onEnterFalling: () => {},
+            
+                  isJumpSettled: () => false,
+                  onEnterJumping: () => {},
+            
+                  isPitchDownHeld: () => this.input.current.pitchDown,
+                  isBoostSettled: () => true,
+                  onEnterDiving: () => {},
+                  onEnterGliderBoost: () => {},
+        });
         this.input = new BoardInput();
+        this.skaterAnimator = new SkaterAnimator(scene,this.fsm);
         this.controller = new BoardController(this.scene, this.boardMesh, this.boardAggregate, this.input);
         this.bindObservables();
 
@@ -45,7 +66,11 @@ export default class BoardBase implements Poc {
 
     private bindObservables(){
         this.beforePhysicsObserver = this.scene.onBeforePhysicsObservable.add(() => this.controller.update());
-        this.afterPhysicsObserver = this.scene.onAfterPhysicsObservable.add(() => this.controller.applyVisualRoll());
+        this.afterPhysicsObserver = this.scene.onAfterPhysicsObservable.add(() => {
+            this.controller.applyVisualRoll();
+            this.controller.updateTelemetry();
+            this.hud.updateTelemetry(this.controller.getVerticalVelocity(), this.controller.getVerticalAcceleration());
+        });
     }
 
     //API PUBLIC
@@ -57,7 +82,8 @@ export default class BoardBase implements Poc {
         this.controller?.dispose();
         this.input?.dispose();
         this.boardAggregate?.dispose();
-        this.groundAggregate?.dispose();
+        this.groundAggregates?.forEach((gAg)=>gAg.dispose());
+        this.skaterAnimator.dispose();
     }
 
 }

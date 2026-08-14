@@ -2,11 +2,14 @@
 import type { BoardFsm } from "./board-fsm/board.fsm";
 
 /**
- * HUD de debug: muestra "Estado > Sub-estado" actual, suscripto a onStateChange
- * de la FSM padre y de la sub-FSM activa — sin polling.
+ * HUD de debug: "Estado > Sub-estado" (suscripto a onStateChange, sólo en transiciones)
+ * + una línea de telemetría (velocidad/aceleración vertical) que se actualiza cada frame,
+ * ya que esos valores cambian constantemente y no sólo en cambios de estado.
  */
 export class BoardHud {
   private container: HTMLDivElement | null = null;
+  private stateLine: HTMLDivElement | null = null;
+  private telemetryLine: HTMLDivElement | null = null;
 
   constructor(private fsm: BoardFsm) {}
 
@@ -25,23 +28,45 @@ export class BoardHud {
       borderRadius: "4px",
       zIndex: "1000",
       pointerEvents: "none",
+      textAlign: "right",
     });
+
+    this.stateLine = document.createElement("div");
+
+    this.telemetryLine = document.createElement("div");
+    Object.assign(this.telemetryLine.style, {
+      fontSize: "12px",
+      color: "#0c0",
+      marginTop: "2px",
+    });
+
+    this.container.appendChild(this.stateLine);
+    this.container.appendChild(this.telemetryLine);
     document.body.appendChild(this.container);
 
-    this.fsm.onStateChange(() => this._render());
-    this.fsm.hoveringSubFsm.onStateChange(() => this._render());
-    this.fsm.fallingSubFsm.onStateChange(() => this._render());
+    this.fsm.onStateChange(() => this._renderState());
+    this.fsm.hoveringSubFsm.onStateChange(() => this._renderState());
+    this.fsm.fallingSubFsm.onStateChange(() => this._renderState());
 
-    this._render(); // primer render inicial, antes del primer cambio de estado
+    this._renderState(); // primer render inicial, antes del primer cambio de estado
+    this.updateTelemetry(0, 0);
   }
 
-  private _render(): void {
-    if (!this.container) return;
-    this.container.textContent = `${this.fsm.getState()} > ${this.fsm.getActiveSubState()}`;
+  /** Llamar una vez por frame — a diferencia del estado, esto no espera a un cambio. */
+  updateTelemetry(verticalVelocity: number, verticalAcceleration: number): void {
+    if (!this.telemetryLine) return;
+    this.telemetryLine.textContent = `vY: ${verticalVelocity.toFixed(2)} m/s  |  aY: ${verticalAcceleration.toFixed(2)} m/s²`;
+  }
+
+  private _renderState(): void {
+    if (!this.stateLine) return;
+    this.stateLine.textContent = `${this.fsm.getState()} > ${this.fsm.getActiveSubState()}`;
   }
 
   dispose(): void {
     this.container?.remove();
     this.container = null;
+    this.stateLine = null;
+    this.telemetryLine = null;
   }
 }

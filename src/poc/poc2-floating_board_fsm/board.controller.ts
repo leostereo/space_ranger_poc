@@ -31,6 +31,11 @@ export class BoardController {
   // de _updateAirPitch (POC1) todavía no está portado (gap conocido, ver nota al final del archivo).
   private pitchAngle = 0;
 
+  // Telemetría para el HUD (comparar caídas) — se actualiza en onAfterPhysicsObservable
+  private previousVerticalVelocity = 0;
+  private verticalVelocity = 0;
+  private verticalAcceleration = 0;
+
   private _ray = new Ray(Vector3.Zero(), Vector3.Down(), 100);
   private _raycastOrigin = new Vector3();
 
@@ -118,6 +123,23 @@ export class BoardController {
     const visualOffset = rollQuat.multiply(pitchQuat);
 
     this.boardMesh.rotationQuaternion = this.boardMesh.rotationQuaternion!.multiply(visualOffset);
+  }
+
+  /** Llamar en `scene.onAfterPhysicsObservable`, junto con applyVisualRoll. Para el HUD (comparar caídas). */
+  updateTelemetry(): void {
+    const dt = this.scene.getEngine().getDeltaTime() / 1000;
+
+    this.verticalVelocity = this.boardAggregate.body.getLinearVelocity().y;
+    this.verticalAcceleration = dt > 0 ? (this.verticalVelocity - this.previousVerticalVelocity) / dt : 0;
+    this.previousVerticalVelocity = this.verticalVelocity;
+  }
+
+  getVerticalVelocity(): number {
+    return this.verticalVelocity;
+  }
+
+  getVerticalAcceleration(): number {
+    return this.verticalAcceleration;
   }
 
   /** Un solo raycast por frame; el resultado se reutiliza en _applyHoverForce. */

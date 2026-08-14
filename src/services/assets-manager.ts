@@ -1,22 +1,29 @@
 import { generalConfig } from "@/poc/config.general";
 import { Texture, Material, AbstractMesh, AnimationGroup, Scene, AssetsManager, StandardMaterial, MeshBuilder, Color3, Tools, PhysicsAggregate, PhysicsShapeType, Mesh, ArcRotateCamera, Vector3, FollowCamera, HemisphericLight } from "@babylonjs/core";
+import { GridMaterial } from "@babylonjs/materials/grid/gridMaterial";
 import "@babylonjs/loaders/glTF"; // Obligatorio en Babylon para leer archivos .glb
 
 export type MeshAssetKey = "character" | 'character-capsule' | "board" | 'light' | 'followCamera' | 'arcCamera' | 'ground-basic' | 'ground-grid';
 export type LightAssetKey = "main" | "ambient" | "antorcha";
 export type CameraAssetKey = "arc" | "follow" | "first";
-export type MaterialAssetKey = "board" | "neon" | "ground-basic";
+export type MaterialAssetKey = "board" | "neon" | "ground-basic" | 'grid-ground';
+export type AnimationAssetKey = "skater" | "character" | "sentinel";
 
 export class AssetManager {
     // Diccionarios en memoria (privados para que nadie los modifique por fuera)
     private static texturas: Record<string, Texture> = {};
-    private static materiales: Record<string, StandardMaterial> = {};
+    private static standardMateriales: Record<string, StandardMaterial> = {};
+    private static gridMateriales: Record<string, GridMaterial> = {};
     private static meshes: Record<MeshAssetKey, Mesh | AbstractMesh> = {} as Record<MeshAssetKey, Mesh | AbstractMesh>;
     private static cams: Record<string, ArcRotateCamera | FollowCamera> = {};
     private static lights: Record<string, HemisphericLight> = {};
 
     // Almacén para las animaciones originales de los GLB
-    private static animationGroups: Record<string, AnimationGroup[]> = {};
+    private static animationGroups: Record<AnimationAssetKey, AnimationGroup[]> = {
+        skater: [],
+        character: [],
+        sentinel: []
+    };
 
     /**
      * Carga inicial asincrónica de todos los recursos.
@@ -108,6 +115,10 @@ export class AssetManager {
         return clon;
     }
 
+    public static getAnimations(key: AnimationAssetKey) {
+        return this.animationGroups[key]
+    }
+
     public static getLight(key: LightAssetKey, clonar: boolean = false, name?: string): HemisphericLight {
         if (clonar) {
             const clon = this.lights[key].clone(name || `luz_clon_${Date.now()}`) as HemisphericLight;
@@ -128,13 +139,17 @@ export class AssetManager {
         return this.cams[key];
     }
 
-    public static getMaterial(key: MaterialAssetKey, clone: boolean = false, name?: string): StandardMaterial {
+    public static getStandardMaterial(key: MaterialAssetKey, clone: boolean = false, name?: string): StandardMaterial {
         if (clone) {
-            const clon = this.materiales[key].clone(name || `material_clon_${Date.now()}`) as StandardMaterial;
+            const clon = this.standardMateriales[key].clone(name || `material_clon_${Date.now()}`) as StandardMaterial;
             return clon;
         }
 
-        return this.materiales[key]
+        return this.standardMateriales[key] as StandardMaterial
+    }
+
+    public static getGridMaterial(key: MaterialAssetKey): GridMaterial {
+        return this.gridMateriales[key] as GridMaterial
     }
 
     //privates
@@ -193,12 +208,21 @@ export class AssetManager {
         const material = new StandardMaterial("poc-ground-material", scene);
         material.diffuseColor = Color3.FromHexString(groundColor);
         material.specularColor = Color3.Black();
-        this.materiales['ground-basic'] = material;
+        this.standardMateriales['ground-basic'] = material;
+
+        const gridMaterial = new GridMaterial("groundGrid", scene as any);
+        gridMaterial.gridRatio = 1.0;
+        gridMaterial.mainColor = new Color3(0, 1, 0); // Color of the major lines
+        gridMaterial.lineColor = new Color3(0.5, 0.5, 0.5); // Color of the smaller grid lines
+        // Control transparency
+        gridMaterial.opacity = 0.8; // Lower value makes the grid see-through
+        gridMaterial.majorUnitFrequency = 10;
+        this.gridMateriales['grid-ground'] = gridMaterial;
 
         // Crear material
         const matMadera = new StandardMaterial("mat_madera_maestro", scene);
         matMadera.diffuseTexture = this.texturas["madera"];
-        this.materiales["madera"] = matMadera;
+        this.standardMateriales["madera"] = matMadera;
 
         // 1. Crear el material Sci-Fi con brillo propio
         const { color, emissiveColor, spawn } = generalConfig.board;
@@ -206,7 +230,7 @@ export class AssetManager {
         boardMaterial.diffuseColor = Color3.FromHexString(color);
         boardMaterial.emissiveColor = Color3.FromHexString(emissiveColor);
         boardMaterial.specularColor = new Color3(0.2, 0.2, 0.2);
-        this.materiales["board"] = boardMaterial;
+        this.standardMateriales["board"] = boardMaterial;
 
     }
 
@@ -232,7 +256,7 @@ export class AssetManager {
             // B) Posicionar la plataforma. 
             // Ajustamos la Y para que la parte superior de la caja quede exactamente en la altura deseada (heightOffset)
             groundMesh.position.set(0, data.heightOffset - (thickness / 2), data.zStart);
-            groundMesh.material = this.materiales['ground-basic'];
+            groundMesh.material = this.standardMateriales['ground-basic'];
 
             // Hacemos que sea explícitamente detectable por el Raycast del controlador
             groundMesh.isPickable = true;
@@ -267,7 +291,7 @@ export class AssetManager {
 
         // Posicionar en el punto de spawn configurado
         boardMesh.position.set(spawn.x, spawn.y, spawn.z);
-        boardMesh.material = this.materiales['board'];
+        boardMesh.material = this.standardMateriales['board'];
 
 
 
@@ -286,7 +310,7 @@ export class AssetManager {
             segments: 32
         }, scene);
 
-        tailMesh.material = this.materiales['board'];
+        tailMesh.material = this.standardMateriales['board'];
         tailMesh.parent = boardMesh; // Emparentamos al cuerpo raíz para Havok
 
         // Posicionamos la cola en el extremo trasero de la patineta (Z negativo)

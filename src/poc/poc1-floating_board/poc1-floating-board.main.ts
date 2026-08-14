@@ -96,7 +96,7 @@ export default class FloatingBoardPoc implements Poc {
     // Configuradas de más alta a más baja para probar el planeo y la caída
     const platformsData = [
       { name: "ground-alta", depth: 40, heightOffset: 0.0, zStart: 0 },   // Plataforma de inicio (Alta)
-      { name: "ground-media", depth: 40, heightOffset: -145.0, zStart: 155 },  // Segunda plataforma (Media, tras un hueco de 15 unidades)
+      { name: "ground-media", depth: 40, heightOffset: -100, zStart: 300 },  // Segunda plataforma (Media, tras un hueco de 15 unidades)
       { name: "ground-baja", depth: 60, heightOffset: -260.0, zStart: 210 }  // Tercera plataforma (Baja, tras otro hueco de 15 unidades)
     ];
 
