@@ -15,7 +15,7 @@ export const scene_builder = (scene: Scene): PhysicsAggregate[] => {
     // Definimos las dimensiones y posiciones de las 3 plataformas consecutivas en el eje Z
     // Configuradas de más alta a más baja para probar el planeo y la caída
     const platformsData = [
-        { name: "ground-alta", depth: 400, heightOffset: 0.0, zStart: 0 },
+        { name: "ground-alta", depth: 40, heightOffset: 0.0, zStart: 0 },
         { name: "ground-media", depth: 40, heightOffset: -100, zStart: 300 },
         { name: "ground-baja", depth: 60, heightOffset: -260.0, zStart: 210 }  // Tercera plataforma (Baja, tras otro hueco de 15 unidades)
     ];

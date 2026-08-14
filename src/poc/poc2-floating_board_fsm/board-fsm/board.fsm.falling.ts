@@ -1,13 +1,16 @@
 // src/poc2-floating_board_fsm/board-fsm/board.fsm.falling.ts
 import { BaseFsm, TransitionTable } from "../abstract/base-fsm";
 
-export type FallingSubState = "Gliding" | "Diving" | "GliderBoost";
+// ✨ Agregamos "Dropping" a la lista de sub-estados
+export type FallingSubState = "Dropping" | "Gliding" | "Diving" | "GliderBoost";
 
-/** B1a — Falling: Gliding <-> Diving, ambos pueden boostear -> GliderBoost. */
+/** B1a — Falling: Dropping <-> Gliding <-> Diving, todos pueden boostear -> GliderBoost. */
 export class BoardFsmFalling extends BaseFsm<FallingSubState> {
   protected transitions: TransitionTable<FallingSubState>;
 
   constructor(
+    /** ✨ true mientras el input de avanzar (forward) está presionado */
+    private isForwardHeld: () => boolean,
     /** true mientras el input de pitchDown está presionado */
     private isPitchDownHeld: () => boolean,
     /** true cuando el impulso + pitch-kick del boost ya se asentaron */
@@ -16,21 +19,47 @@ export class BoardFsmFalling extends BaseFsm<FallingSubState> {
     private onEnterGliderBoost: () => void,
   ) {
     super();
-    this.state = "Gliding";
+    // Estado inicial al entrar al aire: Dropping (caída libre por defecto)
+    this.state = "Dropping";
 
     this.transitions = {
-      Gliding: {
-        Diving: () => this.isPitchDownHeld(),
+      // -----------------------------------------------------------------
+      // ✨ NUEVO ESTADO: Caída libre sin empuje
+      // -----------------------------------------------------------------
+      Dropping: {
+        Diving: () => this.isPitchDownHeld(), // Prioridad absoluta: Picada
+        Gliding: () => this.isForwardHeld() && !this.isPitchDownHeld(), // Activa motor
         GliderBoost: true,
       },
-      Diving: {
-        Gliding: () => !this.isPitchDownHeld(),
-        GliderBoost: true, // se puede boostear en pleno picado
+
+      // -----------------------------------------------------------------
+      // ESTADO ACTUALIZADO: Planeo activo con acelerador
+      // -----------------------------------------------------------------
+      Gliding: {
+        Diving: () => this.isPitchDownHeld(), // Prioridad absoluta: Picada
+        Dropping: () => !this.isForwardHeld(), // Suelta acelerador: cae sin empuje
+        GliderBoost: true,
       },
+
+      // -----------------------------------------------------------------
+      // ESTADO ACTUALIZADO: Picado extremo
+      // -----------------------------------------------------------------
+      Diving: {
+        // Al soltar la picada, evalúa si debe planear o caer muerto
+        Gliding: () => !this.isPitchDownHeld() && this.isForwardHeld(),
+        Dropping: () => !this.isPitchDownHeld() && !this.isForwardHeld(),
+        GliderBoost: true,
+      },
+
+      // -----------------------------------------------------------------
+      // ESTADO ACTUALIZADO: Impulso aéreo
+      // -----------------------------------------------------------------
       GliderBoost: {
-        GliderBoost: true, // self, permite encadenar boosts (decae vía glideBoostChain)
-        Gliding: () => this.isBoostSettled() && !this.isPitchDownHeld(),
+        GliderBoost: true, // Permite encadenar boosts como antes
+        // Al asentarse el boost, decide el destino según la combinación de teclas
         Diving: () => this.isBoostSettled() && this.isPitchDownHeld(),
+        Gliding: () => this.isBoostSettled() && !this.isPitchDownHeld() && this.isForwardHeld(),
+        Dropping: () => this.isBoostSettled() && !this.isPitchDownHeld() && !this.isForwardHeld(),
       },
     };
   }

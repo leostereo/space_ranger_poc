@@ -17,6 +17,8 @@ export interface BoardFsmDeps {
   isJumpSettled: () => boolean;
   onEnterJumping: () => void;
 
+ isForwardHeld: () => boolean; 
+
   // Gliding <-> Diving <-> GliderBoost (hijo: Falling)
   isPitchDownHeld: () => boolean;
   isBoostSettled: () => boolean;
@@ -41,6 +43,7 @@ export class BoardFsm extends BaseFsm<BoardMotionState> {
     );
 
     this.fallingSubFsm = new BoardFsmFalling(
+      this.deps.isForwardHeld, 
       this.deps.isPitchDownHeld,
       this.deps.isBoostSettled,
       this.deps.onEnterDiving,

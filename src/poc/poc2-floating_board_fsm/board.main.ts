@@ -39,25 +39,9 @@ export default class BoardBase implements Poc {
         const {boardMesh,boardAggregate} = board_character_builder(scene);
         this.boardMesh = boardMesh;
         this.boardAggregate = boardAggregate;
-
-        this.fsm = new BoardFsm({
-                  isGroundDetected: () => true,
-                  groundLostElapsed: () => 0,
-                  coyoteTime: generalConfig.groundCheck.coyoteTime,
-                  onEnterHovering: () => {},
-                  onEnterFalling: () => {},
-            
-                  isJumpSettled: () => false,
-                  onEnterJumping: () => {},
-            
-                  isPitchDownHeld: () => this.input.current.pitchDown,
-                  isBoostSettled: () => true,
-                  onEnterDiving: () => {},
-                  onEnterGliderBoost: () => {},
-        });
         this.input = new BoardInput();
-        this.skaterAnimator = new SkaterAnimator(scene,this.fsm);
         this.controller = new BoardController(this.scene, this.boardMesh, this.boardAggregate, this.input);
+        this.skaterAnimator = new SkaterAnimator(scene,this.controller.fsm);
         this.bindObservables();
 
         this.hud = new BoardHud(this.controller.fsm);
@@ -67,6 +51,7 @@ export default class BoardBase implements Poc {
     private bindObservables(){
         this.beforePhysicsObserver = this.scene.onBeforePhysicsObservable.add(() => this.controller.update());
         this.afterPhysicsObserver = this.scene.onAfterPhysicsObservable.add(() => {
+            this.skaterAnimator.update(); 
             this.controller.applyVisualRoll();
             this.controller.updateTelemetry();
             this.hud.updateTelemetry(this.controller.getVerticalVelocity(), this.controller.getVerticalAcceleration());

@@ -62,14 +62,15 @@ export class BoardController {
       groundLostElapsed: () => this.groundLostTimer,
       coyoteTime: generalConfig.groundCheck.coyoteTime,
       onEnterHovering: () => this._onEnterHovering(),
-      onEnterFalling: () => {},
+      onEnterFalling: () => { },
 
       isJumpSettled: () => this.jumpSettleTimer <= 0,
       onEnterJumping: () => this._onEnterJumping(),
+      isForwardHeld: () => this.input.current.forward,
 
       isPitchDownHeld: () => this.input.current.pitchDown,
       isBoostSettled: () => this.boostSettleTimer <= 0,
-      onEnterDiving: () => {},
+      onEnterDiving: () => { },
       onEnterGliderBoost: () => this._onEnterGliderBoost(),
     });
   }
@@ -96,10 +97,25 @@ export class BoardController {
 
     this.fsm.tick();
 
-    if (this.fsm.getState() === "Hovering") {
+    const currentMacroState = this.fsm.getState();
+    const currentSubState = this.fsm.getActiveSubState();
+
+    if (currentMacroState === "Hovering") {
       this._applyHoverForce();
-    } else if (this.fsm.getActiveSubState() === "Diving") {
-      this._applyDiveForce();
+    } else {
+      // =========================================================================
+      // GESTIÓN DE FUERZAS VERTICALES EN EL AIRE (FALLING)
+      // =========================================================================
+      if (currentSubState === "Diving") {
+        // CASO 3: Caída en picada (Fuerza hacia abajo)
+        this._applyDiveForce();
+      }
+      else if (currentSubState === "Gliding") {
+        // ✨ CASO 2: Cayendo PERO CON fuerza de empuje activa (Planeo/Lift del motor)
+        this._applyGlidingLiftForce();
+      }
+      // NOTA: Si el sub-estado es "Dropping" o "GliderBoost", no aplicamos fuerzas continuas extras en Y.
+      // En "Dropping" (CASO 1) Havok actúa de forma natural logrando la caída muerta que buscabas.
     }
 
     this._updateRollAndYaw(dt);
@@ -281,6 +297,45 @@ export class BoardController {
     this.boardAggregate.body.applyImpulse(new Vector3(0, mass * impulse, 0), this.boardMesh.getAbsolutePosition());
     this.jumpSettleTimer = jumpSettleDuration;
   }
+
+  /**
+   * Aplica sustentación aerodinámica artificial cuando la patineta avanza en el aire con motor activo.
+   * (Equivale a tu Punto 2: cayendo pero con fuerza de empuje).
+   */
+  private _applyGlidingLiftForce(): void {
+    const mass = generalConfig.board.mass;
+    const glideFactor = 0.08; // Si querés, podés pasar este valor a generalConfig.movement más adelante
+
+    // Obtenemos la velocidad lineal actual desde Havok usando la referencia optimizada
+    this.boardAggregate.body.getLinearVelocityToRef(this._velocityTemp);
+    const fallSpeed = this._velocityTemp.y;
+
+    // Solo planea si efectivamente está perdiendo altura (yendo hacia abajo)
+    if (fallSpeed < 0) {
+      // Calculamos la velocidad horizontal pura ignorando el eje Y
+      const horizontalVelocity = new Vector3(this._velocityTemp.x, 0, this._velocityTemp.z);
+      const forwardSpeed = horizontalVelocity.length();
+
+      // Evitamos aplicar fuerzas si está prácticamente quieto en el aire
+      if (forwardSpeed > 1) {
+        // Tu fórmula matemática exacta de la POC1
+        let liftAmount = mass * forwardSpeed * Math.abs(fallSpeed) * glideFactor;
+
+        // Limitar el planeo para que nunca supere el 95% de la gravedad total (así no flota indefinidamente)
+        const maxLiftLimit = mass * 9.81 * 0.95;
+        if (liftAmount > maxLiftLimit) {
+          liftAmount = maxLiftLimit;
+        }
+
+        // Aplicamos la fuerza de sustentación hacia arriba en el eje Y del mundo
+        this.boardAggregate.body.applyForce(
+          new Vector3(0, liftAmount, 0),
+          this.boardMesh.getAbsolutePosition()
+        );
+      }
+    }
+  }
+
 
   private _onEnterGliderBoost(): void {
     const { gliderLiftImpulse, gliderPitchKick, gliderDecayFactor, gliderSettleDuration } = generalConfig.boost;
