@@ -25,7 +25,7 @@ export const generalConfig = {
     spawn: { x: 2, y:5, z: 2 }, // offset horizontal para no tapar el gizmo/ejes en el centro
   },
   hover: {
-    height: 1,
+    height: 1.2,
     springStrength: 60,
     damping: 20, // antes 8 (subamortiguado) — causaba oscilación sostenida, ver poc2.md
     bobAmplitude: 0.05,
@@ -36,6 +36,12 @@ export const generalConfig = {
     coyoteTime: 0.15,
   },
   movement: {
+    maxRollAngle: 0.35, // radianes (~20°) — placeholder, ajustar jugando
+    rollLerpSpeed: 6,
+    yawFromRollFactor: 1.5,
+    forwardForce: 150, // Newtons — placeholder, ajustar jugando
+    brakingDragFactor: 0.5, // antes hardcodeado en _updateForwardForce (POC1)
+    driftGripFactor: 1, // antes hardcodeado en _applyLateralFriction (POC1)
     maxPitchAngle: 45, // grados
     pitchLerpSpeed: 5,
     pitchDiveAcceleration: 12,
@@ -47,6 +53,9 @@ export const generalConfig = {
     gliderDecayFactor: 0.6,
     jumpSettleDuration: 0.3,
     gliderSettleDuration: 0.3,
+  },
+  testImpulse: {
+    downwardVelocityKick: 3, // placeholder — simula el peso del personaje aterrizando sobre el board
   },
 
 

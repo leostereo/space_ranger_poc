@@ -8,12 +8,11 @@ import { Tools } from "@babylonjs/core/Misc/tools";
 
 import { BoardFsm } from "./board-fsm/board.fsm";
 import { generalConfig } from "../config.general";
+import type { BoardInput } from "./board.input";
 
 /**
- * Paso 4b (en progreso): guards/acciones reales de jump/boost/hover, portadas
- * de FloatingBoardController (POC1). Roll/yaw/forward/pitchDown dependen de
- * board.input.ts, que todavía no existe — hasta entonces isPitchDownHeld
- * queda fijo en false (Diving nunca se dispara, pero el guard ya está armado).
+ * Paso 4b: guards/acciones reales de jump/boost/hover/pitchDown, portadas de
+ * FloatingBoardController (POC1). Roll/yaw/forward (A/D/Shift) siguen pendientes.
  */
 export class BoardController {
   readonly fsm: BoardFsm;
@@ -27,7 +26,7 @@ export class BoardController {
   private jumpSettleTimer = 0;
   private boostSettleTimer = 0;
   // Usado sólo por la fuerza de picado (Diving) por ahora — el lerp visual/continuo
-  // de _updateAirPitch (POC1) llega recién con board.input.ts.
+  // de _updateAirPitch (POC1) llega cuando se porten roll/yaw/forward.
   private pitchAngle = 0;
 
   private _ray = new Ray(Vector3.Zero(), Vector3.Down(), 100);
@@ -37,6 +36,7 @@ export class BoardController {
     private scene: Scene,
     private boardMesh: Mesh,
     private boardAggregate: PhysicsAggregate,
+    private input: BoardInput,
   ) {
     this.fsm = new BoardFsm({
       isGroundDetected: () => this._groundDetected,
@@ -48,7 +48,7 @@ export class BoardController {
       isJumpSettled: () => this.jumpSettleTimer <= 0,
       onEnterJumping: () => this._onEnterJumping(),
 
-      isPitchDownHeld: () => false, // TODO: board.input.ts (Paso 4b, input)
+      isPitchDownHeld: () => this.input.current.pitchDown,
       isBoostSettled: () => this.boostSettleTimer <= 0,
       onEnterDiving: () => {},
       onEnterGliderBoost: () => this._onEnterGliderBoost(),
@@ -78,11 +78,14 @@ export class BoardController {
     } else if (this.fsm.getActiveSubState() === "Diving") {
       this._applyDiveForce();
     }
-  }
 
-  /** Llamar desde el input handler cuando se consume el request de Space (pendiente de board.input.ts). */
-  handleJumpInput(): void {
-    this.fsm.requestJump();
+    if (this.input.consumeJumpRequest()) {
+      this.fsm.requestJump();
+    }
+
+    if (this.input.consumeTestImpulseRequest()) {
+      this._applyTestImpulse();
+    }
   }
 
   /** Un solo raycast por frame; el resultado se reutiliza en _applyHoverForce. */
@@ -164,10 +167,18 @@ export class BoardController {
     this.boardAggregate.body.applyImpulse(new Vector3(0, impulse, 0), this.boardMesh.getAbsolutePosition());
 
     // Pitch-up momentáneo (nose up, signo negativo respecto a la picada). Sin el lerp de
-    // _updateAirPitch (pendiente en board.input.ts) esto queda fijo hasta el próximo boost.
+    // _updateAirPitch (pendiente de portar roll/yaw/forward) esto queda fijo hasta el próximo boost.
     this.pitchAngle = -Tools.ToRadians(gliderPitchKick) * powerMultiplier;
     this.glideBoostChain++;
     this.boostSettleTimer = gliderSettleDuration;
+  }
+
+  private _applyTestImpulse(): void {
+    const { downwardVelocityKick } = generalConfig.testImpulse;
+    const mass = generalConfig.board.mass;
+    const impulse = -mass * downwardVelocityKick;
+
+    this.boardAggregate.body.applyImpulse(new Vector3(0, impulse, 0), this.boardMesh.getAbsolutePosition());
   }
 
   dispose(): void {
