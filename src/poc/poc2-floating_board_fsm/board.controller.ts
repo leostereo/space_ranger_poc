@@ -4,28 +4,31 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { Ray } from "@babylonjs/core/Culling/ray";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Tools } from "@babylonjs/core/Misc/tools";
 
-import { poc2Config } from "./config";
 import { BoardFsm } from "./board-fsm/board.fsm";
-import { BoardFsmHovering } from "./board-fsm/board.fsm.hovering";
-import { BoardFsmFalling } from "./board-fsm/board.fsm.falling";
 import { generalConfig } from "../config.general";
 
 /**
- * Paso 4a: física mínima, sin input todavía. Sólo raycast + hover spring-damper
- * (portado de FloatingBoardController._updateHover de POC1) + las 3 FSMs
- * transicionando automáticamente: Falling -> Hovering al detectar ground.
- * Input (roll/yaw/forward/pitch/jump/boost) llega en el Paso 4b.
+ * Paso 4b (en progreso): guards/acciones reales de jump/boost/hover, portadas
+ * de FloatingBoardController (POC1). Roll/yaw/forward/pitchDown dependen de
+ * board.input.ts, que todavía no existe — hasta entonces isPitchDownHeld
+ * queda fijo en false (Diving nunca se dispara, pero el guard ya está armado).
  */
 export class BoardController {
   readonly fsm: BoardFsm;
-  readonly hoveringFsm: BoardFsmHovering;
-  readonly fallingFsm: BoardFsmFalling;
 
   private elapsedTime = 0;
   private groundLostTimer = 0;
   private _groundDetected = false;
   private _lastGroundDistance = Infinity;
+
+  private glideBoostChain = 0;
+  private jumpSettleTimer = 0;
+  private boostSettleTimer = 0;
+  // Usado sólo por la fuerza de picado (Diving) por ahora — el lerp visual/continuo
+  // de _updateAirPitch (POC1) llega recién con board.input.ts.
+  private pitchAngle = 0;
 
   private _ray = new Ray(Vector3.Zero(), Vector3.Down(), 100);
   private _raycastOrigin = new Vector3();
@@ -35,33 +38,30 @@ export class BoardController {
     private boardMesh: Mesh,
     private boardAggregate: PhysicsAggregate,
   ) {
-    this.fsm = new BoardFsm(
-      () => this._groundDetected,
-      () => this.groundLostTimer,
-      generalConfig.groundCheck.coyoteTime,
-      () => this._onEnterHovering(),
-      () => this._onEnterFalling(),
-    );
+    this.fsm = new BoardFsm({
+      isGroundDetected: () => this._groundDetected,
+      groundLostElapsed: () => this.groundLostTimer,
+      coyoteTime: generalConfig.groundCheck.coyoteTime,
+      onEnterHovering: () => this._onEnterHovering(),
+      onEnterFalling: () => {},
 
-    // Sin input todavía (Paso 4b): estos guards mantienen a las sub-FSMs
-    // ancladas en Cruising/Gliding — nunca transicionan por su cuenta.
-    this.hoveringFsm = new BoardFsmHovering(
-      () => true,
-      () => {},
-    );
+      isJumpSettled: () => this.jumpSettleTimer <= 0,
+      onEnterJumping: () => this._onEnterJumping(),
 
-    this.fallingFsm = new BoardFsmFalling(
-      () => false,
-      () => true,
-      () => {},
-      () => {},
-    );
+      isPitchDownHeld: () => false, // TODO: board.input.ts (Paso 4b, input)
+      isBoostSettled: () => this.boostSettleTimer <= 0,
+      onEnterDiving: () => {},
+      onEnterGliderBoost: () => this._onEnterGliderBoost(),
+    });
   }
 
   /** Llamar en `scene.onBeforePhysicsObservable`. */
   update(): void {
     const dt = this.scene.getEngine().getDeltaTime() / 1000;
     this.elapsedTime += dt;
+
+    if (this.jumpSettleTimer > 0) this.jumpSettleTimer -= dt;
+    if (this.boostSettleTimer > 0) this.boostSettleTimer -= dt;
 
     this._updateGroundDetection();
 
@@ -75,30 +75,37 @@ export class BoardController {
 
     if (this.fsm.getState() === "Hovering") {
       this._applyHoverForce();
-      this.hoveringFsm.tick();
-    } else {
-      this.fallingFsm.tick();
+    } else if (this.fsm.getActiveSubState() === "Diving") {
+      this._applyDiveForce();
     }
+  }
+
+  /** Llamar desde el input handler cuando se consume el request de Space (pendiente de board.input.ts). */
+  handleJumpInput(): void {
+    this.fsm.requestJump();
   }
 
   /** Un solo raycast por frame; el resultado se reutiliza en _applyHoverForce. */
   private _updateGroundDetection(): void {
-    const { height } = generalConfig.hover;
+    const { height, hoverEngagementFactor } = generalConfig.hover;
+    const thicknessOffset = generalConfig.board.height * 0.5 + 0.05;
 
     this._raycastOrigin.copyFrom(this.boardMesh.absolutePosition);
-    this._ray.origin.copyFrom(this._raycastOrigin);
+    this._ray.origin.set(this._raycastOrigin.x, this._raycastOrigin.y - thicknessOffset, this._raycastOrigin.z);
 
-    const hit = this.scene.pickWithRay(this._ray, (mesh) => mesh.isPickable && mesh !== this.boardMesh);
-    this._lastGroundDistance = hit && hit.hit ? hit.distance : Infinity;
+    const hit = this.scene.pickWithRay(
+      this._ray,
+      (mesh) => mesh.isPickable && mesh !== this.boardMesh && mesh.parent !== this.boardMesh,
+    );
+    this._lastGroundDistance = hit && hit.hit ? hit.distance + thicknessOffset : Infinity;
 
-    // Hysteresis, igual que POC1: engancha bajo `height`, desengancha recién sobre 1.5x.
-    const hoverEngagementThreshold = height * 1.5;
+    // Hysteresis: engancha bajo `height`, desengancha recién sobre hoverEngagementFactor*height.
+    const hoverEngagementThreshold = height * hoverEngagementFactor;
     if (this._lastGroundDistance <= height) {
       this._groundDetected = true;
     } else if (this._lastGroundDistance > hoverEngagementThreshold) {
       this._groundDetected = false;
     }
-    // en la zona intermedia, mantiene el valor del frame anterior (sin cambio)
   }
 
   private _applyHoverForce(): void {
@@ -122,15 +129,48 @@ export class BoardController {
     this.boardAggregate.body.applyForce(new Vector3(0, forceY, 0), this._raycastOrigin);
   }
 
-  private _onEnterHovering(): void {
-    // TODO (Paso 4b): reset glideBoostChain
+  private _applyDiveForce(): void {
+    const { maxPitchAngle: maxPitchAngleDeg, pitchDiveAcceleration } = generalConfig.movement;
+    const maxPitchAngle = Tools.ToRadians(maxPitchAngleDeg);
+    const mass = generalConfig.board.mass;
+
+    if (this.pitchAngle <= 0.001) return;
+
+    const diveIntensity = this.pitchAngle / maxPitchAngle;
+    const diveForce = mass * pitchDiveAcceleration * diveIntensity;
+
+    this.boardAggregate.body.applyForce(new Vector3(0, -diveForce, 0), this.boardMesh.getAbsolutePosition());
   }
 
-  private _onEnterFalling(): void {}
+  private _onEnterHovering(): void {
+    this.glideBoostChain = 0;
+  }
+
+  private _onEnterJumping(): void {
+    const { jumpSettleDuration, impulse } = generalConfig.boost;
+    const mass = generalConfig.board.mass;
+
+    this.boardAggregate.body.applyImpulse(new Vector3(0, mass * impulse, 0), this.boardMesh.getAbsolutePosition());
+    this.jumpSettleTimer = jumpSettleDuration;
+  }
+
+  private _onEnterGliderBoost(): void {
+    const { gliderLiftImpulse, gliderPitchKick, gliderDecayFactor, gliderSettleDuration } = generalConfig.boost;
+    const mass = generalConfig.board.mass;
+
+    const powerMultiplier = Math.pow(gliderDecayFactor, this.glideBoostChain);
+    const impulse = mass * gliderLiftImpulse * powerMultiplier;
+
+    this.boardAggregate.body.applyImpulse(new Vector3(0, impulse, 0), this.boardMesh.getAbsolutePosition());
+
+    // Pitch-up momentáneo (nose up, signo negativo respecto a la picada). Sin el lerp de
+    // _updateAirPitch (pendiente en board.input.ts) esto queda fijo hasta el próximo boost.
+    this.pitchAngle = -Tools.ToRadians(gliderPitchKick) * powerMultiplier;
+    this.glideBoostChain++;
+    this.boostSettleTimer = gliderSettleDuration;
+  }
 
   dispose(): void {
     this.fsm.dispose();
-    this.hoveringFsm.dispose();
-    this.fallingFsm.dispose();
   }
 }

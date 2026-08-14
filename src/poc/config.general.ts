@@ -1,16 +1,16 @@
 export const generalConfig = {
- camera: {
+  camera: {
     alpha: -Math.PI / 2.5,
     beta: Math.PI / 2.8,
     radius: 12,
     target: { x: 0, y: 1, z: 0 },
   },
   ground: {
-    width: 150,
-    depth: 150,
-    thickness: 0.4,
+    width: 30,
+    depth: 60,
+    thickness: 1,
     friction: 0.6,
-    color: "#33383f",
+    color: "#333333",
   },
   board: {
     // Dimensiones placeholder del mesh de la patineta (a reemplazar por el modelo final)
@@ -22,45 +22,33 @@ export const generalConfig = {
     restitution: 0,
     color: "#00e5ff",
     emissiveColor: "#0a4a52",
-    spawn: { x: 2, y:15, z: 2 }, // offset horizontal para no tapar el gizmo/ejes en el centro
+    spawn: { x: 2, y:5, z: 2 }, // offset horizontal para no tapar el gizmo/ejes en el centro
   },
   hover: {
-    // Paso 2: efecto de levitación en idle
-    height: 1.2, // altura de hover sobre el ground detectado
-    springStrength: 40,
-    damping: 8,
-    bobAmplitude: 0.08,
-    bobFrequency: 0.35, // Hz — lento y suave
-  },
-  falling: {
-    // Paso 3+: sin ground detectado
-    minSlope: -2, // m/s
-    maxSlope: -8, // m/s
+    height: 1,
+    springStrength: 60,
+    damping: 20, // antes 8 (subamortiguado) — causaba oscilación sostenida, ver poc2.md
+    bobAmplitude: 0.05,
+    bobFrequency: 0.5,
+    hoverEngagementFactor: 2.5, // antes no existía -> undefined -> NaN -> nunca salía de Hovering
   },
   groundCheck: {
-    rayRange: 2, // m
-    coyoteTime: 0.15, // s
-  },
-  boost: {
-    // salto en Grounded / GliderBoost en Falling (mismo botón, distinto efecto)
-    impulse: 6, // m/s
-    gliderLiftImpulse: 6,       // impulso vertical base del glider boost (m/s)
-    gliderPitchKick: 20,        // grados de pitch-up instantáneo al boostear
-    gliderDecayFactor: 0.6,     // multiplicador de potencia por uso sucesivo
+    coyoteTime: 0.15,
   },
   movement: {
-    forwardForce: 150, // N, aplicada en la dirección forward del board mientras se mantiene Shift
-    maxRollAngle: Math.PI / 6, // 30°, banco máximo al mantener A/D
-    rollLerpSpeed: 6, // qué tan rápido alcanza el banco objetivo (y vuelve a 0 al soltar)
-    yawFromRollFactor: -1.8, // rad/s de yaw por cada radián de banco — viraje coordinado, como un avión
-    maxPitchAngle: 45, 
+    maxPitchAngle: 45, // grados
     pitchLerpSpeed: 5,
     pitchDiveAcceleration: 12,
   },
-  testImpulse: {
-    // Simula el peso del personaje al saltar sobre el board (tecla T)
-    downwardVelocityKick: 3, // m/s de cambio instantáneo de velocidad vertical
+  boost: {
+    impulse: 6,
+    gliderLiftImpulse: 6,
+    gliderPitchKick: 20,
+    gliderDecayFactor: 0.6,
+    jumpSettleDuration: 0.3,
+    gliderSettleDuration: 0.3,
   },
+
 
   playerConfig: {
     initialLives: 5,

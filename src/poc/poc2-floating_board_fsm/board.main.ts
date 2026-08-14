@@ -4,7 +4,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { Poc } from "../types";
 import { BoardController } from "./board.controller";
-// import { BoardHud } from "./board.hud";
+import { BoardHud } from "./board.hud";
 import { board_character_builder, scene_builder } from "./utils/utils";
 
 
@@ -17,7 +17,7 @@ export default class BoardBase implements Poc {
     private boardAggregate: PhysicsAggregate;
     
     private controller: BoardController;
-    // private hud: BoardHud;
+    private hud: BoardHud;
     
     async build(scene: Scene): Promise<void> {
         
@@ -31,19 +31,18 @@ export default class BoardBase implements Poc {
         this.controller = new BoardController(this.scene, this.boardMesh, this.boardAggregate);
         this.bindObservables();
 
-        // this.hud = new BoardHud(this.controller.fsm, this.controller.hoveringFsm, this.controller.fallingFsm);
-        // this.hud.mount();
+        this.hud = new BoardHud(this.controller.fsm);
+        this.hud.mount();
     }
-    
+
     private bindObservables(){
         this.scene.onBeforePhysicsObservable.add(() => this.controller.update());
     }
-   
 
     //API PUBLIC
 
     dispose?(): void {
-        // this.hud?.dispose();
+        this.hud?.dispose();
         this.controller?.dispose();
         this.boardAggregate?.dispose();
         this.groundAggregate?.dispose();

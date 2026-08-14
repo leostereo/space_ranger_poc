@@ -40,15 +40,19 @@ export abstract class BaseFsm<TState extends string> implements IBaseFsm<TState>
   }
 
   /**
-   * Prueba todas las transiciones candidatas declaradas en `transitions` para el
-   * estado actual. Cada guard decide si su transición aplica; si ninguna aplica,
-   * no pasa nada. Escala a N estados hermanos sin cambios (no asume cuántos hay).
+   * Prueba las transiciones candidatas declaradas en `transitions` para el estado
+   * actual QUE TENGAN GUARD (función) — las marcadas con `true` son event-triggered
+   * (sólo se disparan cuando algo las pide explícitamente vía setState()/requestX(),
+   * nunca automáticamente) y se ignoran acá a propósito. Si se auto-probaran, cualquier
+   * transición `true` se dispararía sola en cada frame apenas el estado la habilita.
    */
   tick(): void {
     const candidates = this.transitions[this.state];
     if (!candidates) return;
 
     for (const next of Object.keys(candidates) as TState[]) {
+      const guard = candidates[next];
+      if (guard === true) continue; // event-triggered, no automático
       this.setState(next); // no-op si el guard rechaza o si el estado ya cambió en esta misma iteración
     }
   }

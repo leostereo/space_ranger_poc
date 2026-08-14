@@ -29,7 +29,7 @@ export const scene_builder = (scene:Scene):PhysicsAggregate => {
 
 export const board_character_builder = (scene:Scene):{boardMesh:Mesh,boardAggregate:PhysicsAggregate} => {
 
-        const boardMesh = AssetManager.getMesh("board", "board", scene) as Mesh;
+        const boardMesh = AssetManager.getMesh("board", "skateboard", scene) as Mesh;
         if (boardMesh) {
             const { x, y, z } = generalConfig.board.spawn;
             boardMesh.position.set(x, y, z); // elevado del suelo a propósito: valida Falling -> Hovering
