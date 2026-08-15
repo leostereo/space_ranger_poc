@@ -54,7 +54,11 @@ export default class BoardBase implements Poc {
             this.skaterAnimator.update(); 
             this.controller.applyVisualRoll();
             this.controller.updateTelemetry();
-            this.hud.updateTelemetry(this.controller.getVerticalVelocity(), this.controller.getVerticalAcceleration());
+            
+            this.hud.updateTelemetry(
+                this.controller.getVerticalVelocity(),
+                this.controller.getVerticalAcceleration(),
+                this.controller.getForwardSpeed() );
         });
     }
 

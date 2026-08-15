@@ -35,6 +35,7 @@ export class BoardController {
   private previousVerticalVelocity = 0;
   private verticalVelocity = 0;
   private verticalAcceleration = 0;
+  private forwardSpeedTelemetry = 0;
 
   private _ray = new Ray(Vector3.Zero(), Vector3.Down(), 100);
   private _raycastOrigin = new Vector3();
@@ -148,6 +149,15 @@ export class BoardController {
     this.verticalVelocity = this.boardAggregate.body.getLinearVelocity().y;
     this.verticalAcceleration = dt > 0 ? (this.verticalVelocity - this.previousVerticalVelocity) / dt : 0;
     this.previousVerticalVelocity = this.verticalVelocity;
+
+    Vector3.TransformNormalToRef(this._forwardReference, this.boardMesh.getWorldMatrix(), this._forwardTemp);
+
+    // Obtenemos la velocidad lineal del cuerpo físico
+    this.boardAggregate.body.getLinearVelocityToRef(this._velocityTemp);
+
+    // Proyectamos la velocidad sobre el vector forward usando producto punto
+    this.forwardSpeedTelemetry = Vector3.Dot(this._velocityTemp, this._forwardTemp);
+
   }
 
   getVerticalVelocity(): number {
@@ -156,6 +166,10 @@ export class BoardController {
 
   getVerticalAcceleration(): number {
     return this.verticalAcceleration;
+  }
+
+  getForwardSpeed(): number {
+    return this.forwardSpeedTelemetry;
   }
 
   /** Un solo raycast por frame; el resultado se reutiliza en _applyHoverForce. */

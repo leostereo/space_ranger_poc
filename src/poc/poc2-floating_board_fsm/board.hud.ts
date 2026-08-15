@@ -49,13 +49,24 @@ export class BoardHud {
     this.fsm.fallingSubFsm.onStateChange(() => this._renderState());
 
     this._renderState(); // primer render inicial, antes del primer cambio de estado
-    this.updateTelemetry(0, 0);
+    this.updateTelemetry(0, 0, 0);
   }
 
   /** Llamar una vez por frame — a diferencia del estado, esto no espera a un cambio. */
-  updateTelemetry(verticalVelocity: number, verticalAcceleration: number): void {
+  updateTelemetry(
+    verticalVelocity: number,
+    verticalAcceleration: number,
+    forwardSpeed: number // ✨ Agregamos el tercer parámetro aquí
+  ): void {
     if (!this.telemetryLine) return;
-    this.telemetryLine.textContent = `vY: ${verticalVelocity.toFixed(2)} m/s  |  aY: ${verticalAcceleration.toFixed(2)} m/s²`;
+
+   // Formateamos los números para que queden alineados y legibles en el HUD
+   const vY = verticalVelocity.toFixed(2);
+   const aY = verticalAcceleration.toFixed(2);
+   const fSpeed = forwardSpeed.toFixed(2);
+
+   // Pintamos la telemetría completa incluyendo el avance (fSpeed)
+   this.telemetryLine.textContent = `fSpeed: ${fSpeed} m/s  |  vY: ${vY} m/s  |  aY: ${aY} m/s²`;
   }
 
   private _renderState(): void {
