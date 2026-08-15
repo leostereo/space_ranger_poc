@@ -57,7 +57,14 @@ export const generalConfig = {
   testImpulse: {
     downwardVelocityKick: 3, // placeholder — simula el peso del personaje aterrizando sobre el board
   },
-
+cruising: {
+  speedThresholds: {
+    idleToFast: 10,
+    fastToIdle: 8,      // hysteresis
+    fastToVeryFast: 25,
+    veryFastToFast: 22, // hysteresis
+  },
+},
 
   playerConfig: {
     initialLives: 5,

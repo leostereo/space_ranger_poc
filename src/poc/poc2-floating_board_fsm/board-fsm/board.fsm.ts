@@ -16,6 +16,7 @@ export interface BoardFsmDeps {
   // Cruising <-> Jumping (hijo: Hovering)
   isJumpSettled: () => boolean;
   onEnterJumping: () => void;
+  getForwardSpeed: () => number; // 👈 nuevo
 
  isForwardHeld: () => boolean; 
 
@@ -40,6 +41,7 @@ export class BoardFsm extends BaseFsm<BoardMotionState> {
     this.hoveringSubFsm = new BoardFsmHovering(
       this.deps.isJumpSettled,
       this.deps.onEnterJumping,
+      this.deps.getForwardSpeed, // 👈 nuevo
     );
 
     this.fallingSubFsm = new BoardFsmFalling(

@@ -85,11 +85,23 @@ console.log(groups)
     if (macroState === "Hovering") {
       // Nota: Asumo que en Hovering tus sub-estados podrían llamarse "Cruising" o "Jumping".
       // Ajustá estos strings si en tu board.fsm.hovering.ts usás otros nombres.
-      if (subState === "Jumping") {
+      switch (subState) {
+        case "CruisingIdle":
+          this.playLoop(this.animations.standing_idle);
+          break;
+
+        case "CruisingFast":
+          this.playLoop(this.animations.cruising_forward_idle);
+          break;
+
+        case "CruisingVeryFast":
+          this.playLoop(this.animations.cruising_faster_idle);
+          break;
+
+        case "Jumping":
+        default:
         this.playTransient(this.animations.jump);
-      } else {
-        // Si está en tierra y moviéndose normal
-        this.playLoop(this.animations.cruising_forward_idle);
+          break;
       }
     } 
     // =========================================================================
@@ -104,12 +116,12 @@ console.log(groups)
 
         case "Diving":
           // El picado extremo encaja perfecto con tu animación de agachado ninja/aerodinámico!
-          this.playLoop(this.animations.cruising_maxVel_idle); 
+          this.playLoop(this.animations.cruising_faster_idle); 
           break;
 
         case "Gliding":
           // Planeando con motor: El skater va sobre la tabla equilibrándose
-          this.playLoop(this.animations.cruising_faster_idle);
+          this.playLoop(this.animations.cruising_forward_idle);
           break;
 
         case "Dropping":

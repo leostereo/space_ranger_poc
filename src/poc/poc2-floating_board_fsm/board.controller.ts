@@ -47,6 +47,7 @@ export class BoardController {
   private _rightTemp = new Vector3();
   private _velocityTemp = new Vector3();
   private _forwardVelocityTemp = new Vector3();
+  private _currentForwardSpeed = 0;
 
   constructor(
     private scene: Scene,
@@ -73,6 +74,8 @@ export class BoardController {
       isBoostSettled: () => this.boostSettleTimer <= 0,
       onEnterDiving: () => { },
       onEnterGliderBoost: () => this._onEnterGliderBoost(),
+      getForwardSpeed: () => this._currentForwardSpeed,
+
     });
   }
 
@@ -96,6 +99,7 @@ export class BoardController {
       this.groundLostTimer += dt;
     }
 
+    this._updateCurrentForwardSpeed(); // 👈 antes del tick
     this.fsm.tick();
 
     const currentMacroState = this.fsm.getState();
@@ -289,6 +293,12 @@ export class BoardController {
     }
   }
 
+  private _updateCurrentForwardSpeed(): void {
+    Vector3.TransformNormalToRef(this._forwardReference, this.boardMesh.getWorldMatrix(), this._forwardTemp);
+    this.boardAggregate.body.getLinearVelocityToRef(this._velocityTemp);
+    this._currentForwardSpeed = Vector3.Dot(this._velocityTemp, this._forwardTemp);
+  }
+
   private _applyLateralFriction(): void {
     const { driftGripFactor } = generalConfig.movement;
     const mass = generalConfig.board.mass;
@@ -349,7 +359,6 @@ export class BoardController {
       }
     }
   }
-
 
   private _onEnterGliderBoost(): void {
     const { gliderLiftImpulse, gliderPitchKick, gliderDecayFactor, gliderSettleDuration } = generalConfig.boost;
