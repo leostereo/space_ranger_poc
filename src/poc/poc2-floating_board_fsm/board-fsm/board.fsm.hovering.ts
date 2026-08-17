@@ -1,16 +1,19 @@
-// src/poc2-floating_board_fsm/board-fsm/board.fsm.hovering.ts
+import { generalConfig } from "@/poc/config.general";
 import { BaseFsm, TransitionTable } from "../abstract/base-fsm";
-import { generalConfig } from "../../config.general";
 
-export type HoveringSubState = "CruisingIdle" | "CruisingFast" | "CruisingVeryFast" | "Jumping";
+export type HoveringSubState =
+  | "CruisingIdle"
+  | "CruisingFast"
+  | "CruisingVeryFast"
+  | "JumpImpulseStart"
+  | "Jumping";
 
-/** B1b — Hovering: 3 sub-estados de Cruising (según forwardSpeed, con hysteresis) <-> Jumping. */
 export class BoardFsmHovering extends BaseFsm<HoveringSubState> {
   protected transitions: TransitionTable<HoveringSubState>;
 
   constructor(
     private isJumpSettled: () => boolean,
-    private onEnterJumping: () => void,
+    private onEnterJumping: () => void, // sigue existiendo: sólo aplica el impulso físico
     private getForwardSpeed: () => number,
   ) {
     super();
@@ -21,20 +24,23 @@ export class BoardFsmHovering extends BaseFsm<HoveringSubState> {
 
     this.transitions = {
       CruisingIdle: {
-        Jumping: true,
+        JumpImpulseStart: true,
         CruisingFast: () => this.getForwardSpeed() > idleToFast,
       },
       CruisingFast: {
-        Jumping: true,
+        JumpImpulseStart: true,
         CruisingVeryFast: () => this.getForwardSpeed() > fastToVeryFast,
         CruisingIdle: () => this.getForwardSpeed() < fastToIdle,
       },
       CruisingVeryFast: {
-        Jumping: true,
+        JumpImpulseStart: true,
         CruisingFast: () => this.getForwardSpeed() < veryFastToFast,
       },
+      JumpImpulseStart: {
+            Jumping: true, // 👈 legal, pero sólo se dispara vía setState manual (notifyJumpImpulseFrame), no por tick()
+
+      }, // sólo sale vía notifyJumpImpulseFrame() (setState manual)
       Jumping: {
-        // Evaluado en orden: aterriza en el sub-estado que corresponda a la velocidad actual.
         CruisingVeryFast: () => this.isJumpSettled() && this.getForwardSpeed() > fastToVeryFast,
         CruisingFast: () => this.isJumpSettled() && this.getForwardSpeed() > idleToFast,
         CruisingIdle: () => this.isJumpSettled(),
@@ -42,13 +48,19 @@ export class BoardFsmHovering extends BaseFsm<HoveringSubState> {
     };
   }
 
-  /** Llamar desde el input handler cuando se presiona Space estando en Hovering. */
   requestJump(): void {
-    this.setState("Jumping");
+    this.setState("JumpImpulseStart");
+  }
+
+  /** Llamado por el animator (no por el controller) al llegar al frame de impacto. */
+  notifyJumpImpulseFrame(): void {
+    if (this.state === "JumpImpulseStart") {
+      this.setState("Jumping");
+    }
   }
 
   protected onEnter(state: HoveringSubState): void {
-    if (state === "Jumping") this.onEnterJumping();
+    if (state === "Jumping") this.onEnterJumping(); // sólo esto sigue siendo callback
   }
 
   protected onExit(_state: HoveringSubState): void {}

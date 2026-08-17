@@ -40,7 +40,7 @@ export class AssetManager {
             // };
 
             // --- RECURSO 2: Modelo GLB Externo ---
-            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver3.glb");
+            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver4.glb");
             tareaGLB.onSuccess = (task) => {
                 // Buscamos el nodo raíz que crea automáticamente Babylon para los GLB
 

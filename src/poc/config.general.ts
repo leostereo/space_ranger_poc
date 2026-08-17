@@ -47,7 +47,7 @@ export const generalConfig = {
     pitchDiveAcceleration: 12,
   },
   boost: {
-    impulse: 6,
+    impulse: 10,
     gliderLiftImpulse: 6,
     gliderPitchKick: 20,
     gliderDecayFactor: 0.6,

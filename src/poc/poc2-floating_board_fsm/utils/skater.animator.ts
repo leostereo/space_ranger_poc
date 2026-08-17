@@ -2,6 +2,7 @@
 import {
   type Scene,
   type AnimationGroup,
+  AnimationEvent
 } from "@babylonjs/core";
 import { AssetManager } from "@/services/assets-manager";
 import { BoardFsm } from "../board-fsm/board.fsm";
@@ -20,7 +21,8 @@ export interface ISkaterAnimations {
 export class SkaterAnimator {
   private currentAnimation: AnimationGroup | null = null;
   private animations: ISkaterAnimations | null = null;
-  
+  private IMPULSE_FRAME = 30;
+
   // Flag para bloquear interrupciones de bucle mientras corre una animación única (ej: Salto)
   private isPlayingTransient = false; 
 
@@ -37,7 +39,6 @@ export class SkaterAnimator {
 
   private setupAnimations(): void {
     const groups: AnimationGroup[] = AssetManager.getAnimations('character');
-console.log(groups)
     const find = (name: string): AnimationGroup | undefined =>
       groups.find(g => g.name === name);
 
@@ -47,7 +48,8 @@ console.log(groups)
     const cruising_maxVel_idle = find("skate crouching idle");
     const standing_to_crouch = find("skate standing to crouch");
     const crouch_to_standing = find("skate crouch to standing");
-    const jump = find("skate standing to jump");
+    const jump = find("jump in place2");
+
     const falling = find("skate falling to landing");
 
     if (!standing_idle || !cruising_forward_idle || !cruising_faster_idle || !cruising_maxVel_idle ||
@@ -55,7 +57,18 @@ console.log(groups)
       console.warn("Faltan animaciones");
       return;
     }
-     
+
+
+    const anim = jump.targetedAnimations[0].animation;
+    //callbacks and other settings
+    anim.addEvent(
+      new AnimationEvent(this.IMPULSE_FRAME, () => {
+        this.fsm.hoveringSubFsm.notifyJumpImpulseFrame();
+      }, false), // false: persiste entre reproducciones, no se auto-remueve
+    );
+
+
+
     this.animations = {
       standing_idle,
       cruising_forward_idle,
@@ -98,9 +111,12 @@ console.log(groups)
           this.playLoop(this.animations.cruising_faster_idle);
           break;
 
+        case "JumpImpulseStart":
+          this.playTransient(this.animations.jump);
+          break;
+
         case "Jumping":
-        default:
-        this.playTransient(this.animations.jump);
+        // Física ya aplicada; la animación sigue corriendo sola (isPlayingTransient la protege).
           break;
       }
     } 
