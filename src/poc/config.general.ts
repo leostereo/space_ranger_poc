@@ -24,7 +24,7 @@ export const generalConfig = {
     restitution: 0,
     color: "#00e5ff",
     emissiveColor: "#0a4a52",
-    spawn: { x: 2, y:5, z: 2 }, // offset horizontal para no tapar el gizmo/ejes en el centro
+    spawn: { x: 2, y: 5, z: 2 }, // offset horizontal para no tapar el gizmo/ejes en el centro
   },
   hover: {
     height: 1.2,
@@ -64,17 +64,21 @@ export const generalConfig = {
   testImpulse: {
     downwardVelocityKick: 3, // placeholder — simula el peso del personaje aterrizando sobre el board
   },
-cruising: {
-  speedThresholds: {
-    idleToFast: 10,
-    fastToIdle: 8,      // hysteresis
-    fastToVeryFast: 25,
-    veryFastToFast: 22, // hysteresis
+  cruising: {
+    speedThresholds: {
+      idleToFast: 10,
+      fastToIdle: 8,      // hysteresis
+      fastToVeryFast: 25,
+      veryFastToFast: 22, // hysteresis
+    },
   },
-},
-
-
-
+  ramp: {
+    width: 20,       // podés reusar generalConfig.ground.width si querés el mismo ancho
+    length: 25,       // largo de la rampa (medido sobre su propia pendiente)
+    thickness: 1,      // igual que generalConfig.ground.thickness, o distinto si preferís
+    angleDeg: 30,
+    baseZ: 150,        // dónde arranca (el extremo bajo) dentro de "ground-alta" (spans z: -200 a 200)
+  },
   playerConfig: {
     initialLives: 5,
     height: 1.8,
@@ -98,7 +102,7 @@ cruising: {
       name: 'player1',
       player1RaycastDetectableName: "player1_rayCast_detectable",
       player1CollisionDetectableName: "player1_colision_detectable",
-      spawn: { x: -2, y:5, z: -2 }, // offset horizontal para no tapar el gizmo/ejes en el centro
+      spawn: { x: -2, y: 5, z: -2 }, // offset horizontal para no tapar el gizmo/ejes en el centro
     }
   }
 

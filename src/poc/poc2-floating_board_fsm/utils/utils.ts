@@ -1,6 +1,6 @@
 import { generalConfig } from "@/poc/config.general";
 import { AssetManager } from "@/services/assets-manager";
-import { Axis, Camera, Mesh, MeshBuilder, PhysicsAggregate, PhysicsShapeType, Scene, Space, StandardMaterial, Vector3 } from "@babylonjs/core";
+import { Axis, Camera, Mesh, MeshBuilder, PhysicsAggregate, PhysicsShapeType, Scene, Space, StandardMaterial, Tools, Vector3 } from "@babylonjs/core";
 
 export const scene_builder = (scene: Scene): PhysicsAggregate[] => {
 
@@ -15,8 +15,9 @@ export const scene_builder = (scene: Scene): PhysicsAggregate[] => {
     // Definimos las dimensiones y posiciones de las 3 plataformas consecutivas en el eje Z
     // Configuradas de más alta a más baja para probar el planeo y la caída
     const platformsData = [
-        { name: "ground-alta", depth: 400, heightOffset: 0.0, zStart: 0 },
+        { name: "ground-inicio", depth: 400, heightOffset: 0.0, zStart: 0 },
         { name: "ground-media", depth: 40, heightOffset: -100, zStart: 300 },
+        { name: "ground-alta", depth: 80, heightOffset: 20, zStart: 300 },
         { name: "ground-baja", depth: 60, heightOffset: -260.0, zStart: 210 }  // Tercera plataforma (Baja, tras otro hueco de 15 unidades)
     ];
 
@@ -46,8 +47,45 @@ export const scene_builder = (scene: Scene): PhysicsAggregate[] => {
         );
     });
 
+    // --- RAMPA ---
+    const rampAgg = _buildRamp(scene, material, friction);
+    groundAggs.push(rampAgg);
+
     return groundAggs;
 }
+
+const _buildRamp = (scene: Scene, material: any, friction: number): PhysicsAggregate => {
+    const { width, length, thickness, angleDeg, baseZ } = generalConfig.ramp;
+    const groundTopY = 0; // top de "ground-alta" (heightOffset=0)
+
+    // Cambiá el signo si la rampa queda mirando para el lado equivocado
+    // (depende de si el board avanza en +Z o -Z).
+    const angleRad = Tools.ToRadians(angleDeg);
+
+    const rampMesh = MeshBuilder.CreateBox("ramp", {
+        width,
+        depth: length,
+        height: thickness,
+    }, scene);
+
+    rampMesh.rotation.x = -angleRad;
+
+    // Centro del box calculado para que el borde bajo-frontal quede flush con el piso en baseZ.
+    // (derivado de rotar el offset local del borde por el ángulo de la rampa)
+    const centerY = groundTopY + (thickness / 2) * Math.cos(angleRad) + (length / 2) * Math.sin(angleRad);
+    const centerZ = baseZ + (length / 2) * Math.cos(angleRad) - (thickness / 2) * Math.sin(angleRad);
+
+    rampMesh.position.set(0, centerY, centerZ);
+    rampMesh.material = material;
+    rampMesh.isPickable = true;
+
+    return new PhysicsAggregate(
+        rampMesh,
+        PhysicsShapeType.BOX,
+        { mass: 0, friction, restitution: 0 },
+        scene,
+    );
+};
 
 export const board_character_builder = (scene: Scene): { boardMesh: Mesh, boardAggregate: PhysicsAggregate } => {
 
