@@ -1,3 +1,5 @@
+import { Tools } from "@babylonjs/core";
+
 export const generalConfig = {
   camera: {
     alpha: -Math.PI / 2.5,
@@ -36,7 +38,12 @@ export const generalConfig = {
     coyoteTime: 0.15,
   },
   movement: {
-    maxRollAngle: 0.35, // radianes (~20°) — placeholder, ajustar jugando
+    rollSpeedRange: {
+      min: 0,  // por debajo de esto, se usa maxRollAngle completo
+      max: 30, // por encima de esto, se usa minRollAngle completo (podés alinearlo con tus umbrales de cruising)
+    },
+    rollAngleAtLowSpeed: Tools.ToRadians(35),  // giro cerrado, velocidad baja
+    rollAngleAtHighSpeed: Tools.ToRadians(12), // giro amplio, velocidad alta
     rollLerpSpeed: 6,
     yawFromRollFactor: 1.5,
     forwardForce: 150, // Newtons — placeholder, ajustar jugando
@@ -65,6 +72,8 @@ cruising: {
     veryFastToFast: 22, // hysteresis
   },
 },
+
+
 
   playerConfig: {
     initialLives: 5,

@@ -6,6 +6,7 @@ import { Ray } from "@babylonjs/core/Culling/ray";
 import { Vector3, Quaternion } from "@babylonjs/core/Maths/math.vector";
 import { Axis } from "@babylonjs/core/Maths/math.axis";
 import { Tools } from "@babylonjs/core/Misc/tools";
+import { Scalar } from "@babylonjs/core/Maths/math.scalar";
 
 import { BoardFsm } from "./board-fsm/board.fsm";
 import { generalConfig } from "../config.general";
@@ -252,11 +253,19 @@ export class BoardController {
 
   private _updateRollAndYaw(dt: number): void {
     const { turnLeft, turnRight } = this.input.current;
-    const { maxRollAngle, rollLerpSpeed, yawFromRollFactor } = generalConfig.movement;
+    const { rollAngleAtLowSpeed, rollAngleAtHighSpeed, rollSpeedRange, rollLerpSpeed, yawFromRollFactor } =
+      generalConfig.movement;
+
+    const speedT = Scalar.Clamp(
+      (this.forwardSpeedTelemetry - rollSpeedRange.min) / (rollSpeedRange.max - rollSpeedRange.min),
+      0,
+      1,
+    );
+    const dynamicMaxRollAngle = Scalar.Lerp(rollAngleAtLowSpeed, rollAngleAtHighSpeed, speedT);
 
     let targetRoll = 0;
-    if (turnLeft) targetRoll += maxRollAngle;
-    if (turnRight) targetRoll -= maxRollAngle;
+    if (turnLeft) targetRoll += dynamicMaxRollAngle;
+    if (turnRight) targetRoll -= dynamicMaxRollAngle;
 
     const lerpFactor = 1 - Math.exp(-rollLerpSpeed * dt);
     this.rollAngle += (targetRoll - this.rollAngle) * lerpFactor;
@@ -264,8 +273,6 @@ export class BoardController {
     const yawRate = -this.rollAngle * yawFromRollFactor;
     const current = this.boardAggregate.body.getAngularVelocity();
 
-    // Forzamos la velocidad angular en Y. Mantenemos X y Z amortiguados (el lock de inercia
-    // en board.base.ts ya los bloquea del todo, esto es defensivo por si cambia más adelante).
     this.boardAggregate.body.setAngularVelocity(new Vector3(current.x * 0.9, yawRate, current.z * 0.9));
   }
 
