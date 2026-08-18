@@ -49,6 +49,7 @@ export class BoardController {
   private _velocityTemp = new Vector3();
   private _forwardVelocityTemp = new Vector3();
   private _currentForwardSpeed = 0;
+  private _lastGroundNormal = Vector3.Up();
 
   constructor(
     private scene: Scene,
@@ -127,7 +128,7 @@ export class BoardController {
     this._updateRollAndYaw(dt);
     this._updateForwardForce();
     this._applyLateralFriction();
-    this._updateAirPitch(dt);
+    this._updatePitch(dt);
 
     if (this.input.consumeJumpRequest()) {
       this.fsm.requestJump();
@@ -191,6 +192,11 @@ export class BoardController {
     );
     this._lastGroundDistance = hit && hit.hit ? hit.distance + thicknessOffset : Infinity;
 
+    if (hit && hit.hit) {
+      const normal = hit.getNormal(true, false); // world space, face normal (no interpolación de vértices)
+      if (normal) this._lastGroundNormal.copyFrom(normal);
+    }
+
     // Hysteresis: engancha bajo `height`, desengancha recién sobre hoverEngagementFactor*height.
     const hoverEngagementThreshold = height * hoverEngagementFactor;
     if (this._lastGroundDistance <= height) {
@@ -222,16 +228,43 @@ export class BoardController {
   }
 
   /** Lerp continuo de pitchAngle mientras se mantiene W en Falling. Ausente hasta ahora (gap conocido). */
-  private _updateAirPitch(dt: number): void {
-    const isFalling = this.fsm.getState() === "Falling";
-    const { pitchDown } = this.input.current;
-    const { pitchLerpSpeed, maxPitchAngle: maxPitchAngleDeg } = generalConfig.movement;
+  private _updatePitch(dt: number): void {
+    const macroState = this.fsm.getState();
+    const { maxPitchAngle: maxPitchAngleDeg, pitchLerpSpeed, surfaceAlignLerpSpeed } = generalConfig.movement;
     const maxPitchAngle = Tools.ToRadians(maxPitchAngleDeg);
 
-    const targetPitch = isFalling && pitchDown ? maxPitchAngle : 0;
+    let targetPitch = 0;
+    let lerpSpeed = pitchLerpSpeed;
 
-    const lerpFactor = 1 - Math.exp(-pitchLerpSpeed * dt);
+    if (macroState === "Falling") {
+      const { pitchDown } = this.input.current;
+      targetPitch = pitchDown ? maxPitchAngle : 0;
+    } else if (macroState === "Hovering") {
+      targetPitch = this._computeSurfaceAlignPitch(maxPitchAngle);
+      lerpSpeed = surfaceAlignLerpSpeed;
+    }
+
+    const lerpFactor = 1 - Math.exp(-lerpSpeed * dt);
     this.pitchAngle += (targetPitch - this.pitchAngle) * lerpFactor;
+  }
+
+  private _computeSurfaceAlignPitch(maxPitchAngle: number): number {
+    Vector3.TransformNormalToRef(this._forwardReference, this.boardMesh.getWorldMatrix(), this._forwardTemp);
+
+    // Proyección horizontal del forward (ignora cualquier pitch visual ya aplicado, evita feedback).
+    this._forwardTemp.y = 0;
+    const len = this._forwardTemp.length();
+    if (len < 0.0001) return this.pitchAngle; // sin dirección clara (parado quieto): mantiene el valor actual
+
+    this._forwardTemp.scaleInPlace(1 / len);
+
+    const nUp = Vector3.Dot(this._lastGroundNormal, Vector3.Up());
+    const nForward = Vector3.Dot(this._lastGroundNormal, this._forwardTemp);
+
+    const raw = Math.atan2(nForward, nUp);
+
+    // Clamp de seguridad: evita valores extremos si el raycast pega en un borde/esquina raro.
+    return Math.max(-maxPitchAngle, Math.min(maxPitchAngle, raw));
   }
 
   private _applyDiveForce(): void {

@@ -52,6 +52,7 @@ export const generalConfig = {
     maxPitchAngle: 45, // grados
     pitchLerpSpeed: 5,
     pitchDiveAcceleration: 12,
+    surfaceAlignLerpSpeed: 6, // qué tan rápido el board "cae" en el ángulo de la rampa; ajustá a gusto
   },
   boost: {
     impulse: 10,

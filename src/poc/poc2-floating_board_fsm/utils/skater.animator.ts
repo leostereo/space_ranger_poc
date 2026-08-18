@@ -5,7 +5,9 @@ import {
   AnimationEvent
 } from "@babylonjs/core";
 import { AssetManager } from "@/services/assets-manager";
-import { BoardFsm } from "../board-fsm/board.fsm";
+import { BoardFsm, BoardMotionState } from "../board-fsm/board.fsm";
+import { HoveringSubState } from "../board-fsm/board.fsm.hovering";
+import { FallingSubState } from "../board-fsm/board.fsm.falling";
 
 export interface ISkaterAnimations {
   standing_idle: AnimationGroup;
@@ -23,15 +25,18 @@ export class SkaterAnimator {
   private animations: ISkaterAnimations | null = null;
   private IMPULSE_FRAME = 30;
 
+  private lastProcessedMacroState: BoardMotionState;
+  private lastProcessedSubState: HoveringSubState | FallingSubState;
+
   // Flag para bloquear interrupciones de bucle mientras corre una animación única (ej: Salto)
-  private isPlayingTransient = false; 
+  private isPlayingTransient = false;
 
   constructor(
     private scene: Scene,
     private fsm: BoardFsm,
   ) {
     this.setupAnimations();
-    
+
     // En lugar de suscribirnos solo al evento macro, registramos un observer en el loop de Babylon
     // para que el animator chequee el sub-estado activo de la FSM en cada frame.
 
@@ -68,7 +73,6 @@ export class SkaterAnimator {
     );
 
 
-
     this.animations = {
       standing_idle,
       cruising_forward_idle,
@@ -90,49 +94,66 @@ export class SkaterAnimator {
   public update(): void {
     if (!this.animations || this.isPlayingTransient) return;
 
-    const macroState = this.fsm.getState();
-    const subState = this.fsm.getActiveSubState();
+    const currentMacroState = this.fsm.getState();
+    const currentSubState = this.fsm.getActiveSubState();
+
     // =========================================================================
     // 🛹 1. EVALUACIÓN EN TIERRA (HOVERING)
     // =========================================================================
-    if (macroState === "Hovering") {
+    if (currentMacroState === "Hovering") {
       // Nota: Asumo que en Hovering tus sub-estados podrían llamarse "Cruising" o "Jumping".
       // Ajustá estos strings si en tu board.fsm.hovering.ts usás otros nombres.
-      switch (subState) {
+      switch (currentSubState) {
         case "CruisingIdle":
-          this.playLoop(this.animations.standing_idle);
+          if (this.lastProcessedSubState === "CruisingFast") {
+            this.playTransientThen(this.animations.standing_to_crouch, 30, 1, () => {
+              this.playLoop(this.animations!.standing_idle);
+            });
+          }
           break;
-
         case "CruisingFast":
-          this.playLoop(this.animations.cruising_forward_idle);
+          if (this.lastProcessedSubState === "CruisingIdle") {
+            this.playTransientThen(this.animations.standing_to_crouch, 0, 40, () => {
+              this.playLoop(this.animations!.cruising_forward_idle);
+            });
+          } else if (this.lastProcessedSubState === "CruisingVeryFast") {
+            this.playTransientThen(this.animations.standing_to_crouch, 50, 30, () => {
+              this.playLoop(this.animations!.cruising_forward_idle);
+            });
+          } else {
+            // this.playLoop(this.animations.cruising_forward_idle);
+          }
           break;
 
         case "CruisingVeryFast":
-          this.playLoop(this.animations.cruising_faster_idle);
+          if (this.lastProcessedSubState === "CruisingFast") {
+            this.playTransientThen(this.animations.standing_to_crouch, 30, 50, () => {
+              this.playLoop(this.animations!.cruising_faster_idle);
+            });
+          }
           break;
-
         case "JumpImpulseStart":
           this.playTransient(this.animations.jump);
           break;
 
         case "Jumping":
-        // Física ya aplicada; la animación sigue corriendo sola (isPlayingTransient la protege).
+          // Física ya aplicada; la animación sigue corriendo sola (isPlayingTransient la protege).
           break;
       }
-    } 
+    }
     // =========================================================================
     // 🪂 2. EVALUACIÓN EN EL AIRE (FALLING)
     // =========================================================================
-    else if (macroState === "Falling") {
-      switch (subState) {
+    else if (currentMacroState === "Falling") {
+      switch (currentSubState) {
         case "GliderBoost":
           // Cuando tira el impulso del salto, podemos usar la animación de jump
-          this.playLoop(this.animations.jump); 
+          this.playLoop(this.animations.jump);
           break;
 
         case "Diving":
           // El picado extremo encaja perfecto con tu animación de agachado ninja/aerodinámico!
-          this.playLoop(this.animations.cruising_faster_idle); 
+          this.playLoop(this.animations.cruising_faster_idle);
           break;
 
         case "Gliding":
@@ -147,6 +168,9 @@ export class SkaterAnimator {
           break;
       }
     }
+
+    this.lastProcessedMacroState = currentMacroState;
+    this.lastProcessedSubState = currentSubState;
   }
 
   private playLoop(animation: AnimationGroup): void {
@@ -162,17 +186,32 @@ export class SkaterAnimator {
    */
   private playTransient(animation: AnimationGroup): void {
     if (this.currentAnimation === animation) return;
-    
+
+    this.isPlayingTransient = true;
+    this.currentAnimation?.stop();
+    this.currentAnimation = animation;
+    // Configuramos velocidad normal y que no repita en bucle
+    animation.play(false);
+
+    animation.onAnimationGroupEndObservable.addOnce(() => {
+      this.isPlayingTransient = false;
+      // Al terminar, el próximo tick del update() restaurará el bucle correcto
+    });
+  }
+
+  private playTransientThen(animation: AnimationGroup, fromFrame: number, toFrame: number, onComplete: () => void): void {
+    if (this.currentAnimation === animation) return;
+
     this.isPlayingTransient = true;
     this.currentAnimation?.stop();
     this.currentAnimation = animation;
 
-    // Configuramos velocidad normal y que no repita en bucle
-    animation.play(false); 
-    
+    animation.start(false, 1.0, fromFrame, toFrame, false);
+    // start(loop, speedRatio, from, to, isAdditive)
+
     animation.onAnimationGroupEndObservable.addOnce(() => {
       this.isPlayingTransient = false;
-      // Al terminar, el próximo tick del update() restaurará el bucle correcto
+      onComplete();
     });
   }
 
