@@ -22,6 +22,7 @@ class App {
 
   private activePoc: Poc | null = null;
   private renderLoopBound = false;
+  private physicsEnabled = false; // 👈 nuevo: evita re-enablePhysics sobre la misma scene
 
   constructor() {
     this.canvas = document.createElement("canvas");
@@ -35,13 +36,10 @@ class App {
 
   async bootstrap(): Promise<void> {
     this.engine = await this._createEngine();
-    const scene = new Scene(this.engine);
-    await AssetManager.cargarTodo(this.canvas,scene);
-
 
     this.selector = new SceneSelector(
       pocRegistry,
-      (id) => void this.loadPoc(id,scene),
+      (id) => void this.loadPoc(id), // 👈 ya no pasa scene
       () => this.backToSelector(),
     );
 
@@ -50,37 +48,40 @@ class App {
 
     const latestPoc = pocRegistry[pocRegistry.length - 1];
     if (latestPoc) {
-      void this.loadPoc(latestPoc.id,scene);
+      void this.loadPoc(latestPoc.id);
     }
   }
 
   /** Descarta la escena actual (si hay) y arma una nueva para el POC seleccionado. */
-  async loadPoc(id: string,scene:Scene): Promise<void> {
-    const definition = pocRegistry.find((poc) => poc.id === id);
-    if (!definition) {
-      console.warn(`POC "${id}" no encontrado en el registro.`);
-      return;
-    }
-    
-    this._disposeCurrent();
-
-    const { default: PocClass } = await definition.load();
-    const poc = new PocClass();
-
-
-    if (templateConfig.features.physics) {
-      await this._setPhysics(scene);
-    }
-
-    await poc.build(scene, this.canvas);
-    this._config(scene);
-
-    this.activePoc = poc;
-    this.scene = scene;
-
-    this.selector.showBackButton();
+async loadPoc(id: string): Promise<void> {
+  const definition = pocRegistry.find((poc) => poc.id === id);
+  if (!definition) {
+    console.warn(`POC "${id}" no encontrado en el registro.`);
+    return;
   }
 
+  this._disposeCurrent();
+  this.scene = null; // 👈 explícito: mientras esto sea null, el render loop no renderiza nada
+
+  const scene = new Scene(this.engine);
+
+  await AssetManager.cargarTodo(this.canvas, scene);
+
+  const { default: PocClass } = await definition.load();
+  const poc = new PocClass();
+
+  if (templateConfig.features.physics) {
+    await this._setPhysics(scene);
+  }
+
+  await poc.build(scene, this.canvas); // acá recién se asigna scene.activeCamera
+
+  this._config(scene);
+
+  this.activePoc = poc;
+  this.scene = scene; // 👈 sólo ahora, con todo listo (cámara incluida), lo publicamos para el render loop
+  this.selector.showBackButton();
+}
   /** Vuelve a la pantalla de selección, descartando la escena del POC activo. */
   backToSelector(): void {
     this._disposeCurrent();
@@ -159,7 +160,7 @@ class App {
       void Promise.all([import("@babylonjs/core/Debug/debugLayer"), import("@babylonjs/inspector")]).then(() => {
         window.addEventListener("keydown", (ev) => {
           // Shift+Ctrl+Alt+I
-        if (ev.shiftKey && ev.ctrlKey && ev.altKey) {
+          if (ev.shiftKey && ev.ctrlKey && ev.altKey) {
             if (!this.scene) return;
             if (this.scene.debugLayer.isVisible()) {
               this.scene.debugLayer.hide();
