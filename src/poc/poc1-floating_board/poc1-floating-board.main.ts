@@ -30,7 +30,7 @@ export default class FloatingBoardPoc implements Poc {
   private input: BoardInput;
   private controller: FloatingBoardController;
 
-  async build(scene: Scene, canvas: HTMLCanvasElement): Promise<void> {
+  async build(scene: Scene): Promise<void> {
     this.scene = scene;
 
     this._buildLights();
