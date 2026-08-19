@@ -89,7 +89,7 @@ const _buildRamp = (scene: Scene, material: any, friction: number): PhysicsAggre
 
 export const board_character_builder = (scene: Scene): { boardMesh: Mesh, boardAggregate: PhysicsAggregate } => {
 
-    const boardMesh = AssetManager.getMesh("board", "skateboard", scene) as Mesh;
+    const boardMesh = AssetManager.getMesh("board", "skateboard") as Mesh;
     if (boardMesh) {
         const { x, y, z } = generalConfig.board.spawn;
         boardMesh.position.set(x, y, z); // elevado del suelo a propósito: valida Falling -> Hovering
@@ -100,8 +100,8 @@ export const board_character_builder = (scene: Scene): { boardMesh: Mesh, boardA
 
     }
 
-    const skater = AssetManager.getMesh('character', 'character', scene);
-    const capsule = AssetManager.getMesh('character-capsule', 'character-capsule', scene);
+    const skater = AssetManager.getMesh('character', 'character');
+    const capsule = AssetManager.getMesh('character-capsule', 'character-capsule');
 
     if (capsule && skater) {
         skater.setEnabled(true);

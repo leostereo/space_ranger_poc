@@ -86,7 +86,7 @@ export class AssetManager {
      * MÉTODO GLOBAL MÁGICO: Trae una copia lista y limpia de cualquier asset.
      * Maneja automáticamente la lógica compleja de clones y animaciones.
      */
-    public static getMesh(clave: MeshAssetKey, nombreInstancia: string, scene: Scene): Mesh | AbstractMesh | null {
+    public static getMesh(clave: MeshAssetKey, nombreInstancia: string): Mesh | AbstractMesh | null {
         const molde = this.meshes[clave];
         if (!molde) {
             console.error(`El asset "${clave}" no existe en el AssetManager.`);
