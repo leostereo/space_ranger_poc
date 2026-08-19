@@ -20,9 +20,11 @@ src/poc2-floating_board_fsm/
 ├── board.input.ts
 ├── board.hud.ts
 ├── board.controller.ts
+├── board.thruster.ts
 ├── poc2.md
 ├── utils/
 │   └── utils.ts                   ← scene_builder (ground), board_character_builder (mesh + aggregate)
+│   └── skate.animator.ts                   
 ├── board-fsm/
 │   ├── board.fsm.ts               ← padre (B1), decide Falling vs Hovering
 │   ├── board.fsm.falling.ts       ← B1a
