@@ -8,10 +8,11 @@ export type LightAssetKey = "main" | "ambient" | "antorcha";
 export type CameraAssetKey = "arc" | "follow" | "first";
 export type MaterialAssetKey = "board" | "neon" | "ground-basic" | 'grid-ground';
 export type AnimationAssetKey = "skater" | "character" | "sentinel";
+export type TexturetKey = "flare";
 
 export class AssetManager {
     // Diccionarios en memoria (privados para que nadie los modifique por fuera)
-    private static texturas: Record<string, Texture> = {};
+    private static textures: Record<string, Texture> = {};
     private static standardMateriales: Record<string, StandardMaterial> = {};
     private static gridMateriales: Record<string, GridMaterial> = {};
     private static meshes: Record<MeshAssetKey, Mesh | AbstractMesh> = {} as Record<MeshAssetKey, Mesh | AbstractMesh>;
@@ -34,10 +35,10 @@ export class AssetManager {
             const manager = new AssetsManager(scene);
 
             // // --- RECURSO 1: Textura de madera ---
-            // const tareaTextura = manager.addTextureTask("txt_madera", "texturas/madera.jpg");
-            // tareaTextura.onSuccess = (task) => {
-            //     this.texturas["madera"] = task.texture;
-            // };
+            const tareaTextura = manager.addTextureTask("txt_flare", "texture/flare.png");
+            tareaTextura.onSuccess = (task) => {
+                this.textures["flare"] = task.texture;
+            };
 
             // --- RECURSO 2: Modelo GLB Externo ---
             const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver4.glb");
@@ -113,6 +114,10 @@ export class AssetManager {
         // 3. Lo activamos para que sea visible y retorne al código
         clon.setEnabled(true);
         return clon;
+    }
+
+    public static getTexture(key: TexturetKey): Texture {
+        return this.textures[key] as Texture
     }
 
     public static getAnimations(key: AnimationAssetKey) {
@@ -221,7 +226,7 @@ export class AssetManager {
 
         // Crear material
         const matMadera = new StandardMaterial("mat_madera_maestro", scene);
-        matMadera.diffuseTexture = this.texturas["madera"];
+        matMadera.diffuseTexture = this.textures["madera"];
         this.standardMateriales["madera"] = matMadera;
 
         // 1. Crear el material Sci-Fi con brillo propio

@@ -114,4 +114,4 @@ No se crean archivos para `A1`/`A2`/`B2` en este POC — se agregan cuando haya 
   - [x] **4a** — Física mínima, sin input: `PhysicsAggregate` del board, ground real, raycast (`isGroundDetected`) y fuerza de hover (spring-damper). El board cae desde el spawn elevado (`Falling`) y llega solo a `Hovering`. Confirmado funcionando.
   - [x] **4b** — Input completo: roll/yaw, forward, pitchDown/Diving, jump/GliderBoost. Pendiente: lerp continuo de pitchAngle (ver Notas de implementación) y applyVisualRoll (roll/pitch siguen sin reflejarse visualmente en el mesh, sólo afectan física).
 - [x] **Paso 5** — `board.hud.ts` — estado/sub-estado en pantalla vía `onStateChange`. Wireado en `board.base.ts`.
-- [ ] **Paso 6** — Registrar POC2 en el selector de POCs (`board.base.ts` + registry lazy-load).
+- [x] **Paso 6** — Registrar POC2 en el selector de POCs (`board.base.ts` + registry lazy-load).

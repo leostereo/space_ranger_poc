@@ -11,6 +11,7 @@ import { Scalar } from "@babylonjs/core/Maths/math.scalar";
 import { BoardFsm } from "./board-fsm/board.fsm";
 import { generalConfig } from "../config.general";
 import type { BoardInput } from "./board.input";
+import { BoardThruster } from "./board.thruster";
 
 /**
  * Paso 4b: guards/acciones reales de jump/boost/hover/pitchDown, portadas de
@@ -50,6 +51,7 @@ export class BoardController {
   private _forwardVelocityTemp = new Vector3();
   private _currentForwardSpeed = 0;
   private _lastGroundNormal = Vector3.Up();
+  private thruster: BoardThruster;
 
   constructor(
     private scene: Scene,
@@ -79,6 +81,9 @@ export class BoardController {
       getForwardSpeed: () => this._currentForwardSpeed,
 
     });
+
+    this.thruster = new BoardThruster(this.scene, this.boardMesh);
+
   }
 
   /** Llamar en `scene.onBeforePhysicsObservable`. */
@@ -137,6 +142,9 @@ export class BoardController {
     if (this.input.consumeTestImpulseRequest()) {
       this._applyTestImpulse();
     }
+
+    this.thruster.update(this.input.current.forward, this.forwardSpeedTelemetry);
+
   }
 
   /** Llamar en `scene.onAfterPhysicsObservable`. Roll y pitch son 100% visuales, no tocan física. */
@@ -426,5 +434,6 @@ export class BoardController {
 
   dispose(): void {
     this.fsm.dispose();
+    this.thruster.dispose();
   }
 }

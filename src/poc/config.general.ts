@@ -1,4 +1,4 @@
-import { Tools } from "@babylonjs/core";
+import { Tools, Vector3 } from "@babylonjs/core";
 
 export const generalConfig = {
   camera: {
@@ -79,6 +79,14 @@ export const generalConfig = {
     thickness: 1,      // igual que generalConfig.ground.thickness, o distinto si preferís
     angleDeg: 30,
     baseZ: 150,        // dónde arranca (el extremo bajo) dentro de "ground-alta" (spans z: -200 a 200)
+  },
+  thruster: {
+    backOffset: -0.6,     // en espacio LOCAL del board, hacia atrás (ajustar signo/eje según tu modelo)
+    heightOffset: -0.05,   // levemente arriba de la superficie del board
+    direction: new Vector3(0, 0, -1), // dirección local "hacia atrás" (mismo eje que backOffset)
+    minEmitRate: 10,
+    maxEmitRate: 100,
+    speedNormalizer: 25,  // alineado con tu umbral fastToVeryFast, así a esa velocidad ya es intensidad máxima
   },
   playerConfig: {
     initialLives: 5,

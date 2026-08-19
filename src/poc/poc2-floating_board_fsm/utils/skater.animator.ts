@@ -25,9 +25,6 @@ export class SkaterAnimator {
   private animations: ISkaterAnimations | null = null;
   private IMPULSE_FRAME = 30;
 
-  private lastProcessedMacroState: BoardMotionState;
-  private lastProcessedSubState: HoveringSubState | FallingSubState;
-
   // Flag para bloquear interrupciones de bucle mientras corre una animación única (ej: Salto)
   private isPlayingTransient = false;
 
@@ -84,6 +81,20 @@ export class SkaterAnimator {
       falling,
     };
 
+    [
+      standing_idle,
+      cruising_forward_idle,
+      cruising_faster_idle,
+      cruising_maxVel_idle,
+      standing_to_crouch,
+      crouch_to_standing,
+      jump,
+      falling,
+    ].forEach((ag) => {
+      ag.enableBlending = true;
+      ag.blendingSpeed = 0.1;
+    });
+
     groups.forEach(g => g.stop());
   }
 
@@ -105,39 +116,22 @@ export class SkaterAnimator {
       // Ajustá estos strings si en tu board.fsm.hovering.ts usás otros nombres.
       switch (currentSubState) {
         case "CruisingIdle":
-          if (this.lastProcessedSubState === "CruisingFast") {
-            this.playTransientThen(this.animations.standing_to_crouch, 30, 1, () => {
-              this.playLoop(this.animations!.standing_idle);
-            });
-          }
+          this.playLoop(this.animations.standing_idle);
           break;
+
         case "CruisingFast":
-          if (this.lastProcessedSubState === "CruisingIdle") {
-            this.playTransientThen(this.animations.standing_to_crouch, 0, 40, () => {
-              this.playLoop(this.animations!.cruising_forward_idle);
-            });
-          } else if (this.lastProcessedSubState === "CruisingVeryFast") {
-            this.playTransientThen(this.animations.standing_to_crouch, 50, 30, () => {
-              this.playLoop(this.animations!.cruising_forward_idle);
-            });
-          } else {
-            // this.playLoop(this.animations.cruising_forward_idle);
-          }
+          this.playLoop(this.animations.cruising_forward_idle);
           break;
 
         case "CruisingVeryFast":
-          if (this.lastProcessedSubState === "CruisingFast") {
-            this.playTransientThen(this.animations.standing_to_crouch, 30, 50, () => {
-              this.playLoop(this.animations!.cruising_faster_idle);
-            });
-          }
+          this.playLoop(this.animations.cruising_faster_idle);
           break;
+
         case "JumpImpulseStart":
           this.playTransient(this.animations.jump);
           break;
 
         case "Jumping":
-          // Física ya aplicada; la animación sigue corriendo sola (isPlayingTransient la protege).
           break;
       }
     }
@@ -168,9 +162,6 @@ export class SkaterAnimator {
           break;
       }
     }
-
-    this.lastProcessedMacroState = currentMacroState;
-    this.lastProcessedSubState = currentSubState;
   }
 
   private playLoop(animation: AnimationGroup): void {
@@ -199,21 +190,18 @@ export class SkaterAnimator {
     });
   }
 
-  private playTransientThen(animation: AnimationGroup, fromFrame: number, toFrame: number, onComplete: () => void): void {
-    if (this.currentAnimation === animation) return;
+  // private playTransientThen(animation: AnimationGroup, fromFrame: number, toFrame: number, onComplete: () => void): void {
+  //   if (this.currentAnimation === animation) return;
 
-    this.isPlayingTransient = true;
-    this.currentAnimation?.stop();
-    this.currentAnimation = animation;
+  //   this.isPlayingTransient = true;
+  //   this.currentAnimation = animation;
+  //   animation.start(false, 1.0, fromFrame, toFrame, false);
 
-    animation.start(false, 1.0, fromFrame, toFrame, false);
-    // start(loop, speedRatio, from, to, isAdditive)
-
-    animation.onAnimationGroupEndObservable.addOnce(() => {
-      this.isPlayingTransient = false;
-      onComplete();
-    });
-  }
+  //   animation.onAnimationGroupEndObservable.addOnce(() => {
+  //     this.isPlayingTransient = false;
+  //     onComplete();
+  //   });
+  // }
 
   dispose(): void {
     this.currentAnimation?.stop();
