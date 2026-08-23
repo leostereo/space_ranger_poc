@@ -24,6 +24,7 @@ export class CharacterInput {
   };
 
   private equipJetpackRequested = false;
+  private jumpRequested = false;
 
   constructor() {
     window.addEventListener("keydown", this._onKeyDown);
@@ -41,6 +42,19 @@ export class CharacterInput {
     return true;
   }
 
+  /**
+   * Salto (Space). Edge-triggered — misma tecla física que `up` (empuje del jetpack),
+   * pero consumida una sola vez por tecla presionada, no continua. Sólo tiene efecto
+   * mientras StandAlone esté activo (StandAloneFsm.requestJump() ignora la llamada si no
+   * está en OnGround); en Jetpack, el input controller de esa strategy no la consume, así
+   * que no interfiere con la lectura continua de `up`.
+   */
+  consumeJumpRequest(): boolean {
+    if (!this.jumpRequested) return false;
+    this.jumpRequested = false;
+    return true;
+  }
+
   dispose(): void {
     window.removeEventListener("keydown", this._onKeyDown);
     window.removeEventListener("keyup", this._onKeyUp);
@@ -52,7 +66,7 @@ export class CharacterInput {
       case "KeyS": this.state.backward = true; break;
       case "KeyA": this.state.left = true; break;
       case "KeyD": this.state.right = true; break;
-      case "Space": this.state.up = true; break;
+      case "Space": this.state.up = true; this.jumpRequested = true; break;
       case "KeyF": this.equipJetpackRequested = true; break;
     }
   };

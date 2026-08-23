@@ -1,7 +1,7 @@
 // src/poc3-jetpack_character_fsm/character-fsm/character.fsm.ts
 import { BaseFsm, TransitionTable } from "../abstract/base-fsm";
-import { JetpackFsm, JetpackSubState } from "./character.fsm.jetpack";
 import { StandAloneFsm, type StandAloneSubState } from "./character.fsm.stand-alone";
+import { JetpackFsm, type JetpackSubState } from "./character.fsm.jetpack";
 
 export type CharacterMainState = "StandAlone" | "EquippingJetpack" | "Jetpack";
 
@@ -12,6 +12,10 @@ export interface CharacterFsmDeps {
   onEnterEquippingJetpack: () => void;
   /** Dispara el swap de vuelta a la strategy de StandAlone en character.base.ts. */
   onEnterStandAlone: () => void;
+  // Threading hacia StandAloneFsm (ver StandAloneFsmDeps) — mismo criterio que poc2, donde
+  // BoardFsm recibe todas las deps de sus hijas y las reparte en el constructor.
+  isGroundDetected: () => boolean;
+  onEnterOnAir: () => void;
 }
 
 /**
@@ -28,7 +32,10 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
     super();
     this.state = "StandAlone"; // estado inicial: asignado directo, no vía setState
 
-    this.standAloneSubFsm = new StandAloneFsm();
+    this.standAloneSubFsm = new StandAloneFsm({
+      isGroundDetected: this.deps.isGroundDetected,
+      onEnterOnAir: this.deps.onEnterOnAir,
+    });
     this.jetpackSubFsm = new JetpackFsm();
 
     this.transitions = {
