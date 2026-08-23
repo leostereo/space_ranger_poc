@@ -89,7 +89,11 @@ const _buildRamp = (scene: Scene, material: any, friction: number): PhysicsAggre
 
 export const board_character_builder = (scene: Scene): { boardMesh: Mesh, boardAggregate: PhysicsAggregate } => {
 
-    const boardMesh = AssetManager.getMesh("board", "skateboard") as Mesh;
+    // FIX: AssetManager.getMesh() ahora devuelve { mesh, animations } en vez del mesh
+    // directo (ver poc3.md / assets-manager.ts) — se desempaqueta acá, sin tocar nada más.
+    const boardResult = AssetManager.getMesh("board", "skateboard");
+    const boardMesh = boardResult?.mesh as Mesh;
+
     if (boardMesh) {
         const { x, y, z } = generalConfig.board.spawn;
         boardMesh.position.set(x, y, z); // elevado del suelo a propósito: valida Falling -> Hovering
@@ -100,8 +104,10 @@ export const board_character_builder = (scene: Scene): { boardMesh: Mesh, boardA
 
     }
 
-    const skater = AssetManager.getMesh('character', 'character');
-    const capsule = AssetManager.getMesh('character-capsule', 'character-capsule');
+    const skaterResult = AssetManager.getMesh('character', 'character');
+    const capsuleResult = AssetManager.getMesh('character-capsule', 'character-capsule');
+    const skater = skaterResult?.mesh;
+    const capsule = capsuleResult?.mesh as Mesh;
 
     if (capsule && skater) {
         skater.setEnabled(true);

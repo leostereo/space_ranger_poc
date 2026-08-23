@@ -17,4 +17,10 @@ export const pocRegistry: PocDefinition[] = [
     description: "Aplica una fsm anidad al board obtenido en poc1.",
     load: () => import("./poc2-floating_board_fsm/board.main"),
   },
+  {
+    id: "poc3-character-jetPack",
+    label: "POC 3 · Character JetPack",
+    description: "Create jetpack for character",
+    load: () => import("./poc3-jetpack_character_fsm/character.base"),
+  },
 ];
