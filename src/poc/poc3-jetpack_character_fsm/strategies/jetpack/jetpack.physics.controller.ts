@@ -16,7 +16,7 @@ const FUEL_DRAIN_RATE = 1; // unidades de combustible por segundo de empuje
 const HOVER_SPRING_STRENGTH = 20;
 const HOVER_DAMPING = 8;
 const HOVER_MAX_FORCE_FACTOR = 8; // mismo criterio de clamp que poc2 (mass * gravity * factor)
-const CLIMB_RATE = 3; // m/s a los que sube el target height mientras se sostiene Space
+const THRUST_FORCE = 1400; // Newtons, aplicado ADEMÁS del hover mientras se sostiene Space (~5.7 m/s² extra con esta masa)
 
 // Bob — mismo bobAmplitude/bobFrequency que generalConfig.hover en poc2. Sin esto el hover
 // queda rígido, clavado en un punto; el seno le da la sensación de "flotando" real.
@@ -24,18 +24,18 @@ const BOB_AMPLITUDE = 0.15; // metros
 const BOB_FREQUENCY = 0.5; // Hz
 
 /**
- * Física de vuelo: hover estable en Y (spring-damper + compensación de gravedad, portado
- * de _applyHoverForce() en poc2) + Space para subir el target height (climb). Sin
- * horizontal/estabilización todavía — eso llega con los sub-estados Idle/Thrusting/Floating.
- * El combustible vive acá porque es un detalle de ESTA strategy — el padre (CharacterFsm)
- * sólo conoce hasFuel() vía closure.
+ * Física de vuelo: hover estable en Y (spring-damper + compensación de gravedad + bob,
+ * portado de _applyHoverForce() en poc2) + Space aplica una fuerza de empuje ADICIONAL
+ * (no mueve el target del spring — eso tenía lag, se sentía "mushy"). Mientras empuja, el
+ * target del hover sigue la posición actual, así al soltar Space el hover sostiene ahí en
+ * vez de tironear de vuelta al punto viejo. Sin horizontal/estabilización todavía — eso
+ * llega con los sub-estados Idle/Thrusting/Floating. El combustible vive acá porque es un
+ * detalle de ESTA strategy — el padre (CharacterFsm) sólo conoce hasFuel() vía closure.
  */
 export class JetpackPhysicsController implements IPhysicsController {
   private fuel = MAX_FUEL;
-  // Altura objetivo en el mundo — arranca en la posición donde se activó el jetpack (esto
-  // es justo lo que generaba el efecto "queda flotando en el punto Y de entrada" que
-  // notaste; ahora es intencional, sostenido por fuerza real en vez de por ausencia de
-  // fuerza).
+  // Altura objetivo en el mundo — arranca en la posición donde se activó el jetpack, y
+  // sigue a la posición actual mientras se empuja (ver tick()).
   private hoverTargetHeight: number;
   // Acumulador para el bob sinusoidal — mismo rol que elapsedTime en poc2.
   private elapsedTime = 0;
@@ -49,18 +49,33 @@ export class JetpackPhysicsController implements IPhysicsController {
 
   tick(dt: number): void {
     this.elapsedTime += dt;
-    this._applyHoverForce();
 
     const { up } = this.getInput();
     if (up && this.fuel > 0) {
       this.fuel = Math.max(0, this.fuel - dt * FUEL_DRAIN_RATE);
-      this.hoverTargetHeight += CLIMB_RATE * dt;
+      this._applyThrust();
     }
+
+    this._applyHoverForce();
   }
 
   /** Leído por character.base.ts para armar el dep hasFuel() de CharacterFsm. */
   hasFuel(): boolean {
     return this.fuel > 0;
+  }
+
+  /**
+   * Fuerza de empuje directa, además del hover — esto es lo que hace que Space se sienta
+   * como un impulso real en vez de un ajuste lento del punto de equilibrio. Actualiza
+   * hoverTargetHeight a la posición actual en cada frame de empuje, para que el hover no
+   * tire hacia el punto viejo apenas se suelta la tecla.
+   */
+  private _applyThrust(): void {
+    this.characterAggregate.body.applyForce(
+      new Vector3(0, THRUST_FORCE, 0),
+      this.characterAggregate.transformNode.getAbsolutePosition(),
+    );
+    this.hoverTargetHeight = this.characterAggregate.transformNode.getAbsolutePosition().y;
   }
 
   /**

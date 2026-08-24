@@ -44,20 +44,23 @@ export type TexturetKey = "flare";
  * como tarea aparte cuando StandAlone tenga su propio set de animaciones a pie.
  */
 export interface ICharacterAnimations {
-  standing_idle: AnimationGroup;
-  cruising_forward_idle: AnimationGroup;
-  cruising_faster_idle: AnimationGroup;
-  cruising_maxVel_idle: AnimationGroup;
-  standing_to_crouch: AnimationGroup;
-  crouch_to_standing: AnimationGroup;
-  jump: AnimationGroup;
-  falling: AnimationGroup;
+    standing_idle: AnimationGroup;
+    cruising_forward_idle: AnimationGroup;
+    cruising_faster_idle: AnimationGroup;
+    cruising_maxVel_idle: AnimationGroup;
+    standing_to_crouch: AnimationGroup;
+    crouch_to_standing: AnimationGroup;
+    jump: AnimationGroup;
+    falling: AnimationGroup;
+    floating: AnimationGroup;
+    flying: AnimationGroup;
+    falling_idle: AnimationGroup,
 }
 
 export interface MeshInstanceResult {
-  mesh: Mesh | AbstractMesh;
-  /** null si el asset no tiene animaciones preparadas (ej. 'character-capsule', 'board'). */
-  animations: ICharacterAnimations | null;
+    mesh: Mesh | AbstractMesh;
+    /** null si el asset no tiene animaciones preparadas (ej. 'character-capsule', 'board'). */
+    animations: ICharacterAnimations | null;
 }
 
 export class AssetManager {
@@ -95,7 +98,7 @@ export class AssetManager {
             };
 
             // --- RECURSO 2: Modelo GLB Externo ---
-            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver4.glb");
+            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver5.glb");
             tareaGLB.onSuccess = (task) => {
                 // Buscamos el nodo raíz que crea automáticamente Babylon para los GLB
 
@@ -111,7 +114,7 @@ export class AssetManager {
                     this.animationGroups['character'].forEach((ag) => ag.stop());
                 }
             };
-            
+
             // --- RECURSO 3: mapa ---
             const tareaMap = manager.addMeshTask("batalla del pilar", "", "maps/", "topoexport_3D_modeling_batallaDelPilar.glb");
             tareaMap.onSuccess = (task) => {
@@ -170,15 +173,22 @@ export class AssetManager {
         const jump = find("jump in place2");
         const falling = find("skate falling to landing");
 
+        const falling_idle = find("falling idle");
+        const flying = find("flying");
+        const floating = find("floating");
+        //const falling_to_landing = find("falling ro landing"); repetido
+
+
         if (!standing_idle || !cruising_forward_idle || !cruising_faster_idle || !cruising_maxVel_idle ||
-            !standing_to_crouch || !crouch_to_standing || !jump || !falling) {
+            !standing_to_crouch || !crouch_to_standing || !jump || !falling || !falling_idle ||
+            !flying || !floating) {
             console.warn("AssetManager: faltan animaciones de 'character' — revisar nombres de clips en el GLB.");
             return;
         }
 
         const mold: ICharacterAnimations = {
             standing_idle, cruising_forward_idle, cruising_faster_idle, cruising_maxVel_idle,
-            standing_to_crouch, crouch_to_standing, jump, falling,
+            standing_to_crouch, crouch_to_standing, jump, falling, floating, flying, falling_idle
         };
 
         Object.values(mold).forEach((ag) => {
@@ -210,6 +220,9 @@ export class AssetManager {
             crouch_to_standing: cloneOne(mold.crouch_to_standing),
             jump: cloneOne(mold.jump),
             falling: cloneOne(mold.falling),
+            floating: cloneOne(mold.floating),
+            flying: cloneOne(mold.floating),
+            falling_idle: cloneOne(mold.falling_idle)
         };
     }
 

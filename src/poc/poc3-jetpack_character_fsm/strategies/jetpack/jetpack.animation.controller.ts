@@ -37,7 +37,7 @@ export class JetpackAnimationController implements IAnimationController {
       case "On":
         // TODO: placeholder — el GLB actual no tiene clip de jetpack, "falling" es lo más
         // cercano semánticamente a "en el aire" del set actual (ver assets-manager.ts).
-        return this.animations.cruising_forward_idle;
+        return this.animations.floating;
       default:
         return null;
     }

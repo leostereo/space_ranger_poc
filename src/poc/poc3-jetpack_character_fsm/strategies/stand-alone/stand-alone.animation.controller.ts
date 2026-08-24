@@ -59,7 +59,7 @@ export class StandAloneAnimationController implements IAnimationController {
       case "OnAir":
         // TODO: placeholder — no hay clip de "en el aire a pie" en el GLB actual, se
         // reutiliza "falling" (misma solución temporal que en JetpackAnimationController).
-        return { animation: this.animations.falling, loop: true };
+        return { animation: this.animations.falling_idle, loop: true };
       default:
         return null;
     }
