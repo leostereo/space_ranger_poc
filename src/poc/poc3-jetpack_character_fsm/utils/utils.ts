@@ -7,12 +7,13 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { generalConfig } from "@/poc/config.general";
 import { AssetManager, type ICharacterAnimations } from "@/services/assets-manager";
+import { Tools } from "@babylonjs/lite-compat";
 
 // TODO: mover a src/config.general.ts cuando se integre al repo real.
 const TMP_CONFIG = {
   characterMass: 70,
   spawnHeight: 3,
-  groundSize: 100,
+  groundSize: 50,
 };
 
 export function scene_builder(scene: Scene): PhysicsAggregate[] {
@@ -23,6 +24,12 @@ export function scene_builder(scene: Scene): PhysicsAggregate[] {
   // _builGrounds() esté activo en AssetManager (hoy está comentado ahí).
   const ground = MeshBuilder.CreateGround("ground", { width: TMP_CONFIG.groundSize, height: TMP_CONFIG.groundSize }, scene);
   const groundAggregate = new PhysicsAggregate(ground, PhysicsShapeType.BOX, { mass: 0 }, scene);
+
+  // const mapResult = AssetManager.getMesh('batalla del pilar','map')
+  // const map = mapResult?.mesh as Mesh;
+  // map.position.y = 300;
+  // map.rotation._x = Tools.ToRadians(-60);
+
   return [groundAggregate];
 }
 

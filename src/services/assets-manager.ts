@@ -24,12 +24,12 @@
 // Vale la pena migrarlo a `getMesh('character', ...).animations` cuando se retome poc2,
 // para no tener la lógica de nombres de clips duplicada en dos lugares.
 
-import { Texture, Material, AbstractMesh, AnimationGroup, Scene, AssetsManager, StandardMaterial, MeshBuilder, Color3, Tools, PhysicsAggregate, PhysicsShapeType, Mesh, ArcRotateCamera, Vector3, FollowCamera, HemisphericLight } from "@babylonjs/core";
+import { Texture, Material, AbstractMesh, AnimationGroup, Scene, AssetsManager, StandardMaterial, MeshBuilder, Color3, Tools, PhysicsAggregate, PhysicsShapeType, Mesh, ArcRotateCamera, Vector3, FollowCamera, HemisphericLight, Axis, Space, Quaternion } from "@babylonjs/core";
 import { GridMaterial } from "@babylonjs/materials/grid/gridMaterial";
 import { generalConfig } from "@/poc/config.general";
 import "@babylonjs/loaders/glTF"; // Obligatorio en Babylon para leer archivos .glb
 
-export type MeshAssetKey = "character" | 'character-capsule' | "board" | 'light' | 'followCamera' | 'arcCamera' | 'ground-basic' | 'ground-grid';
+export type MeshAssetKey = "character" | 'character-capsule' | "board" | 'light' | 'followCamera' | 'arcCamera' | 'ground-basic' | 'ground-grid' | 'batalla del pilar';
 export type LightAssetKey = "main" | "ambient" | "antorcha";
 export type CameraAssetKey = "arc" | "follow" | "first";
 export type MaterialAssetKey = "board" | "neon" | "ground-basic" | 'grid-ground';
@@ -123,8 +123,18 @@ export class AssetManager {
                 const root = task.loadedMeshes.find(m => m.name === "__root__");
 
                 if (root) {
+
+                    //root.scaling = new Vector3(0.1, 0.1, 0.1); 
+                    
+                    if (root.rotationQuaternion) {
+                        // root.rotationQuaternion = Quaternion.Identity();
+                    }
+                    root.position.x =  0;
+                    root.position.y = -900;
+                    root.position.z = -100;
+                    root.rotate(Axis.X, Math.PI / 2, Space.LOCAL);
                     // Desactivamos el nodo raíz (apaga al personaje entero y sus hijos)
-                    root.setEnabled(false);
+                    root.setEnabled(true);
                     this.meshes["batalla del pilar"] = root;
                 }
             };
