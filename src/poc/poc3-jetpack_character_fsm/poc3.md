@@ -238,28 +238,32 @@ cambia dos supuestos que tenía este documento:
   anterior sin adaptar del todo. Ya está corregido: `characterMesh` devuelto es la cápsula
   real del `AssetManager` (la que lleva el `PhysicsAggregate`).
 
-## Punto abierto nuevo — carga de assets antes de `build()`
+## Punto abierto nuevo — carga de assets antes de `build()` — **decisión tomada, a confirmar**
 
 `AssetManager.cargarTodo(canvas, scene)` es async y necesita `canvas` — pero
-`character.base.ts` (`Poc.build(scene)`) hoy sólo recibe `scene`. Falta definir:
-- ¿`cargarTodo()` se llama una vez al bootstrapear la app (antes de elegir POC), o cada POC
-  la llama en su propio `build()` con guard para no recargar si ya está poblado?
-- Si es lo segundo, `Poc.build()` va a necesitar el `canvas` en su firma — cambio que
-  afecta a todos los POCs, no sólo a este.
+`character.base.ts` (`Poc.build(scene)`) sólo recibe `scene`. **Supuesto adoptado**: la
+carga se dispara una sola vez al bootstrapear la app, antes del selector de POCs — no
+dentro de cada `Poc.build()`. Por eso `Poc.build()` NO cambió de firma en POC3.
+`character.base.ts` documenta este supuesto en un comentario explícito, y si no es así en
+tu repo real (por ejemplo si cada POC dispara su propio `cargarTodo()`), `character_builder()`
+va a tirar el error "`AssetManager: 'character' o 'character-capsule' no disponibles`" en
+runtime — señal clara de que hay que revisar este punto. **Confirmame si el supuesto es correcto.**
 
-## Punto abierto nuevo — animation groups por instancia en `AssetManager.getMesh()`
+## Punto abierto nuevo — animation groups por instancia en `AssetManager.getMesh()` — **resuelto**
 
-Mirando `AssetManager.getMesh()`: clona los `animationGroups` del molde para cada
-instancia, pero el resultado del clon **no se guarda ni se devuelve** — el comentario del
-propio método lo dice ("Opcional: Podés guardar este clonAnimGroup..."). Para que el
-animation controller de POC3 pueda tomar "animations groups listos para usar" como pediste,
-`getMesh()` necesita devolver también esas animaciones clonadas (por ejemplo,
-`{ mesh, animationGroups }` en vez de sólo el mesh) — si no, cada instancia comparte los
-`AnimationGroup` del molde original y dos personajes en pantalla animarían sincronizados
-entre sí en lugar de independientes. Antes de tocar el animation controller de POC3,
-conviene resolver esto en `AssetManager` primero.
+`AssetManager.getMesh()` ahora devuelve `{ mesh, animationGroups }` en vez de sólo el mesh
+— las animaciones clonadas por instancia ya no se descartan. `character_builder()` en
+`utils.ts` las recibe una sola vez (junto con `characterMesh`/`characterAggregate`) y
+`character.base.ts` las pasa por referencia a la strategy activa. Los animation controllers
+(`StandAloneAnimationController`/`JetpackAnimationController`) las reciben ya listas por
+constructor y sólo `stop()` en su `dispose()` — nunca las disponen, porque no son dueños:
+el dueño es `character.base.ts`, que sí las dispone en su propio `dispose()` final.
 
+**⚠️ Breaking change a tener en cuenta**: si `AssetManager.getMesh()` ya se usa en otro
+lado del repo (poc2, para `'board'`, por ejemplo), esas llamadas hay que actualizarlas para
+leer `.mesh` en vez de usar el resultado directo.
 
+## Confirmado a partir del código real de POC2
 
 - `generalConfig` es compartido (`src/config.general.ts`), no por-POC.
 - Patrón deps-callback: ninguna FSM (padre o hija) conoce al controller/strategy
@@ -324,6 +328,16 @@ conviene resolver esto en `AssetManager` primero.
   `character.base.ts` al terminar el `build()`. No hace falta usar `_isBlocking` (que sigue
   sin uso concreto ni en POC2 ni, por ahora, en este diseño).
 
+## Decisiones descartadas
+
+**State pattern para los macro-estados (`ICharacterMainState` con `enter/tick/exit/getHUDLabel/dispose`), evaluado y descartado por ahora.** Se llegó a implementar (`character.state.ts` + una clase por macro-estado + una capa extra `IStandAloneSubState` para los sub-estados de a pie) y se encontraron 3 problemas concretos, no sólo de estilo:
+- Doble-inicialización real: llamar `enter()` del estado inicial desde el constructor de `CharacterFsm` disparaba `_swapToStandAlone()` antes de que `character.base.ts` terminara de asignar `this.fsm`, corriendo en paralelo con el `await this._swapToStandAlone()` explícito de `build()`.
+- El HUD dejó de reaccionar a cambios de sub-estado (sólo quedó escuchando el macro-estado).
+- 3 `as any` para acceder a métodos específicos de `StandAloneState` a través de la interfaz genérica — la interfaz no puede expresar métodos que sólo tiene un estado sin ensancharse para todos.
+- La capa `IStandAloneSubState` (OnGround/JumpImpulseStart/OnAir como clases) quedó vacía — la lógica real (raycast, WASD, impulso) sigue en `StandAlonePhysicsController`, sin mover.
+
+El único beneficio real (evitar que `CharacterFsmDeps` crezca con una entrada por cada dep de cada sub-fsm) es genuino pero todavía no duele con sólo 2 macro-estados. **Se mantiene el diseño actual** (`BaseFsm`/`TransitionTable` en los dos niveles, deps por constructor) — revisar esta decisión si `CharacterFsmDeps` se vuelve difícil de leer más adelante (ej. al integrar HoverSkate en poc4).
+
 ## Puntos abiertos (a resolver antes/durante implementación)
 
 1. **Sub-estados de `Jetpack`**: el diagrama es tentativo. Falta confirmar si conviene
@@ -352,8 +366,9 @@ conviene resolver esto en `AssetManager` primero.
 - [x] **Paso 5** — Strategy `StandAlone` mínima: mover con WASD sobre la capsule compartida (sin salto todavía).
 - [x] **Paso 6** — `character.fsm.jetpack.ts` (alcance mínimo: un solo estado `On`) + strategy `Jetpack` mínima: empuje vertical con Space + tracking de combustible (`hasFuel()`).
 - [x] **Paso 7** — Transición `StandAlone` ⇄ `Jetpack` funcional de punta a punta: `requestEquipJetpack()` → `EquippingJetpack` → swap async de strategy → `notifyJetpackReady()` → `Jetpack`; vuelta automática por guard de combustible. **No hace falta handoff de transform** — `characterMesh`/`characterAggregate` son compartidos y únicos, a diferencia de HoverSkate en poc4 donde sí habrá un mesh de board separado.
+- [x] **Paso 7.5** — Integración con `AssetManager` real: `character_builder()` pide `character`/`character-capsule` al `AssetManager` (en vez de crear meshes sueltos), parenteando el GLB visual a la cápsula física. `AssetManager.getMesh()` corregido para devolver también los `AnimationGroup` clonados por instancia (antes se descartaban). Animation controllers ahora reciben esas animaciones ya listas por constructor, sin cargar/clonar nada ellos mismos.
 - [ ] **Paso 8** — `character.hud.ts` extendido con telemetría (combustible, velocidad) — por ahora sólo muestra estado/sub-estado.
 - [ ] **Paso 9** — `jetpack.thruster.ts` (efecto visual) — deferido a propósito, según lo acordado.
 - [ ] **Paso 10** — Sub-estados finos de `StandAlone` (`OnAir`, `OnLadder`) y `Jetpack` (`Idle`/`Thrusting`/`Floating`), una vez validado el esqueleto mínimo.
 - [ ] **Paso 11** — Registrar POC3 en el selector de POCs.
-
+- [ ] **Paso 12** — Confirmar el supuesto de cuándo se llama `AssetManager.cargarTodo()` (bootstrap único vs. por-POC) — ver "Punto abierto — carga de assets antes de build()".

@@ -28,6 +28,11 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
   readonly standAloneSubFsm: StandAloneFsm;
   readonly jetpackSubFsm: JetpackFsm;
 
+  // Flag manual para la salida de Jetpack por input (Ctrl) — se combina con el guard
+  // automático de combustible en la misma transición (TransitionTable sólo admite un
+  // guard por par [origen][destino], así que ambas condiciones viven en una sola función).
+  private unequipRequested = false;
+
   constructor(private deps: CharacterFsmDeps) {
     super();
     this.state = "StandAlone"; // estado inicial: asignado directo, no vía setState
@@ -49,7 +54,9 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
         Jetpack: true,
       },
       Jetpack: {
-        StandAlone: () => !this.deps.hasFuel(), // guard automático, mismo criterio que coyote time
+        // Guard automático: sale por falta de combustible O por pedido manual (Ctrl de
+        // nuevo, sin importar el sub-estado de Jetpack) — cualquiera de las dos alcanza.
+        StandAlone: () => !this.deps.hasFuel() || this.unequipRequested,
       },
     };
   }
@@ -65,9 +72,15 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
     // EquippingJetpack: sin sub-fsm activa todavía, sólo espera notifyJetpackReady().
   }
 
-  /** Único punto de entrada de input: el input controller de la strategy activa llama esto, no setState(). */
+  /**
+   * Único punto de entrada de input: el input controller de la strategy activa llama esto,
+   * no setState(). Restricción de negocio: sólo se puede equipar el jetpack estando en el
+   * aire (OnAir) — no parado ni durante el impulso de salto. El chequeo vive acá, no en el
+   * input controller, mismo criterio que el resto de la fsm: la fsm decide qué es válido,
+   * el input sólo pide.
+   */
   requestEquipJetpack(): void {
-    if (this.state === "StandAlone") {
+    if (this.state === "StandAlone" && this.standAloneSubFsm.getState() === "OnAir") {
       this.setState("EquippingJetpack");
     }
   }
@@ -76,6 +89,18 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
   notifyJetpackReady(): void {
     if (this.state === "EquippingJetpack") {
       this.setState("Jetpack");
+    }
+  }
+
+  /**
+   * Único punto de entrada para volver a StandAlone por decisión del jugador (Ctrl de
+   * nuevo mientras está en Jetpack) — no importa el sub-estado de Jetpack en el que esté.
+   * Sólo levanta el flag; el guard combinado en `transitions.Jetpack.StandAlone` es quien
+   * efectivamente decide y dispara el `setState()` en el próximo `tick()`.
+   */
+  requestUnequipJetpack(): void {
+    if (this.state === "Jetpack") {
+      this.unequipRequested = true;
     }
   }
 
@@ -88,7 +113,10 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
 
   protected onEnter(state: CharacterMainState): void {
     if (state === "EquippingJetpack") this.deps.onEnterEquippingJetpack();
-    if (state === "StandAlone") this.deps.onEnterStandAlone();
+    if (state === "StandAlone") {
+      this.deps.onEnterStandAlone();
+      this.unequipRequested = false; // reset — si no, la próxima vez que se equipe el jetpack saldría solo
+    }
   }
 
   protected onExit(_state: CharacterMainState): void {

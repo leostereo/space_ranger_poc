@@ -35,7 +35,7 @@ export class CharacterInput {
     return this.state;
   }
 
-  /** Equipar jetpack (F). Edge-triggered, mismo criterio que consumeJumpRequest() en poc2. */
+  /** Equipar jetpack (Ctrl). Edge-triggered, mismo criterio que consumeJumpRequest() en poc2. */
   consumeEquipJetpackRequest(): boolean {
     if (!this.equipJetpackRequested) return false;
     this.equipJetpackRequested = false;
@@ -67,7 +67,10 @@ export class CharacterInput {
       case "KeyA": this.state.left = true; break;
       case "KeyD": this.state.right = true; break;
       case "Space": this.state.up = true; this.jumpRequested = true; break;
-      case "KeyF": this.equipJetpackRequested = true; break;
+      case "ControlLeft":
+      case "ControlRight":
+        this.equipJetpackRequested = true;
+        break;
     }
   };
 

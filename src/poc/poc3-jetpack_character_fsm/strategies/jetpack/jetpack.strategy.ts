@@ -32,7 +32,7 @@ export async function buildJetpackStrategy(
   characterAnimations: ICharacterAnimations | null,
 ): Promise<JetpackStrategyResult> {
   const physics = new JetpackPhysicsController(characterAggregate, () => input.current);
-  const inputController = new JetpackInputController();
+  const inputController = new JetpackInputController(input, characterFsm);
   const animation = new JetpackAnimationController(characterAnimations, characterFsm.jetpackSubFsm);
 
   const strategy: IVehicleStrategy = {
