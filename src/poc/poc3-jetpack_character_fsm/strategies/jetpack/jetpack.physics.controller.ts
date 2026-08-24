@@ -3,6 +3,7 @@ import type { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggrega
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { IPhysicsController } from "../contracts/iphysics-controller";
 import type { CharacterInputState } from "../../character.input";
+import { Scalar } from "@babylonjs/core";
 
 // TODO: mover a config.general.ts junto con el resto (ver TODO en utils.ts)
 const CHARACTER_MASS = 70; // mismo valor que TMP_CONFIG.characterMass en utils.ts — duplicado a propósito, cada physics controller trae su propia config local (mismo criterio ya usado en stand-alone.physics.controller.ts)
@@ -17,6 +18,9 @@ const HOVER_SPRING_STRENGTH = 20;
 const HOVER_DAMPING = 8;
 const HOVER_MAX_FORCE_FACTOR = 8; // mismo criterio de clamp que poc2 (mass * gravity * factor)
 const THRUST_FORCE = 1400; // Newtons, aplicado ADEMÁS del hover mientras se sostiene Space (~5.7 m/s² extra con esta masa)
+// ── giro ──
+const TURN_SPEED = 2.5;   // rad/s — velocidad angular objetivo al girar (A/D)
+const TURN_DAMPING = 10;  // qué tan rápido se acerca a la velocidad angular objetivo (o vuelve a 0 al soltar)
 
 // Bob — mismo bobAmplitude/bobFrequency que generalConfig.hover en poc2. Sin esto el hover
 // queda rígido, clavado en un punto; el seno le da la sensación de "flotando" real.
@@ -57,6 +61,8 @@ export class JetpackPhysicsController implements IPhysicsController {
     }
 
     this._applyHoverForce();
+    this._applyTurn(dt);
+
   }
 
   /** Leído por character.base.ts para armar el dep hasFuel() de CharacterFsm. */
@@ -76,6 +82,27 @@ export class JetpackPhysicsController implements IPhysicsController {
       this.characterAggregate.transformNode.getAbsolutePosition(),
     );
     this.hoverTargetHeight = this.characterAggregate.transformNode.getAbsolutePosition().y;
+  }
+
+  private _applyTurn(dt: number): void {
+  const { left, right } = this.getInput();
+  const turnDirection = (left ? -1 : 0) + (right ? 1 : 0); // A = -Y, D = +Y
+  const targetAngularVelocity = turnDirection * TURN_SPEED;
+
+    const currentYawVelocity = this.characterAggregate.body.getAngularVelocity().y;
+    const smoothedY = Scalar.Lerp(
+      currentYawVelocity,
+      targetAngularVelocity,
+      Math.min(1, TURN_DAMPING * dt),
+    );
+
+    // Sólo yaw en "On" — x/z forzados a 0 para garantizar cero roll/pitch,
+    // sin depender de que el hover force esté perfectamente balanceado.
+    // Este comportamiento es específico de este sub-estado: cuando entre la
+    // fuerza de arrastre (drag), el giro va a dejar de ser una velocidad
+    // angular pura y probablemente sí queramos algo de roll acoplado a la
+    // velocidad lateral (mismo espíritu que el yaw/roll coordinado de poc2).
+    this.characterAggregate.body.setAngularVelocity(new Vector3(0, smoothedY, 0));
   }
 
   /**
