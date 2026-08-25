@@ -24,7 +24,9 @@ export class StandAlonePhysicsController implements IPhysicsController {
     private scene: Scene,
     private characterAggregate: PhysicsAggregate,
     private getInput: () => CharacterInputState,
+    initialGroundDetected: boolean,
   ) {
+    this._groundDetected = initialGroundDetected;
     this._setupFallAndLanding();
   }
 
@@ -121,7 +123,9 @@ export class StandAlonePhysicsController implements IPhysicsController {
 
     const hit = this.scene.pickWithRay(
       this._ray,
-      (mesh) => mesh.isPickable && mesh !== this.characterAggregate.transformNode,
+      (mesh) => mesh.isPickable &&
+        mesh !== this.characterAggregate.transformNode
+        && mesh.name !== 'playerCapsule' 
     );
 
     const verticalVelocity = this.characterAggregate.body.getLinearVelocity().y;

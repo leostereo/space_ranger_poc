@@ -32,7 +32,14 @@ export async function buildStandAloneStrategy(
   characterFsm: CharacterFsm,
   characterAnimations: ICharacterAnimations | null,
 ): Promise<StandAloneStrategyResult> {
-  const physics = new StandAlonePhysicsController(scene, characterAggregate, () => input.current);
+  // Fuente de verdad real en este instante — standAloneSubFsm nunca se destruye ni se
+  // resetea (vive en CharacterFsm, sobrevive a los swaps de strategy), así que su estado
+  // actual es exactamente lo que hay que respetar al reconstruir el physics controller.
+  // Sin esto, StandAlonePhysicsController arrancaba siempre asumiendo "apoyado", lo cual
+  // rompía al volver de Jetpack en pleno vuelo (Ctrl para desequipar estando OnAir).
+  const initialGroundDetected = characterFsm.standAloneSubFsm.getState() !== "OnAir";
+
+  const physics = new StandAlonePhysicsController(scene, characterAggregate, () => input.current, initialGroundDetected);
   const inputController = new StandAloneInputController(input, characterFsm);
   const animation = new StandAloneAnimationController(characterAnimations, characterFsm.standAloneSubFsm);
 

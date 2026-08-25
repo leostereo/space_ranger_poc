@@ -16,6 +16,11 @@ const TMP_CONFIG = {
   groundSize: 50,
 };
 
+const CHARACTER_NON_PICKABLE_MESH_NAMES = [
+  "Alpha_Surface",
+  "Alpha_Joints",
+];
+
 export function scene_builder(scene: Scene): PhysicsAggregate[] {
   const light = AssetManager.getLight("main", false, "light");
   light.setEnabled(true);
@@ -86,6 +91,18 @@ export function character_builder(scene: Scene): CharacterBuildResult {
   const capsuleHeight = generalConfig.playerConfig.height;
   character.position.set(0, -(capsuleHeight / 2), 0);
   character.rotate(Axis.Y, Math.PI, Space.LOCAL);
+
+  for (const meshName of CHARACTER_NON_PICKABLE_MESH_NAMES) {
+    const mesh = scene.getMeshByName(meshName);
+    if (mesh) {
+      mesh.isPickable = false;
+    } else {
+      console.warn(
+        `character_builder: mesh esperado "${meshName}" no encontrado en la escena — ` +
+        `¿cambió el export del GLB? Si el ground-check vuelve a autodetectarse, revisar esta lista.`,
+      );
+    }
+  }
 
   const characterAggregate = new PhysicsAggregate(
     capsule,

@@ -35,7 +35,7 @@ const CRUISE_PITCH_LERP_SPEED = 6;
 const CRUISE_LATERAL_GRIP = 0.9;
 const CRUISE_PITCH_FORCE = 1600; // Newtons, según intensidad de pitch — simétrico arriba/abajo (gravedad se compensa aparte, siempre)
 const MAX_HOVER_CATCH_SPEED = 4; // m/s — tope de velocidad vertical que se le "perdona" al hover al retomar
-
+const ON_HORIZONTAL_BRAKE_FACTOR = 4; // mismo criterio que brakingDragFactor/CRUISE_LATERAL_GRIP — a ojo, ajustar sintiendo el frenado
 export class JetpackPhysicsController implements IPhysicsController {
   private fuel = MAX_FUEL;
   private hoverTargetHeight: number;
@@ -52,7 +52,7 @@ export class JetpackPhysicsController implements IPhysicsController {
   private _rightReference = Vector3.Right();
   private _rightTemp = new Vector3();
   private _velocityTemp = new Vector3();
-
+  private _horizontalVelocityTemp = new Vector3(); // nuevo — para _applyOnHorizontalBrake()
   private wasCruisePitching = false;
 
   constructor(
@@ -113,6 +113,8 @@ export class JetpackPhysicsController implements IPhysicsController {
     } else {
       this._applyTurn(dt);
       this._decayCruiseVisuals(dt); // relaja roll Y pitch a 0 al volver a "On"
+      this._applyOnHorizontalBrake(); // nuevo
+
     }
   }
 
@@ -128,6 +130,17 @@ export class JetpackPhysicsController implements IPhysicsController {
       new Vector3(0, CHARACTER_MASS * GRAVITY, 0),
       this.characterAggregate.transformNode.getAbsolutePosition(),
     );
+  }
+
+  private _applyOnHorizontalBrake(): void {
+    this.characterAggregate.body.getLinearVelocityToRef(this._velocityTemp);
+    this._horizontalVelocityTemp.set(this._velocityTemp.x, 0, this._velocityTemp.z);
+
+    const speed = this._horizontalVelocityTemp.length();
+    if (speed < 0.05) return;
+
+    const brakeForce = this._horizontalVelocityTemp.scale(-CHARACTER_MASS * ON_HORIZONTAL_BRAKE_FACTOR);
+    this.characterAggregate.body.applyForce(brakeForce, this.characterAggregate.transformNode.getAbsolutePosition());
   }
 
 private _updateCruisePitch(dt: number): void {
