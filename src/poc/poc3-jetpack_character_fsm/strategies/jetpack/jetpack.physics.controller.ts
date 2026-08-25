@@ -130,17 +130,20 @@ export class JetpackPhysicsController implements IPhysicsController {
     );
   }
 
-  /** Sólo el lerp visual del ángulo — separado de la fuerza para que corra siempre en
-   * Cruising (incluso sin W/S, así decae solo a 0 al soltar). */
-  private _updateCruisePitch(dt: number): void {
-    const { forward, backward } = this.getInput();
-    let targetPitch = 0;
-    if (forward) targetPitch = CRUISE_MAX_PITCH_ANGLE;
-    if (backward) targetPitch = -CRUISE_MAX_PITCH_ANGLE;
+private _updateCruisePitch(dt: number): void {
+  const { forward, backward } = this.getInput();
+  let targetPitch = 0;
+  // Invertido a propósito respecto al mapeo anterior — convención de palanca de vuelo:
+  // W (adelante) empuja el nose hacia abajo y desciende (picar); S (atrás) levanta el
+  // nose y asciende (trepar). El signo de pitchAngle sigue siendo el mismo que ya
+  // maneja correctamente tanto la fuerza real como el visual — sólo se intercambia
+  // qué tecla dispara cada signo.
+  if (forward) targetPitch = -CRUISE_MAX_PITCH_ANGLE;
+  if (backward) targetPitch = CRUISE_MAX_PITCH_ANGLE;
 
-    const pitchLerpFactor = 1 - Math.exp(-CRUISE_PITCH_LERP_SPEED * dt);
-    this.pitchAngle += (targetPitch - this.pitchAngle) * pitchLerpFactor;
-  }
+  const pitchLerpFactor = 1 - Math.exp(-CRUISE_PITCH_LERP_SPEED * dt);
+  this.pitchAngle += (targetPitch - this.pitchAngle) * pitchLerpFactor;
+}
 
   /**
    * Fuerza vertical — mismo patrón 1:1 que _applyDiveForce en poc2 (board.controller.ts):
