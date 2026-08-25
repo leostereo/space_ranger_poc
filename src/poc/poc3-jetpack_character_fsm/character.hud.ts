@@ -19,7 +19,7 @@ export class CharacterHud {
     this.container.id = "poc3-character-hud";
     Object.assign(this.container.style, {
       position: "fixed",
-      top: "12px",
+      top: "32px",
       right: "12px",
       padding: "6px 12px",
       background: "rgba(0, 0, 0, 0.6)",

@@ -19,6 +19,7 @@ const TMP_CONFIG = {
 const CHARACTER_NON_PICKABLE_MESH_NAMES = [
   "Alpha_Surface",
   "Alpha_Joints",
+  "character.Armature.Alpha_Surface",
 ];
 
 export function scene_builder(scene: Scene): PhysicsAggregate[] {
@@ -34,6 +35,8 @@ export function scene_builder(scene: Scene): PhysicsAggregate[] {
   // const map = mapResult?.mesh as Mesh;
   // map.position.y = 300;
   // map.rotation._x = Tools.ToRadians(-60);
+
+  createPlatforms(scene);
 
   return [groundAggregate];
 }
@@ -120,4 +123,43 @@ export function character_builder(scene: Scene): CharacterBuildResult {
     characterAggregate,
     characterAnimations: characterResult.animations,
   };
+}
+
+
+const platformsData = [
+  { name: "ground-media", depth: 40, heightOffset: -100, zStart: 300 },
+  { name: "ground-alta", depth: 80, heightOffset: 20, zStart: 300 },
+  { name: "ground-baja", depth: 60, heightOffset: -260.0, zStart: 210 }  // Tercera plataforma (Baja, tras otro hueco de 15 unidades)
+];
+
+
+const createPlatforms = (scene:Scene) => {
+
+   const { width, depth, thickness, friction, color } = generalConfig.ground;
+  
+  const material = AssetManager.getGridMaterial('grid-ground');
+
+  platformsData.forEach((data) => {
+    // A) Crear el Mesh de la plataforma individual
+    const groundMesh = MeshBuilder.CreateBox(data.name, {
+      width: width,
+      depth: data.depth,
+      height: thickness
+    }, scene);
+
+    // B) Posicionar la plataforma. 
+    // Ajustamos la Y para que la parte superior de la caja quede exactamente en la altura deseada (heightOffset)
+    groundMesh.position.set(0, data.heightOffset - (thickness / 2), data.zStart);
+    groundMesh.material = material;
+
+    // Hacemos que sea explícitamente detectable por el Raycast del controlador
+    groundMesh.isPickable = true;
+
+    new PhysicsAggregate(
+      groundMesh,
+      PhysicsShapeType.BOX,
+      { mass: 0, friction, restitution: 0 },
+      scene,
+    );
+  });
 }
