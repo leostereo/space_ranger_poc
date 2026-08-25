@@ -1,0 +1,956 @@
+diff --git a/src/poc/poc3-jetpack_character_fsm/character-fsm/character.fsm.stand-alone.ts b/src/poc/poc3-jetpack_character_fsm/character-fsm/character.fsm.stand-alone.ts
+index 6e84a01..c4aaa2d 100644
+--- a/src/poc/poc3-jetpack_character_fsm/character-fsm/character.fsm.stand-alone.ts
++++ b/src/poc/poc3-jetpack_character_fsm/character-fsm/character.fsm.stand-alone.ts
+@@ -1,60 +1,86 @@
+ // src/poc3-jetpack_character_fsm/character-fsm/character.fsm.stand-alone.ts
+ import { BaseFsm, TransitionTable } from "../abstract/base-fsm";
++import type { IStandAloneSubState } from "./stand-alone/stand-alone.state";
++import { OnGroundSubState } from "./stand-alone/states/onground.state";
++import { JumpImpulseSubState } from "./stand-alone/states/jumpimpulse.state";
++import { OnAirSubState } from "./stand-alone/states/onair.state";
+ 
+-/**
+- * A — A pie. `OnLadder` (roadmap original) queda para más adelante. Se agrega el salto:
+- * OnGround -> JumpImpulseStart -> OnAir -> OnGround, mismo patrón puente que
+- * BoardFsmHovering (JumpImpulseStart -> Jumping) en poc2 — el estado puente nunca se
+- * auto-dispara en tick(), sólo sale vía notifyJumpImpulseFrame(), llamado por quien
+- * reproduce la animación de salto al llegar al frame de impulso.
+- */
+ export type StandAloneSubState = "OnGround" | "JumpImpulseStart" | "OnAir";
+ 
+ export interface StandAloneFsmDeps {
+-  /** Vía raycast en el physics controller activo — ver stand-alone.physics.controller.ts. */
+   isGroundDetected: () => boolean;
+-  /** Aplica el impulso físico del salto. Se dispara al ENTRAR a OnAir (frame de impulso), no al presionar la tecla. */
+   onEnterOnAir: () => void;
+ }
+ 
+ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
+   protected transitions: TransitionTable<StandAloneSubState>;
++  private subStates: Record<StandAloneSubState, IStandAloneSubState>;
++
++  // Flags automáticos de control de flujo
++  private wantsToJump = false;
++  private isJumpImpulseFrameReached = false;
+ 
+   constructor(private deps: StandAloneFsmDeps) {
+     super();
+-    this.state = "OnGround"; // estado inicial: asignado directo, no vía setState
++    this.state = "OnGround";
++
++    // Instanciamos las clases inyectando solo lo que cada una necesita
++    this.subStates = {
++      OnGround: new OnGroundSubState(),
++      JumpImpulseStart: new JumpImpulseSubState(),
++      OnAir: new OnAirSubState(this.deps.onEnterOnAir),
++    };
+ 
++    // Tabla de transiciones reactiva y homogénea
+     this.transitions = {
+       OnGround: {
+-        JumpImpulseStart: true, // vía requestJump()
++        JumpImpulseStart: () => this.wantsToJump,
+       },
+       JumpImpulseStart: {
+-        OnAir: true, // vía notifyJumpImpulseFrame(), manual — nunca automático en tick()
++        OnAir: () => this.isJumpImpulseFrameReached,
+       },
+       OnAir: {
+-        OnGround: () => this.deps.isGroundDetected(), // guard automático, mismo criterio que ground detection en poc2
++        OnGround: () => this.deps.isGroundDetected(),
+       },
+     };
++
++    this.subStates[this.state].enter();
+   }
+ 
+-  /** Único punto de entrada de input — mismo patrón que requestJump() en BoardFsm. */
+-  requestJump(): void {
++  public override tick(): void {
++    super.tick();
++    // Ejecuta la lógica del sub-estado activo de manera polimórfica
++    this.subStates[this.state].tick();
++  }
++
++  /** Modificado: El input controller de a pie enciende este flag */
++  public requestJump(): void {
+     if (this.state === "OnGround") {
+-      this.setState("JumpImpulseStart");
++      this.wantsToJump = true;
+     }
+   }
+ 
+-  /** Llamado por quien reproduce la animación de salto al llegar al frame de impulso (ver character.base.ts). */
+-  notifyJumpImpulseFrame(): void {
++  /** Modificado: El sistema de animación de Babylon.js enciende este flag en el frame correcto */
++  public notifyJumpImpulseFrame(): void {
+     if (this.state === "JumpImpulseStart") {
+-      this.setState("OnAir");
++      this.isJumpImpulseFrameReached = true;
+     }
+   }
+ 
+-  protected onEnter(state: StandAloneSubState): void {
+-    if (state === "OnAir") this.deps.onEnterOnAir();
++  // Interceptamos los cambios de sub-estado para ejecutar los enter/exit de las clases
++  public override setState(newState: StandAloneSubState): void {
++    // Limpieza de flags al cambiar de estado para evitar bucles infinitos
++    if (newState === "JumpImpulseStart") this.wantsToJump = false;
++    if (this.state === "JumpImpulseStart" && newState === "OnAir") this.isJumpImpulseFrameReached = false;
++
++    super.setState(newState);
++    this.subStates[this.state].enter();
+   }
+ 
++  protected onEnter(_state: StandAloneSubState): void {}
+   protected onExit(_state: StandAloneSubState): void {}
+-  dispose(): void {}
+-}
+\ No newline at end of file
++  
++  public dispose(): void {
++    // Listo por si alguna subclase necesita limpiar eventos en el futuro
++  }
++}
+diff --git a/src/poc/poc3-jetpack_character_fsm/character-fsm/character.fsm.ts b/src/poc/poc3-jetpack_character_fsm/character-fsm/character.fsm.ts
+index 32316e4..d0a53c3 100644
+--- a/src/poc/poc3-jetpack_character_fsm/character-fsm/character.fsm.ts
++++ b/src/poc/poc3-jetpack_character_fsm/character-fsm/character.fsm.ts
+@@ -1,102 +1,153 @@
+ // src/poc3-jetpack_character_fsm/character-fsm/character.fsm.ts
+ import { BaseFsm, TransitionTable } from "../abstract/base-fsm";
+-import { StandAloneFsm, type StandAloneSubState } from "./character.fsm.stand-alone";
+-import { JetpackFsm, type JetpackSubState } from "./character.fsm.jetpack";
++import type { ICharacterMainState } from "./character.state";
++import { StandAloneState } from "./character.state.standalone";
++import { EquippingJetpackState } from "./character.state.equipping";
++import { JetpackState } from "./character.state.jetpack";
+ 
+ export type CharacterMainState = "StandAlone" | "EquippingJetpack" | "Jetpack";
+ 
+ export interface CharacterFsmDeps {
+-  /** Vive en el padre, igual criterio que isGroundDetected/groundLostElapsed en BoardFsmDeps. */
+-  hasFuel: () => boolean;
+-  /** Dispara el build() async de la strategy de Jetpack en character.base.ts. */
+   onEnterEquippingJetpack: () => void;
+-  /** Dispara el swap de vuelta a la strategy de StandAlone en character.base.ts. */
+   onEnterStandAlone: () => void;
+-  // Threading hacia StandAloneFsm (ver StandAloneFsmDeps) — mismo criterio que poc2, donde
+-  // BoardFsm recibe todas las deps de sus hijas y las reparte en el constructor.
+-  isGroundDetected: () => boolean;
+-  onEnterOnAir: () => void;
+ }
+ 
+-/**
+- * Raíz: decide entre StandAlone / EquippingJetpack (puente) / Jetpack.
+- * HoverSkate (poc2) se integra en poc4 como tercera rama de este mismo padre.
+- */
+ export class CharacterFsm extends BaseFsm<CharacterMainState> {
+   protected transitions: TransitionTable<CharacterMainState>;
+ 
+-  readonly standAloneSubFsm: StandAloneFsm;
+-  readonly jetpackSubFsm: JetpackFsm;
++  // Guardamos referencias concretas para poder usar sus métodos específicos de inyección
++  private standAloneStateObj: StandAloneState;
++  private jetpackStateObj: JetpackState;
++  private states: Record<CharacterMainState, ICharacterMainState>;
++
++  private wantsToEquipJetpack = false;
++  private isJetpackReady = false;
+ 
+   constructor(private deps: CharacterFsmDeps) {
+     super();
+-    this.state = "StandAlone"; // estado inicial: asignado directo, no vía setState
++    this.state = "StandAlone";
+ 
+-    this.standAloneSubFsm = new StandAloneFsm({
+-      isGroundDetected: this.deps.isGroundDetected,
+-      onEnterOnAir: this.deps.onEnterOnAir,
++    // 1. Instanciamos los objetos de estado
++    this.standAloneStateObj = new StandAloneState({
++      onEnterStandAlone: this.deps.onEnterStandAlone
+     });
+-    this.jetpackSubFsm = new JetpackFsm();
++    this.jetpackStateObj = new JetpackState();
++
++    // 2. Armamos el diccionario indexado
++    this.states = {
++      StandAlone: this.standAloneStateObj,
++      EquippingJetpack: new EquippingJetpackState(this.deps.onEnterEquippingJetpack),
++      Jetpack: this.jetpackStateObj
++    };
+ 
++    // 3. Tabla de transiciones limpia y automatizada
+     this.transitions = {
+       StandAlone: {
+-        EquippingJetpack: true, // vía requestEquipJetpack()
++        EquippingJetpack: () => this.wantsToEquipJetpack,
+       },
+       EquippingJetpack: {
+-        // Estado puente: nunca se auto-dispara en tick() (mismo patrón que
+-        // JumpImpulseStart -> Jumping en poc2). Sólo sale vía notifyJetpackReady(),
+-        // llamado por character.base.ts cuando termina el build() async de la strategy.
+-        Jetpack: true,
++        Jetpack: () => this.isJetpackReady,
+       },
+       Jetpack: {
+-        StandAlone: () => !this.deps.hasFuel(), // guard automático, mismo criterio que coyote time
++        // El guard le pregunta directamente al objeto JetpackState si le queda combustible
++        StandAlone: () => !this.jetpackStateObj.checkFuel(),
+       },
+     };
++
++    this.states[this.state].enter();
+   }
+ 
+   public override tick(): void {
+     super.tick();
++    this.states[this.state].tick();
++  }
+ 
+-    if (this.state === "StandAlone") {
+-      this.standAloneSubFsm.tick();
+-    } else if (this.state === "Jetpack") {
+-      this.jetpackSubFsm.tick();
+-    }
+-    // EquippingJetpack: sin sub-fsm activa todavía, sólo espera notifyJetpackReady().
++  /** NUEVO MÉTODO: Resuelve el error de CharacterBase para StandAlone */
++  public updateStandAloneDeps(deps: { isGroundDetected: () => boolean; onEnterOnAir: () => void }): void {
++    this.standAloneStateObj.setPhysicsDeps(deps);
+   }
+ 
+-  /** Único punto de entrada de input: el input controller de la strategy activa llama esto, no setState(). */
+-  requestEquipJetpack(): void {
++  /** NUEVO MÉTODO: Resuelve el error de CharacterBase para Jetpack */
++  public updateJetpackDeps(deps: { hasFuel: () => boolean }): void {
++    this.jetpackStateObj.setPhysicsDeps(deps);
++  }
++
++
++  public requestEquipJetpack(): void {
+     if (this.state === "StandAlone") {
+-      this.setState("EquippingJetpack");
++      this.wantsToEquipJetpack = true;
+     }
+   }
+ 
+-  /** Llamado por character.base.ts, no por ningún controller de input. */
+-  notifyJetpackReady(): void {
++  public notifyJetpackReady(): void {
+     if (this.state === "EquippingJetpack") {
+-      this.setState("Jetpack");
++      this.isJetpackReady = true;
+     }
+   }
+ 
+-  /** Para el HUD: evita que tenga que conocer standAloneSubFsm/jetpackSubFsm por separado. */
+-  getActiveSubState(): StandAloneSubState | JetpackSubState | "Loading" {
+-    if (this.state === "StandAlone") return this.standAloneSubFsm.getState();
+-    if (this.state === "Jetpack") return this.jetpackSubFsm.getState();
+-    return "Loading";
++  public getActiveSubState(): string {
++    return this.states[this.state].getHUDLabel();
++  }
++
++  public override setState(newState: CharacterMainState): void {
++    this.states[this.state].exit();
++
++    if (newState === "Jetpack") this.wantsToEquipJetpack = false;
++    if (this.state === "EquippingJetpack" && newState === "Jetpack") this.isJetpackReady = false;
++
++    super.setState(newState);
++    this.states[this.state].enter();
++  }
++
++  // Agregar esto dentro de tu clase CharacterFsm (src/poc3-jetpack_character_fsm/character-fsm/character.fsm.ts)
++
++  /** 
++   * Permite que el InputController solicite el salto de forma pública 
++   * redirigiendo la petición a la clase de estado StandAlone de forma segura.
++   */
++  public requestJump(): void {
++    if (this.state === "StandAlone") {
++      // Le avisa al objeto de estado StandAlone que procese el intento de salto
++      (this.states.StandAlone as any).subFsm?.requestJump();
++    }
+   }
+ 
+-  protected onEnter(state: CharacterMainState): void {
+-    if (state === "EquippingJetpack") this.deps.onEnterEquippingJetpack();
+-    if (state === "StandAlone") this.deps.onEnterStandAlone();
++  /**
++   * Permite que el AnimationController se suscriba a los cambios de sub-estado 
++   * de a pie sin tener acceso directo a la propiedad privada.
++   */
++  public onStandAloneSubStateChange(callback: (state: any) => void): void {
++    const standAloneFsm = (this.states.StandAlone as any).subFsm;
++    if (standAloneFsm) {
++      standAloneFsm.onStateChange(callback);
++    }
++  }
++  
++  public onMainStateChange(callback: (state: CharacterMainState) => void): void {
++    this.onStateChange(callback);
+   }
+ 
+-  protected onExit(_state: CharacterMainState): void {
+-    // sin side-effects por ahora
++  /** 
++   * Reenvía de forma segura el aviso del frame de despegue de la animación
++   */
++  public notifyJumpImpulseFrame(): void {
++    if (this.state === "StandAlone") {
++      (this.states.StandAlone as any).subFsm?.notifyJumpImpulseFrame();
++    }
+   }
+ 
+-  dispose(): void {
+-    this.standAloneSubFsm.dispose();
+-    this.jetpackSubFsm.dispose();
++  // Agregar o verificar esto dentro de tu clase CharacterFsm (src/poc3-jetpack_character_fsm/character-fsm/character.fsm.ts)
++
++  /**
++   * Permite que componentes externos (como el HUD) escuchen los cambios del macro-estado
++   * de la FSM de forma segura.
++   */
++
++
++  protected onEnter(_state: CharacterMainState): void { }
++  protected onExit(_state: CharacterMainState): void { }
++
++  public dispose(): void {
++    Object.values(this.states).forEach(state => state.dispose());
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/src/poc/poc3-jetpack_character_fsm/character-fsm/character.state.equipping.ts b/src/poc/poc3-jetpack_character_fsm/character-fsm/character.state.equipping.ts
+new file mode 100644
+index 0000000..8a31ec5
+--- /dev/null
++++ b/src/poc/poc3-jetpack_character_fsm/character-fsm/character.state.equipping.ts
+@@ -0,0 +1,11 @@
++import type { ICharacterMainState } from "./character.state";
++
++export class EquippingJetpackState implements ICharacterMainState {
++  constructor(private onEnter: () => void) {}
++
++  enter(): void { this.onEnter(); }
++  tick(): void {} // Estado puente: no hace nada en el tick, solo espera
++  exit(): void {}
++  getHUDLabel(): "Loading" { return "Loading"; } // Mapeo limpio para el HUD
++  dispose(): void {}
++}
+diff --git a/src/poc/poc3-jetpack_character_fsm/character-fsm/character.state.jetpack.ts b/src/poc/poc3-jetpack_character_fsm/character-fsm/character.state.jetpack.ts
+new file mode 100644
+index 0000000..f702b15
+--- /dev/null
++++ b/src/poc/poc3-jetpack_character_fsm/character-fsm/character.state.jetpack.ts
+@@ -0,0 +1,28 @@
++// src/poc3-jetpack_character_fsm/character-fsm/character.state.jetpack.ts
++import type { ICharacterMainState } from "./character.state";
++import { JetpackFsm } from "./character.fsm.jetpack";
++
++export class JetpackState implements ICharacterMainState {
++  private subFsm: JetpackFsm;
++  private hasFuelFn: () => boolean = () => true;
++
++  constructor() {
++    this.subFsm = new JetpackFsm();
++  }
++
++  // Este método recibirá la función de combustible de la estrategia
++  public setPhysicsDeps(deps: { hasFuel: () => boolean }): void {
++    this.hasFuelFn = deps.hasFuel;
++  }
++
++  // Exponemos el chequeo para que la FSM raíz pueda leerlo en su tabla de transiciones
++  public checkFuel(): boolean {
++    return this.hasFuelFn();
++  }
++
++  enter(): void {}
++  tick(): void { this.subFsm.tick(); }
++  exit(): void {}
++  getHUDLabel(): string { return this.subFsm.getState(); }
++  dispose(): void { this.subFsm.dispose(); }
++}
+diff --git a/src/poc/poc3-jetpack_character_fsm/character-fsm/character.state.standalone.ts b/src/poc/poc3-jetpack_character_fsm/character-fsm/character.state.standalone.ts
+new file mode 100644
+index 0000000..dfeabb9
+--- /dev/null
++++ b/src/poc/poc3-jetpack_character_fsm/character-fsm/character.state.standalone.ts
+@@ -0,0 +1,34 @@
++// src/poc3-jetpack_character_fsm/character-fsm/character.state.standalone.ts
++import type { ICharacterMainState } from "./character.state";
++import { StandAloneFsm } from "./character.fsm.stand-alone";
++
++export class StandAloneState implements ICharacterMainState {
++  private subFsm: StandAloneFsm | null = null;
++  private onEnterStandAlone: () => void;
++
++  constructor(deps: { onEnterStandAlone: () => void }) {
++    this.onEnterStandAlone = deps.onEnterStandAlone;
++  }
++
++  // Este método recibirá la física fresca de la estrategia
++  public setPhysicsDeps(deps: { isGroundDetected: () => boolean; onEnterOnAir: () => void }): void {
++    // Si ya existía una sub-fsm, la limpiamos primero para evitar fugas de memoria
++    if (this.subFsm) this.subFsm.dispose(); 
++    
++    this.subFsm = new StandAloneFsm({
++      isGroundDetected: deps.isGroundDetected,
++      onEnterOnAir: deps.onEnterOnAir,
++    });
++  }
++
++  enter(): void { this.onEnterStandAlone(); }
++  tick(): void { this.subFsm?.tick(); }
++  exit(): void {}
++  getHUDLabel(): string { return this.subFsm?.getState() ?? "OnGround"; }
++  dispose(): void { this.subFsm?.dispose(); }
++
++  // Reenvía el frame de animación a su sub-fsm interna
++  notifyJumpImpulseFrame(): void {
++    this.subFsm?.notifyJumpImpulseFrame();
++  }
++}
+diff --git a/src/poc/poc3-jetpack_character_fsm/character-fsm/character.state.ts b/src/poc/poc3-jetpack_character_fsm/character-fsm/character.state.ts
+new file mode 100644
+index 0000000..bd7851f
+--- /dev/null
++++ b/src/poc/poc3-jetpack_character_fsm/character-fsm/character.state.ts
+@@ -0,0 +1,10 @@
++// src/poc3-jetpack_character_fsm/character-fsm/character.state.ts
++export interface ICharacterMainState {
++  enter(): void;
++  tick(): void;
++  exit(): void;
++  getHUDLabel(): string;
++  dispose(): void;
++  /** Opcional: Solo lo implementará el estado StandAlone */
++  notifyJumpImpulseFrame?(): void;
++}
+diff --git a/src/poc/poc3-jetpack_character_fsm/character-fsm/stand-alone/stand-alone.state.ts b/src/poc/poc3-jetpack_character_fsm/character-fsm/stand-alone/stand-alone.state.ts
+new file mode 100644
+index 0000000..61d3283
+--- /dev/null
++++ b/src/poc/poc3-jetpack_character_fsm/character-fsm/stand-alone/stand-alone.state.ts
+@@ -0,0 +1,6 @@
++// src/poc3-jetpack_character_fsm/character-fsm/stand-alone/stand-alone.state.ts
++
++export interface IStandAloneSubState {
++  enter(): void;
++  tick(): void;
++}
+diff --git a/src/poc/poc3-jetpack_character_fsm/character-fsm/stand-alone/states/jumpimpulse.state.ts b/src/poc/poc3-jetpack_character_fsm/character-fsm/stand-alone/states/jumpimpulse.state.ts
+new file mode 100644
+index 0000000..b4c9474
+--- /dev/null
++++ b/src/poc/poc3-jetpack_character_fsm/character-fsm/stand-alone/states/jumpimpulse.state.ts
+@@ -0,0 +1,9 @@
++// src/poc3-jetpack_character_fsm/character-fsm/stand-alone/states/jumpimpulse.state.ts
++import type { IStandAloneSubState } from "../stand-alone.state";
++
++export class JumpImpulseSubState implements IStandAloneSubState {
++  enter(): void {
++    // Aquí puedes congelar la velocidad horizontal si buscas un salto pesado
++  }
++  tick(): void {} // Estado puente: espera quieto a que termine el frame de anticipación
++}
+diff --git a/src/poc/poc3-jetpack_character_fsm/character-fsm/stand-alone/states/onair.state.ts b/src/poc/poc3-jetpack_character_fsm/character-fsm/stand-alone/states/onair.state.ts
+new file mode 100644
+index 0000000..853c614
+--- /dev/null
++++ b/src/poc/poc3-jetpack_character_fsm/character-fsm/stand-alone/states/onair.state.ts
+@@ -0,0 +1,15 @@
++// src/poc3-jetpack_character_fsm/character-fsm/stand-alone/states/onair.state.ts
++import type { IStandAloneSubState } from "../stand-alone.state";
++
++export class OnAirSubState implements IStandAloneSubState {
++  // Recibe la dependencia física directamente, la FSM raíz ya no la ve
++  constructor(private onEnterOnAir: () => void) {}
++
++  enter(): void {
++    this.onEnterOnAir(); // ¡Se dispara el impulso físico vertical en Babylon.js!
++  }
++  
++  tick(): void {
++    // Aquí el PhyController aplicará física aérea (menor control de giro, gravedad)
++  }
++}
+diff --git a/src/poc/poc3-jetpack_character_fsm/character-fsm/stand-alone/states/onground.state.ts b/src/poc/poc3-jetpack_character_fsm/character-fsm/stand-alone/states/onground.state.ts
+new file mode 100644
+index 0000000..1c5e811
+--- /dev/null
++++ b/src/poc/poc3-jetpack_character_fsm/character-fsm/stand-alone/states/onground.state.ts
+@@ -0,0 +1,9 @@
++// src/poc3-jetpack_character_fsm/character-fsm/stand-alone/states/onground.state.ts
++import type { IStandAloneSubState } from "../stand-alone.state";
++
++export class OnGroundSubState implements IStandAloneSubState {
++  enter(): void {}
++  tick(): void {
++    // Aquí el PhyController aplicará fuerzas de caminata normales basadas en el input
++  }
++}
+diff --git a/src/poc/poc3-jetpack_character_fsm/character.base.ts b/src/poc/poc3-jetpack_character_fsm/character.base.ts
+index 421ece5..5812587 100644
+--- a/src/poc/poc3-jetpack_character_fsm/character.base.ts
++++ b/src/poc/poc3-jetpack_character_fsm/character.base.ts
+@@ -11,28 +11,17 @@ import { CharacterFsm } from "./character-fsm/character.fsm";
+ import { CharacterInput } from "./character.input";
+ import { CharacterHud } from "./character.hud";
+ import { character_builder, scene_builder } from "./utils/utils";
+-import { buildStandAloneStrategy, type StandAloneStrategyResult } from "./strategies/stand-alone/stand-alone.strategy";
+-import { buildJetpackStrategy, type JetpackStrategyResult } from "./strategies/jetpack/jetpack.strategy";
++import { buildStandAloneStrategy } from "./strategies/stand-alone/stand-alone.strategy";
++import { buildJetpackStrategy } from "./strategies/jetpack/jetpack.strategy";
+ import type { IVehicleStrategy } from "./strategies/contracts/ivehicle-strategy";
+ 
+-// TODO: mover a config.general.ts. Mismo valor conceptual que IMPULSE_FRAME en SkaterAnimator (poc2) — frame del clip "jump" en el que el pie despega, ajustado a ojo mirando la animación.
+ const JUMP_IMPULSE_FRAME = 30;
+ 
+-/**
+- * Orquestador de POC3. A diferencia de board.base.ts (poc2), acá la fsm NO vive adentro
+- * de un controller — vive directo acá, porque los controllers (agrupados en
+- * IVehicleStrategy) se destruyen/recrean en cada transición y la fsm tiene que sobrevivir
+- * a eso. Ver poc3.md, sección "Confirmado a partir del código real de POC2".
+- *
+- * SUPUESTO (a confirmar, ver poc3.md "Punto abierto — carga de assets antes de build()"):
+- * `AssetManager.cargarTodo(canvas, scene)` ya se llamó y resolvió ANTES de que este
+- * `build(scene)` se ejecute.
+- */
+ export default class CharacterBase implements Poc {
+   private scene: Scene;
+   private groundAggregates: PhysicsAggregate[];
+ 
+-  // Compartidos entre StandAlone y Jetpack — se construyen UNA sola vez (ver utils.ts).
++  // Componentes compartidos (persisten durante toda la vida del personaje)
+   private characterMesh: Mesh;
+   private characterAggregate: PhysicsAggregate;
+   private characterAnimations: ICharacterAnimations | null;
+@@ -41,13 +30,8 @@ export default class CharacterBase implements Poc {
+   private fsm: CharacterFsm;
+   private hud: CharacterHud;
+ 
++  // Estrategia de controladores activa (se destruye y recrea en cada swap)
+   private activeStrategy: IVehicleStrategy | null = null;
+-  // Referencias concretas (no genéricas), sólo mientras la strategy correspondiente está
+-  // activa — es lo que le da a la fsm sus deps (hasFuel / isGroundDetected /
+-  // applyJumpImpulse) sin que la fsm conozca las clases concretas.
+-  private activeJetpackPhysics: JetpackStrategyResult["physicsController"] | null = null;
+-  private activeStandAlonePhysics: StandAloneStrategyResult["physicsController"] | null = null;
+-
+   private beforePhysicsObserver: Nullable<Observer<Scene>> = null;
+ 
+   async build(scene: Scene): Promise<void> {
+@@ -61,41 +45,26 @@ export default class CharacterBase implements Poc {
+ 
+     this.input = new CharacterInput();
+ 
++    // 1. Inicializamos la FSM. Las dependencias globales se reducen al mínimo.
++    // Los guards de física específicos se inyectarán dinámicamente en los métodos _swap.
+     this.fsm = new CharacterFsm({
+-      hasFuel: () => this.activeJetpackPhysics?.hasFuel() ?? true,
+       onEnterEquippingJetpack: () => this._swapToJetpack(),
+       onEnterStandAlone: () => this._swapToStandAlone(),
+-      isGroundDetected: () => this.activeStandAlonePhysics?.isGroundDetected() ?? false,
+-      onEnterOnAir: () => this.activeStandAlonePhysics?.applyJumpImpulse(),
+     });
+ 
+     this._wireJumpAnimationEvent();
+ 
+-    // Arranca directo en StandAlone (estado inicial de la fsm, sin pasar por onEnter).
+-    const { strategy, physicsController } = await buildStandAloneStrategy(
+-      this.scene,
+-      this.characterAggregate,
+-      this.input,
+-      this.fsm,
+-      this.characterAnimations,
+-    );
+-    this.activeStrategy = strategy;
+-    this.activeStandAlonePhysics = physicsController;
++    // 2. Arrancamos directo en la estrategia StandAlone por defecto
++    await this._swapToStandAlone();
+ 
+-    this.hud = new CharacterHud(this.fsm);
++    this.hud = new CharacterHud(() => this.fsm);
+     this.hud.mount();
+ 
+     this._bindObservables();
+   }
+ 
+   /**
+-   * Registra el AnimationEvent del salto UNA sola vez, acá — no dentro de
+-   * StandAloneAnimationController. Motivo: `characterAnimations.jump` es el MISMO
+-   * AnimationGroup compartido entre todas las reconstrucciones de la strategy StandAlone
+-   * (se construye una sola vez en character_builder, no por strategy). Si el registro
+-   * viviera en el constructor de StandAloneAnimationController, cada vuelta a StandAlone
+-   * después de pasar por Jetpack agregaría un listener nuevo sobre el mismo AnimationGroup
+-   * sin sacar el anterior — el impulso terminaría disparándose N veces por salto.
++   * Vincula el frame de despegue de la animación con la FSM de forma encapsulada.
+    */
+   private _wireJumpAnimationEvent(): void {
+     const jumpAnimation = this.characterAnimations?.jump.targetedAnimations[0]?.animation;
+@@ -103,29 +72,29 @@ export default class CharacterBase implements Poc {
+ 
+     jumpAnimation.addEvent(
+       new AnimationEvent(JUMP_IMPULSE_FRAME, () => {
+-        this.fsm.standAloneSubFsm.notifyJumpImpulseFrame();
+-      }, false), // false: persiste entre reproducciones, no se auto-remueve (igual que en poc2)
++        // La base le avisa a la raíz de la FSM, y esta redirige el evento internamente
++        this.fsm.notifyJumpImpulseFrame();
++      }, false),
+     );
+   }
+ 
+   private _bindObservables(): void {
+     this.beforePhysicsObserver = this.scene.onBeforePhysicsObservable.add(() => {
+       const dt = this.scene.getEngine().getDeltaTime() / 1000;
+-      // Física primero, fsm después: los guards automáticos (isGroundDetected, hasFuel)
+-      // necesitan leer el valor de ESTE frame, no el del frame anterior. Mismo orden que
+-      // poc2 (_updateGroundDetection() corre antes de fsm.tick() en board.controller.ts).
++
++      // Mantenemos tu excelente criterio: primero se actualiza la física de la estrategia
++      // activa para que los guards de la FSM lean datos frescos de este mismo frame.
+       this.activeStrategy?.tick(dt);
+       this.fsm.tick();
++      this.hud.update(); 
++
+     });
+   }
+ 
+   /**
+-   * Disparado por CharacterFsm.onEnter("EquippingJetpack") vía deps. Al terminar,
+-   * notifica a la fsm para que complete la transición puente -> Jetpack
+-   * (notifyJetpackReady(), mismo patrón que notifyJumpImpulseFrame() en poc2).
++   * Carga asíncrona del Jetpack e inyección dinámica de sus dependencias en la FSM.
+    */
+   private async _swapToJetpack(): Promise<void> {
+-    this.activeStandAlonePhysics = null;
+     this.activeStrategy?.dispose();
+ 
+     const { strategy, physicsController } = await buildJetpackStrategy(
+@@ -135,14 +104,21 @@ export default class CharacterBase implements Poc {
+       this.characterAnimations,
+     );
+     this.activeStrategy = strategy;
+-    this.activeJetpackPhysics = physicsController;
+ 
++    // Inyectamos las dependencias del Jetpack directamente en su estado de la FSM.
++    // Ya no necesitamos guardar la referencia a "physicsController" en esta clase base.
++    this.fsm.updateJetpackDeps({
++      hasFuel: () => physicsController.hasFuel()
++    });
++
++    // Notificamos que la carga asíncrona de Babylon de la estrategia terminó con éxito
+     this.fsm.notifyJetpackReady();
+   }
+ 
+-  /** Disparado por CharacterFsm.onEnter("StandAlone") vía deps (vuelta automática, sin combustible). */
++  /**
++   * Retorno a la estrategia a pie e inyección de sus dependencias de suelo/aire en la FSM.
++   */
+   private async _swapToStandAlone(): Promise<void> {
+-    this.activeJetpackPhysics = null;
+     this.activeStrategy?.dispose();
+ 
+     const { strategy, physicsController } = await buildStandAloneStrategy(
+@@ -153,7 +129,12 @@ export default class CharacterBase implements Poc {
+       this.characterAnimations,
+     );
+     this.activeStrategy = strategy;
+-    this.activeStandAlonePhysics = physicsController;
++
++    // Inyectamos las dependencias específicas de a pie directo en el StandAloneState de la FSM
++    this.fsm.updateStandAloneDeps({
++      isGroundDetected: () => physicsController.isGroundDetected(),
++      onEnterOnAir: () => physicsController.applyJumpImpulse(),
++    });
+   }
+ 
+   dispose(): void {
+@@ -168,4 +149,4 @@ export default class CharacterBase implements Poc {
+     }
+     this.groundAggregates?.forEach((g) => g.dispose());
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/src/poc/poc3-jetpack_character_fsm/character.hud.ts b/src/poc/poc3-jetpack_character_fsm/character.hud.ts
+index 46ccc84..ba7b7c3 100644
+--- a/src/poc/poc3-jetpack_character_fsm/character.hud.ts
++++ b/src/poc/poc3-jetpack_character_fsm/character.hud.ts
+@@ -1,56 +1,47 @@
+ // src/poc3-jetpack_character_fsm/character.hud.ts
+-import type { CharacterFsm } from "./character-fsm/character.fsm";
+-
+-/**
+- * HUD MÍNIMO: sólo "Estado > Sub-estado" vía onStateChange (suscripto a la fsm raíz y a
+- * las dos sub-fsm), igual criterio que board.hud.ts. Telemetría (velocidad, combustible)
+- * queda para cuando la física de Jetpack tenga algo real que mostrar — en ese momento se
+- * agrega updateTelemetry(), empujado explícitamente una vez por frame desde
+- * character.base.ts, mismo patrón que poc2 (no polling, no observable continuo).
+- */
++
++import { CharacterFsm } from "./character-fsm/character.fsm";
++
+ export class CharacterHud {
+-  private container: HTMLDivElement | null = null;
+-  private stateLine: HTMLDivElement | null = null;
+-
+-  constructor(private fsm: CharacterFsm) {}
+-
+-  mount(): void {
+-    this.container = document.createElement("div");
+-    this.container.id = "poc3-character-hud";
+-    Object.assign(this.container.style, {
+-      position: "fixed",
+-      top: "12px",
+-      right: "12px",
+-      padding: "6px 12px",
+-      background: "rgba(0, 0, 0, 0.6)",
+-      color: "#0ff",
+-      fontFamily: "monospace",
+-      fontSize: "14px",
+-      borderRadius: "4px",
+-      zIndex: "1000",
+-      pointerEvents: "none",
+-      textAlign: "right",
+-    });
+-
+-    this.stateLine = document.createElement("div");
+-    this.container.appendChild(this.stateLine);
+-    document.body.appendChild(this.container);
+-
+-    this.fsm.onStateChange(() => this._renderState());
+-    this.fsm.standAloneSubFsm.onStateChange(() => this._renderState());
+-    this.fsm.jetpackSubFsm.onStateChange(() => this._renderState());
+-
+-    this._renderState();
++  private element: HTMLElement | null = null;
++  private isInitialized = false;
++
++  constructor(
++    private getCharacterFsm: () => CharacterFsm
++  ) {}
++
++  public mount(): void {
++    this.element = document.createElement("div");
++    // ... (toda tu configuración de estilos CSS aquí)
++    document.body.appendChild(this.element);
+   }
+ 
+-  private _renderState(): void {
+-    if (!this.stateLine) return;
+-    this.stateLine.textContent = `${this.fsm.getState()} > ${this.fsm.getActiveSubState()}`;
++  public update(): void {
++    if (!this.isInitialized) {
++      const fsm = this.getCharacterFsm();
++      if (fsm) {
++        // CORREGIDO: Suscripción directa sin guardar retorno void
++        fsm.onMainStateChange(() => this.render());
++        
++        this.render();
++        this.isInitialized = true;
++      }
++    }
++  }
++
++  public render(): void {
++    if (!this.element) return;
++    const fsm = this.getCharacterFsm();
++    if (!fsm) return;
++
++    const subState = fsm.getActiveSubState();
++    this.element.innerHTML = `
++      <div><strong>Macro Estado:</strong> ${fsm.getState()}</div>
++      <div><strong>Sub Estado:</strong> ${subState}</div>
++    `;
+   }
+ 
+-  dispose(): void {
+-    this.container?.remove();
+-    this.container = null;
+-    this.stateLine = null;
++  public dispose(): void {
++    this.element?.remove();
+   }
+ }
+diff --git a/src/poc/poc3-jetpack_character_fsm/strategies/stand-alone/stand-alone.animation.controller.ts b/src/poc/poc3-jetpack_character_fsm/strategies/stand-alone/stand-alone.animation.controller.ts
+index a303f45..48459a3 100644
+--- a/src/poc/poc3-jetpack_character_fsm/strategies/stand-alone/stand-alone.animation.controller.ts
++++ b/src/poc/poc3-jetpack_character_fsm/strategies/stand-alone/stand-alone.animation.controller.ts
+@@ -2,39 +2,39 @@
+ import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
+ import type { ICharacterAnimations } from "@/services/assets-manager";
+ import type { IAnimationController } from "../contracts/ianimation-controller";
+-import type { StandAloneFsm, StandAloneSubState } from "../../character-fsm/character.fsm.stand-alone";
++import type { CharacterFsm } from "../../character-fsm/character.fsm";
++import type { StandAloneSubState } from "../../character-fsm/character.fsm.stand-alone";
+ 
+-/**
+- * Recibe la sub-fsm por constructor (referencia directa, NO closures) — mismo patrón que
+- * SkaterAnimator en poc2 (`private fsm: BoardFsm`), y misma relación que ya tiene
+- * StandAloneInputController con CharacterFsm. Esto es lo que permite leer sub-estados acá.
+- * El otro sentido (animación -> fsm) — notifyJumpImpulseFrame() al llegar al frame de
+- * impulso del salto — NO se registra acá: vive en character.base.ts, porque el
+- * AnimationGroup de `jump` es compartido entre reconstrucciones de esta clase (ver
+- * comentario en character.base.ts) y sólo puede registrarse una vez.
+- *
+- * Suscripción a onStateChange + render inicial explícito, mismo criterio que
+- * character.hud.ts / board.hud.ts (onStateChange no dispara para el estado con el que la
+- * fsm ya arrancó).
+- */
+ export class StandAloneAnimationController implements IAnimationController {
+   private currentAnimation: AnimationGroup | null = null;
++  private unsubscribe: (() => void) | null = null;
++  private isSubscribed = false;
+ 
+   constructor(
+     private animations: ICharacterAnimations | null,
+-    private standAloneFsm: StandAloneFsm,
++    private getCharacterFsm: () => CharacterFsm, // Recibe el getter perezoso (lazy)
+   ) {
+-    this.standAloneFsm.onStateChange((state) => this._render(state));
+-    this._render(this.standAloneFsm.getState());
++    // IMPORTANTE: Ya no llamamos a la FSM aquí adentro. El constructor queda limpio
++    // para evitar el problema de inicialización asíncrona de TypeScript/JavaScript.
+   }
+ 
+-  /** Nada por frame todavía — hoy todo pasa por onStateChange. Frame-based (ej. blend por velocidad) se agrega cuando haga falta. */
+-  tick(): void {}
++  /** El tick corre en cada cuadro de Babylon de forma segura cuando todo ya está construido */
++public tick(): void {
++    if (!this.isSubscribed) {
++      const fsm = this.getCharacterFsm();
++      if (fsm) {
++        // CORREGIDO: Ya no asignamos a this.unsubscribe porque el método devuelve void
++        fsm.onStandAloneSubStateChange((state) => this._render(state));
++        
++        this._render(fsm.getActiveSubState() as StandAloneSubState);
++        this.isSubscribed = true;
++      }
++    }
++  }
+ 
+-  dispose(): void {
+-    // No dispone `animations` (compartido, dueño: character.base.ts) — sólo pausa lo que
+-    // esta strategy dejó corriendo, para no pisarse con la próxima.
++  public dispose(): void {
+     this.currentAnimation?.stop();
++    this.unsubscribe?.();
+   }
+ 
+   private _render(state: StandAloneSubState): void {
+@@ -52,16 +52,11 @@ export class StandAloneAnimationController implements IAnimationController {
+       case "OnGround":
+         return { animation: this.animations.standing_idle, loop: true };
+       case "JumpImpulseStart":
+-        // No loop: se reproduce una vez; el AnimationEvent (ver character.base.ts) dispara
+-        // notifyJumpImpulseFrame() al llegar al frame de impulso, independientemente de si
+-        // el clip terminó de reproducirse o no.
+         return { animation: this.animations.jump, loop: false };
+       case "OnAir":
+-        // TODO: placeholder — no hay clip de "en el aire a pie" en el GLB actual, se
+-        // reutiliza "falling" (misma solución temporal que en JetpackAnimationController).
+         return { animation: this.animations.falling, loop: true };
+       default:
+         return null;
+     }
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/src/poc/poc3-jetpack_character_fsm/strategies/stand-alone/stand-alone.input.controller.ts b/src/poc/poc3-jetpack_character_fsm/strategies/stand-alone/stand-alone.input.controller.ts
+index 8dcc843..80ee67f 100644
+--- a/src/poc/poc3-jetpack_character_fsm/strategies/stand-alone/stand-alone.input.controller.ts
++++ b/src/poc/poc3-jetpack_character_fsm/strategies/stand-alone/stand-alone.input.controller.ts
+@@ -3,24 +3,24 @@ import type { IInputController } from "../contracts/iinput-controller";
+ import type { CharacterFsm } from "../../character-fsm/character.fsm";
+ import type { CharacterInput } from "../../character.input";
+ 
+-/**
+- * Traduce input crudo -> acción de fsm para el estado StandAlone. El movimiento (WASD) lo
+- * lee directo el physics controller — acá sólo se traduce lo que dispara una TRANSICIÓN.
+- */
+ export class StandAloneInputController implements IInputController {
++  private characterFsm: CharacterFsm;
++
+   constructor(
+     private input: CharacterInput,
+-    private characterFsm: CharacterFsm,
+-  ) {}
++    private getCharacterFsm: () => CharacterFsm, // Recibe el getter seguro
++  ) {
++    this.characterFsm = this.getCharacterFsm();
++  }
+ 
+   tick(): void {
+     if (this.input.consumeEquipJetpackRequest()) {
+       this.characterFsm.requestEquipJetpack();
+     }
+     if (this.input.consumeJumpRequest()) {
+-      this.characterFsm.standAloneSubFsm.requestJump();
++      this.characterFsm.requestJump(); 
+     }
+   }
+ 
+   dispose(): void {}
+-}
+\ No newline at end of file
++}
+diff --git a/src/poc/poc3-jetpack_character_fsm/strategies/stand-alone/stand-alone.strategy.ts b/src/poc/poc3-jetpack_character_fsm/strategies/stand-alone/stand-alone.strategy.ts
+index 83e26fa..4155d43 100644
+--- a/src/poc/poc3-jetpack_character_fsm/strategies/stand-alone/stand-alone.strategy.ts
++++ b/src/poc/poc3-jetpack_character_fsm/strategies/stand-alone/stand-alone.strategy.ts
+@@ -9,32 +9,26 @@ import { StandAlonePhysicsController } from "./stand-alone.physics.controller";
+ import { StandAloneInputController } from "./stand-alone.input.controller";
+ import { StandAloneAnimationController } from "./stand-alone.animation.controller";
+ 
++
++
+ export interface StandAloneStrategyResult {
+   strategy: IVehicleStrategy;
+-  /**
+-   * Referencia concreta (no la interfaz genérica) para que character.base.ts pueda leer
+-   * isGroundDetected()/applyJumpImpulse() sin castear IPhysicsController — mismo criterio
+-   * que JetpackStrategyResult.physicsController para hasFuel().
+-   */
+   physicsController: StandAlonePhysicsController;
+ }
+ 
+-/**
+- * Factory async por convención del repo (mismo criterio que build() en otros POCs).
+- * `characterAnimations` viene de character.base.ts (construido una sola vez junto con
+- * characterMesh/characterAggregate, ver utils.ts) — esta factory NO carga ni clona nada.
+- * `scene` se agrega para el raycast de ground detection (ver stand-alone.physics.controller.ts).
+- */
+ export async function buildStandAloneStrategy(
+   scene: Scene,
+   characterAggregate: PhysicsAggregate,
+   input: CharacterInput,
+-  characterFsm: CharacterFsm,
++  characterFsm: CharacterFsm, // Viene seguro desde CharacterBase
+   characterAnimations: ICharacterAnimations | null,
+ ): Promise<StandAloneStrategyResult> {
++  
+   const physics = new StandAlonePhysicsController(scene, characterAggregate, () => input.current);
+-  const inputController = new StandAloneInputController(input, characterFsm);
+-  const animation = new StandAloneAnimationController(characterAnimations, characterFsm.standAloneSubFsm);
++  
++  // PASAMOS LA FSM COMO GETTER (() => characterFsm) PARA EVITAR EL UNDEFINED POR ASINCRONÍA
++  const inputController = new StandAloneInputController(input, () => characterFsm);
++  const animation = new StandAloneAnimationController(characterAnimations, () => characterFsm);
+ 
+   const strategy: IVehicleStrategy = {
+     physics,
+@@ -53,4 +47,4 @@ export async function buildStandAloneStrategy(
+   };
+ 
+   return { strategy, physicsController: physics };
+-}
+\ No newline at end of file
++}
