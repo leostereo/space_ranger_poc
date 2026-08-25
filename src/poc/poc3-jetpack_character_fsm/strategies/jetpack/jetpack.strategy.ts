@@ -10,28 +10,20 @@ import { JetpackAnimationController } from "./jetpack.animation.controller";
 
 export interface JetpackStrategyResult {
   strategy: IVehicleStrategy;
-  /**
-   * Referencia concreta (no la interfaz genérica) para que character.base.ts pueda leer
-   * hasFuel() sin castear IPhysicsController — hasFuel() es específico de Jetpack, no
-   * pertenece al contrato genérico.
-   */
   physicsController: JetpackPhysicsController;
 }
 
-/**
- * Async por convención — thruster.ts queda para el final, según lo acordado.
- * `characterAnimations` viene de character.base.ts, mismo criterio que en
- * buildStandAloneStrategy. `characterFsm` se agrega para que el animation controller
- * pueda leer/suscribirse a `characterFsm.jetpackSubFsm` (antes no tenía forma de
- * comunicarse con la fsm — ver aclaración en jetpack.animation.controller.ts).
- */
 export async function buildJetpackStrategy(
   characterAggregate: PhysicsAggregate,
   input: CharacterInput,
   characterFsm: CharacterFsm,
   characterAnimations: ICharacterAnimations | null,
 ): Promise<JetpackStrategyResult> {
-  const physics = new JetpackPhysicsController(characterAggregate, () => input.current);
+  const physics = new JetpackPhysicsController(
+    characterAggregate,
+    () => input.current,
+    () => characterFsm.jetpackSubFsm.getState(),
+  );
   const inputController = new JetpackInputController(input, characterFsm);
   const animation = new JetpackAnimationController(characterAnimations, characterFsm.jetpackSubFsm);
 

@@ -1,52 +1,64 @@
 // src/poc3-jetpack_character_fsm/strategies/jetpack/jetpack.physics.controller.ts
 import type { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Vector3, Quaternion } from "@babylonjs/core/Maths/math.vector";
+import { Axis } from "@babylonjs/core/Maths/math.axis";
+import { Scalar } from "@babylonjs/core/Maths/math.scalar";
+import { Tools } from "@babylonjs/core/Misc/tools";
 import type { IPhysicsController } from "../contracts/iphysics-controller";
 import type { CharacterInputState } from "../../character.input";
-import { Scalar } from "@babylonjs/core";
+import type { JetpackSubState } from "../../character-fsm/character.fsm.jetpack";
 
-// TODO: mover a config.general.ts junto con el resto (ver TODO en utils.ts)
-const CHARACTER_MASS = 70; // mismo valor que TMP_CONFIG.characterMass en utils.ts — duplicado a propósito, cada physics controller trae su propia config local (mismo criterio ya usado en stand-alone.physics.controller.ts)
+const CHARACTER_MASS = 70;
 const GRAVITY = 9.81;
-const MAX_FUEL = 5; // segundos de empuje continuo (climb)
-const FUEL_DRAIN_RATE = 1; // unidades de combustible por segundo de empuje
+const MAX_FUEL = 5;
+const FUEL_DRAIN_RATE = 1;
 
-// Spring-damper del hover — mismo patrón que generalConfig.hover en poc2
-// (_applyHoverForce), pero el "target height" acá es un Y absoluto en el mundo, no una
-// distancia al suelo por raycast (no aplica para vuelo libre).
 const HOVER_SPRING_STRENGTH = 20;
 const HOVER_DAMPING = 8;
-const HOVER_MAX_FORCE_FACTOR = 8; // mismo criterio de clamp que poc2 (mass * gravity * factor)
-const THRUST_FORCE = 1400; // Newtons, aplicado ADEMÁS del hover mientras se sostiene Space (~5.7 m/s² extra con esta masa)
-// ── giro ──
-const TURN_SPEED = 2.5;   // rad/s — velocidad angular objetivo al girar (A/D)
-const TURN_DAMPING = 10;  // qué tan rápido se acerca a la velocidad angular objetivo (o vuelve a 0 al soltar)
+const HOVER_MAX_FORCE_FACTOR = 8;
+const THRUST_FORCE = 1400;
 
-// Bob — mismo bobAmplitude/bobFrequency que generalConfig.hover en poc2. Sin esto el hover
-// queda rígido, clavado en un punto; el seno le da la sensación de "flotando" real.
-const BOB_AMPLITUDE = 0.15; // metros
-const BOB_FREQUENCY = 0.5; // Hz
+const BOB_AMPLITUDE = 0.15;
+const BOB_FREQUENCY = 0.5;
 
-/**
- * Física de vuelo: hover estable en Y (spring-damper + compensación de gravedad + bob,
- * portado de _applyHoverForce() en poc2) + Space aplica una fuerza de empuje ADICIONAL
- * (no mueve el target del spring — eso tenía lag, se sentía "mushy"). Mientras empuja, el
- * target del hover sigue la posición actual, así al soltar Space el hover sostiene ahí en
- * vez de tironear de vuelta al punto viejo. Sin horizontal/estabilización todavía — eso
- * llega con los sub-estados Idle/Thrusting/Floating. El combustible vive acá porque es un
- * detalle de ESTA strategy — el padre (CharacterFsm) sólo conoce hasFuel() vía closure.
- */
+// ── giro en "On" — yaw puro, sin roll ──
+const TURN_SPEED = 2.5;
+const TURN_DAMPING = 10;
+
+// ── cruising ──
+const CRUISE_FORWARD_FORCE = 2200;
+const CRUISE_ROLL_ANGLE = Tools.ToRadians(35);
+const CRUISE_ROLL_LERP_SPEED = 6;
+const CRUISE_YAW_FROM_ROLL_FACTOR = 1.5;
+const CRUISE_MAX_PITCH_ANGLE = Tools.ToRadians(40);
+const CRUISE_PITCH_LERP_SPEED = 6;
+const CRUISE_LATERAL_GRIP = 0.9;
+const CRUISE_PITCH_FORCE = 1600; // Newtons, según intensidad de pitch — simétrico arriba/abajo (gravedad se compensa aparte, siempre)
+const MAX_HOVER_CATCH_SPEED = 4; // m/s — tope de velocidad vertical que se le "perdona" al hover al retomar
+
 export class JetpackPhysicsController implements IPhysicsController {
   private fuel = MAX_FUEL;
-  // Altura objetivo en el mundo — arranca en la posición donde se activó el jetpack, y
-  // sigue a la posición actual mientras se empuja (ver tick()).
   private hoverTargetHeight: number;
-  // Acumulador para el bob sinusoidal — mismo rol que elapsedTime en poc2.
   private elapsedTime = 0;
+
+  // Visual (roll/pitch) — aplicado en applyVisualRoll(), llamado desde
+  // onAfterPhysicsObservable en character.base.ts, nunca en tick().
+  private rollAngle = 0;
+  private pitchAngle = 0;
+
+  // Vectores reutilizados, mismo criterio anti-GC que board.controller.ts (poc2).
+  private _forwardReference = Vector3.Forward();
+  private _forwardTemp = new Vector3();
+  private _rightReference = Vector3.Right();
+  private _rightTemp = new Vector3();
+  private _velocityTemp = new Vector3();
+
+  private wasCruisePitching = false;
 
   constructor(
     private characterAggregate: PhysicsAggregate,
     private getInput: () => CharacterInputState,
+    private getSubState: () => JetpackSubState,
   ) {
     this.hoverTargetHeight = this.characterAggregate.transformNode.getAbsolutePosition().y;
   }
@@ -54,15 +66,54 @@ export class JetpackPhysicsController implements IPhysicsController {
   tick(dt: number): void {
     this.elapsedTime += dt;
 
-    const { up } = this.getInput();
+    const { up, forward, backward } = this.getInput();
     if (up && this.fuel > 0) {
       this.fuel = Math.max(0, this.fuel - dt * FUEL_DRAIN_RATE);
       this._applyThrust();
     }
 
-    this._applyHoverForce();
-    this._applyTurn(dt);
+    // Gravedad: SIEMPRE compensada, en todo sub-estado — separada del spring del hover
+    // para que CRUISE_PITCH_FORCE sea simétrico arriba/abajo (antes, subir tenía que pagar
+    // la gravedad de su propio bolsillo y bajar la recibía gratis; de ahí la asimetría).
+    this._applyGravityCompensation();
 
+    const subState = this.getSubState();
+
+    if (subState === "Cruising") {
+      this._updateCruisePitch(dt); // lerp del ángulo ANTES de decidir si hay fuerza que aplicar
+    }
+
+    const cruisePitching = subState === "Cruising" && (forward || backward);
+
+    if (cruisePitching) {
+      // Hover spring 100% apagado mientras se pitchea — mismo criterio 1:1 que poc2:
+      // Hovering vs Falling son mutuamente excluyentes. Acá: el spring sólo corre si NO
+      // estás empujando W/S en Cruising. La gravedad ya está compensada aparte arriba;
+      // sumamos la fuerza de pitch (bidireccional) encima.
+      this.hoverTargetHeight = this.characterAggregate.transformNode.getAbsolutePosition().y;
+      this._applyCruisePitchForce();
+      this.wasCruisePitching = true;
+    } else {
+      if (this.wasCruisePitching) {
+        // Al soltar W/S mientras se venía rápido, no dejamos que el hover tenga que atajar
+        // toda esa velocidad de un golpe con su damping — eso producía el rebote. Se
+        // clampea UNA vez, en la transición, no en cada frame.
+        const velocity = this.characterAggregate.body.getLinearVelocity();
+        const clampedY = Scalar.Clamp(velocity.y, -MAX_HOVER_CATCH_SPEED, MAX_HOVER_CATCH_SPEED);
+        this.characterAggregate.body.setLinearVelocity(new Vector3(velocity.x, clampedY, velocity.z));
+        this.wasCruisePitching = false;
+      }
+      this._applyHoverSpringDamper();
+    }
+
+    if (subState === "Cruising") {
+      this._applyCruiseForward();
+      this._applyCruiseSteering(dt);
+      this._applyCruiseLateralFriction();
+    } else {
+      this._applyTurn(dt);
+      this._decayCruiseVisuals(dt); // relaja roll Y pitch a 0 al volver a "On"
+    }
   }
 
   /** Leído por character.base.ts para armar el dep hasFuel() de CharacterFsm. */
@@ -70,12 +121,45 @@ export class JetpackPhysicsController implements IPhysicsController {
     return this.fuel > 0;
   }
 
+  /** Compensación de gravedad pura — separada del spring del hover para poder desactivar
+   * SÓLO la corrección de altura mientras se pitchea en Cruising, sin perder sustentación. */
+  private _applyGravityCompensation(): void {
+    this.characterAggregate.body.applyForce(
+      new Vector3(0, CHARACTER_MASS * GRAVITY, 0),
+      this.characterAggregate.transformNode.getAbsolutePosition(),
+    );
+  }
+
+  /** Sólo el lerp visual del ángulo — separado de la fuerza para que corra siempre en
+   * Cruising (incluso sin W/S, así decae solo a 0 al soltar). */
+  private _updateCruisePitch(dt: number): void {
+    const { forward, backward } = this.getInput();
+    let targetPitch = 0;
+    if (forward) targetPitch = CRUISE_MAX_PITCH_ANGLE;
+    if (backward) targetPitch = -CRUISE_MAX_PITCH_ANGLE;
+
+    const pitchLerpFactor = 1 - Math.exp(-CRUISE_PITCH_LERP_SPEED * dt);
+    this.pitchAngle += (targetPitch - this.pitchAngle) * pitchLerpFactor;
+  }
+
   /**
-   * Fuerza de empuje directa, además del hover — esto es lo que hace que Space se sienta
-   * como un impulso real en vez de un ajuste lento del punto de equilibrio. Actualiza
-   * hoverTargetHeight a la posición actual en cada frame de empuje, para que el hover no
-   * tire hacia el punto viejo apenas se suelta la tecla.
+   * Fuerza vertical — mismo patrón 1:1 que _applyDiveForce en poc2 (board.controller.ts):
+   * guard por magnitud del ángulo, fuerza proporcional a la intensidad, aplicada en el
+   * punto del cuerpo. Única diferencia real: acá es bidireccional (el signo de pitchAngle
+   * decide arriba/abajo), porque a diferencia de la patineta el jetpack sí puede subir.
    */
+  private _applyCruisePitchForce(): void {
+    if (Math.abs(this.pitchAngle) <= 0.001) return;
+
+    const pitchIntensity = this.pitchAngle / CRUISE_MAX_PITCH_ANGLE; // -1..1
+    const verticalForce = CRUISE_PITCH_FORCE * pitchIntensity;
+
+    this.characterAggregate.body.applyForce(
+      new Vector3(0, verticalForce, 0),
+      this.characterAggregate.transformNode.getAbsolutePosition(),
+    );
+  }
+
   private _applyThrust(): void {
     this.characterAggregate.body.applyForce(
       new Vector3(0, THRUST_FORCE, 0),
@@ -84,35 +168,8 @@ export class JetpackPhysicsController implements IPhysicsController {
     this.hoverTargetHeight = this.characterAggregate.transformNode.getAbsolutePosition().y;
   }
 
-  private _applyTurn(dt: number): void {
-  const { left, right } = this.getInput();
-  const turnDirection = (left ? -1 : 0) + (right ? 1 : 0); // A = -Y, D = +Y
-  const targetAngularVelocity = turnDirection * TURN_SPEED;
-
-    const currentYawVelocity = this.characterAggregate.body.getAngularVelocity().y;
-    const smoothedY = Scalar.Lerp(
-      currentYawVelocity,
-      targetAngularVelocity,
-      Math.min(1, TURN_DAMPING * dt),
-    );
-
-    // Sólo yaw en "On" — x/z forzados a 0 para garantizar cero roll/pitch,
-    // sin depender de que el hover force esté perfectamente balanceado.
-    // Este comportamiento es específico de este sub-estado: cuando entre la
-    // fuerza de arrastre (drag), el giro va a dejar de ser una velocidad
-    // angular pura y probablemente sí queramos algo de roll acoplado a la
-    // velocidad lateral (mismo espíritu que el yaw/roll coordinado de poc2).
-    this.characterAggregate.body.setAngularVelocity(new Vector3(0, smoothedY, 0));
-  }
-
-  /**
-   * Mismo cálculo que _applyHoverForce() en poc2 (error * springStrength - velocidad *
-   * damping, más compensación de gravedad, clamped), adaptado: `error` es contra un Y
-   * absoluto del mundo (hoverTargetHeight + bob) en vez de una distancia al suelo por
-   * raycast. El bob sinusoidal es lo que le da la sensación de "flotando" — sin él, el
-   * hover queda rígido en un punto fijo.
-   */
-  private _applyHoverForce(): void {
+  /** Spring-damper puro — SIN gravedad (ya se compensa aparte, siempre, en tick()). */
+  private _applyHoverSpringDamper(): void {
     const currentY = this.characterAggregate.transformNode.getAbsolutePosition().y;
     const verticalVelocity = this.characterAggregate.body.getLinearVelocity().y;
 
@@ -121,7 +178,6 @@ export class JetpackPhysicsController implements IPhysicsController {
 
     const error = dynamicTargetHeight - currentY;
     let forceY = CHARACTER_MASS * (error * HOVER_SPRING_STRENGTH - verticalVelocity * HOVER_DAMPING);
-    forceY += CHARACTER_MASS * GRAVITY; // compensación de gravedad, igual que poc2
 
     const maxForce = CHARACTER_MASS * GRAVITY * HOVER_MAX_FORCE_FACTOR;
     forceY = Math.max(-maxForce, Math.min(maxForce, forceY));
@@ -132,8 +188,110 @@ export class JetpackPhysicsController implements IPhysicsController {
     );
   }
 
+  /** Giro de "On": velocidad angular directa en Y, sin roll. x/z forzados a 0 cada tick
+   * para garantizar cero roll/pitch pase lo que pase con el resto de las fuerzas. */
+  private _applyTurn(dt: number): void {
+    const { left, right } = this.getInput();
+    const turnDirection = (left ? -1 : 0) + (right ? 1 : 0); // A = -Y, D = +Y (left-handed, ver nota giro invertido)
+    const targetAngularVelocity = turnDirection * TURN_SPEED;
+
+    const currentYawVelocity = this.characterAggregate.body.getAngularVelocity().y;
+    const smoothedY = Scalar.Lerp(
+      currentYawVelocity,
+      targetAngularVelocity,
+      Math.min(1, TURN_DAMPING * dt),
+    );
+
+    this.characterAggregate.body.setAngularVelocity(new Vector3(0, smoothedY, 0));
+  }
+
+  /** Empuje en la dirección forward del mesh mientras Cruising está activo. */
+  private _applyCruiseForward(): void {
+    Vector3.TransformNormalToRef(
+      this._forwardReference,
+      this.characterAggregate.transformNode.getWorldMatrix(),
+      this._forwardTemp,
+    );
+
+    // Proyección horizontal: el empuje de Cruising sólo avanza en XZ. Sin esto, el tilt
+    // visual del pitch (post-física) le mete una componente vertical al forward que
+    // compite/cancela con _applyCruisePitchForce — mismo motivo por el que poc2 zeroea el
+    // Y del forward en _computeSurfaceAlignPitch (evitar feedback loop visual<->física).
+    this._forwardTemp.y = 0;
+    const len = this._forwardTemp.length();
+    if (len < 0.0001) return;
+    this._forwardTemp.scaleInPlace(1 / len);
+
+    this.characterAggregate.body.applyForce(
+      this._forwardTemp.scale(CRUISE_FORWARD_FORCE),
+      this.characterAggregate.transformNode.getAbsolutePosition(),
+    );
+  }
+
+  /** Steering en Cruising: roll visual + yaw físico derivado del roll — portado de
+   * _updateRollAndYaw en poc2 (board.controller.ts). */
+  private _applyCruiseSteering(dt: number): void {
+    const { left, right } = this.getInput();
+    let targetRoll = 0;
+    if (left) targetRoll += CRUISE_ROLL_ANGLE;
+    if (right) targetRoll -= CRUISE_ROLL_ANGLE;
+
+    const rollLerpFactor = 1 - Math.exp(-CRUISE_ROLL_LERP_SPEED * dt);
+    this.rollAngle += (targetRoll - this.rollAngle) * rollLerpFactor;
+
+    const yawRate = -this.rollAngle * CRUISE_YAW_FROM_ROLL_FACTOR;
+    const current = this.characterAggregate.body.getAngularVelocity();
+    this.characterAggregate.body.setAngularVelocity(new Vector3(current.x * 0.9, yawRate, current.z * 0.9));
+  }
+
+  /**
+   * Anula la velocidad lateral (perpendicular al forward del mesh) — mismo fix que
+   * _applyLateralFriction() en poc2 (board.controller.ts) para el "piso enjabonado":
+   * sin esto, al girar en Cruising el momentum sigue empujando en la dirección vieja
+   * mientras el mesh ya rotó, y el cuerpo desliza de costado en vez de "morder" la curva.
+   */
+  private _applyCruiseLateralFriction(): void {
+    this.characterAggregate.body.getLinearVelocityToRef(this._velocityTemp);
+    Vector3.TransformNormalToRef(
+      this._rightReference,
+      this.characterAggregate.transformNode.getWorldMatrix(),
+      this._rightTemp,
+    );
+
+    const lateralSpeed = Vector3.Dot(this._velocityTemp, this._rightTemp);
+
+    if (Math.abs(lateralSpeed) > 0.01) {
+      const counterForce = this._rightTemp.scale(-lateralSpeed * CHARACTER_MASS * CRUISE_LATERAL_GRIP);
+      this.characterAggregate.body.applyForce(
+        counterForce,
+        this.characterAggregate.transformNode.getAbsolutePosition(),
+      );
+    }
+  }
+
+  /** Relaja roll/pitch a 0 al volver a "On", para no dejar el mesh inclinado. */
+  private _decayCruiseVisuals(dt: number): void {
+    if (this.rollAngle === 0 && this.pitchAngle === 0) return;
+    const lerpFactor = 1 - Math.exp(-CRUISE_ROLL_LERP_SPEED * dt);
+    this.rollAngle += (0 - this.rollAngle) * lerpFactor;
+    this.pitchAngle += (0 - this.pitchAngle) * lerpFactor;
+  }
+
+  /** 100% visual, no toca física — mismo patrón que BoardController.applyVisualRoll()
+   * en poc2. Llamado desde onAfterPhysicsObservable en character.base.ts. */
+  applyVisualRoll(): void {
+    const node = this.characterAggregate.transformNode;
+    if (!node.rotationQuaternion) return;
+
+    const rollQuat = Quaternion.RotationAxis(Axis.Z, this.rollAngle);
+    // Invertido — mismo motivo que el yaw de "On" (Babylon left-handed). El signo de
+    // pitchAngle NO se toca acá: eso maneja la fuerza real y ya está correcto (W sube,
+    // S baja); sólo la representación visual estaba al revés.
+    const pitchQuat = Quaternion.RotationAxis(Axis.X, -this.pitchAngle);
+    node.rotationQuaternion = node.rotationQuaternion.multiply(rollQuat.multiply(pitchQuat));
+  }
+
   dispose(): void {
     // No posee characterAggregate (compartida, dueño: character.base.ts) — nada que liberar acá todavía.
-    // (jetpack.thruster.ts, cuando se implemente, sí va a tener recursos propios para liberar.)
   }
 }

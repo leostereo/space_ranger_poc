@@ -94,6 +94,10 @@ export function character_builder(scene: Scene): CharacterBuildResult {
     scene,
   );
 
+          const camera = AssetManager.getCamera('follow', false, 'camera')
+          camera.lockedTarget = character;
+          scene.activeCamera = camera;
+
   return {
     characterMesh: capsule,
     characterAggregate,

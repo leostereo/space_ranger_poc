@@ -1,21 +1,28 @@
 // src/poc3-jetpack_character_fsm/character-fsm/character.fsm.jetpack.ts
-
 import { BaseFsm, TransitionTable } from "../abstract/base-fsm";
 
 /**
- * B2 — Jetpack. Alcance MÍNIMO para esta primera pasada: un solo estado `On`.
- * `Idle`/`Thrusting`/`Floating` (ver poc3.md, diagrama tentativo) quedan para cuando la
- * física básica de vuelo esté probada — mismo criterio que poc2 (Paso 4a: física mínima
- * sin input antes de sub-estados finos).
+ * B2 — Jetpack. Ahora con dos estados: `On` (hover + thrust + yaw puro) y `Cruising`
+ * (Shift sostenido: drag forward + steering con roll/yaw derivado + pitch bidireccional).
+ * `Idle`/`Thrusting`/`Floating` del diagrama original quedan pendientes — ver poc3.md.
  */
-export type JetpackSubState = "On";
+export type JetpackSubState = "On" | "Cruising";
+
+export interface JetpackFsmDeps {
+  isCruiseHeld: () => boolean;
+}
 
 export class JetpackFsm extends BaseFsm<JetpackSubState> {
   protected transitions: TransitionTable<JetpackSubState> = {
-    On: {},
+    On: {
+      Cruising: () => this.deps.isCruiseHeld(),
+    },
+    Cruising: {
+      On: () => !this.deps.isCruiseHeld(),
+    },
   };
 
-  constructor() {
+  constructor(private deps: JetpackFsmDeps) {
     super();
     this.state = "On";
   }

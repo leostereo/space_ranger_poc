@@ -231,7 +231,7 @@ export class AssetManager {
             jump: cloneOne(mold.jump),
             falling: cloneOne(mold.falling),
             floating: cloneOne(mold.floating),
-            flying: cloneOne(mold.floating),
+            flying: cloneOne(mold.flying),
             falling_idle: cloneOne(mold.falling_idle)
         };
     }
