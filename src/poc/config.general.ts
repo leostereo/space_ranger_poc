@@ -90,7 +90,8 @@ export const generalConfig = {
   },
   playerConfig: {
     initialLives: 5,
-    height: 1.8,
+    // height: 1.8,
+    height: 0.8,
     capsuleRadius: 0.4,
     aimHeightMultiplier: 0.5,
     capsuleBottomPoint: -0.5,

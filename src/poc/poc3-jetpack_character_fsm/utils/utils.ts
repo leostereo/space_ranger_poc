@@ -31,12 +31,8 @@ export function scene_builder(scene: Scene): PhysicsAggregate[] {
   const ground = MeshBuilder.CreateGround("ground", { width: TMP_CONFIG.groundSize, height: TMP_CONFIG.groundSize }, scene);
   const groundAggregate = new PhysicsAggregate(ground, PhysicsShapeType.BOX, { mass: 0 }, scene);
 
-  // const mapResult = AssetManager.getMesh('batalla del pilar','map')
-  // const map = mapResult?.mesh as Mesh;
-  // map.position.y = 300;
-  // map.rotation._x = Tools.ToRadians(-60);
-
   createPlatforms(scene);
+  addMapAggregate(scene);
 
   return [groundAggregate];
 }
@@ -114,9 +110,9 @@ export function character_builder(scene: Scene): CharacterBuildResult {
     scene,
   );
 
-          const camera = AssetManager.getCamera('follow', false, 'camera')
-          camera.lockedTarget = character;
-          scene.activeCamera = camera;
+  const camera = AssetManager.getCamera('follow', false, 'camera')
+  camera.lockedTarget = character;
+  scene.activeCamera = camera;
 
   return {
     characterMesh: capsule,
@@ -133,10 +129,10 @@ const platformsData = [
 ];
 
 
-const createPlatforms = (scene:Scene) => {
+const createPlatforms = (scene: Scene) => {
 
-   const { width, depth, thickness, friction, color } = generalConfig.ground;
-  
+  const { width, depth, thickness, friction, color } = generalConfig.ground;
+
   const material = AssetManager.getGridMaterial('grid-ground');
 
   platformsData.forEach((data) => {
@@ -162,4 +158,12 @@ const createPlatforms = (scene:Scene) => {
       scene,
     );
   });
+}
+
+const addMapAggregate = (scene: Scene) => {
+  const ground = scene.getMeshByName('FUSION_SUELO')
+  if (ground) {
+    const groundAggregate = new PhysicsAggregate(ground, PhysicsShapeType.BOX, { mass: 0 }, scene);
+  }
+
 }
