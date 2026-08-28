@@ -1,5 +1,5 @@
 // src/poc2-floating_board_fsm/board-fsm/board.fsm.falling.ts
-import { BaseFsm, TransitionTable } from "../abstract/base-fsm";
+import { BaseFsm, TransitionTable } from "../../abstract/base-fsm";
 
 // ✨ Agregamos "Dropping" a la lista de sub-estados
 export type FallingSubState = "Dropping" | "Gliding" | "Diving" | "GliderBoost";

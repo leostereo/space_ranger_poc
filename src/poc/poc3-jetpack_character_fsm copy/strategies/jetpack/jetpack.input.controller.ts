@@ -13,13 +13,13 @@ export class JetpackInputController implements IInputController {
   constructor(
     private input: CharacterInput,
     private characterFsm: CharacterFsm,
-  ) {}
+  ) { }
 
   tick(): void {
-    if (this.input.consumeEquipJetpackRequest()) {
+    if (this.input.consumeEquipRequest()) {
       this.characterFsm.requestUnequipJetpack();
     }
   }
 
-  dispose(): void {}
+  dispose(): void { }
 }

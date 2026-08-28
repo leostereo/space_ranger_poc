@@ -1,5 +1,5 @@
 // src/poc2-floating_board_fsm/board-fsm/board.fsm.ts
-import { BaseFsm, TransitionTable } from "../abstract/base-fsm";
+import { BaseFsm, TransitionTable } from "../../abstract/base-fsm";
 import { BoardFsmHovering, type HoveringSubState } from "./board.fsm.hovering";
 import { BoardFsmFalling, type FallingSubState } from "./board.fsm.falling";
 

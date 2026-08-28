@@ -24,7 +24,7 @@ export const pocRegistry: PocDefinition[] = [
     load: () => import("./poc3-jetpack_character_fsm/character.base"),
   },
   {
-    id: "poc3-character-jetPack",
+    id: "poc3-character-jetPackKKKK",
     label: "POC 4 · Character JetPack and hoverBoard",
     description: "Integrate character , jetcp and hoverBoard",
     load: () => import("./poc3-jetpack_character_fsm copy/character.base"),

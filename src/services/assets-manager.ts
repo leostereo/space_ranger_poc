@@ -55,6 +55,13 @@ export interface ICharacterAnimations {
     floating: AnimationGroup;
     flying: AnimationGroup;
     falling_idle: AnimationGroup,
+
+    jump_on_board: AnimationGroup,
+    walking_forward: AnimationGroup,
+    walking_backwards: AnimationGroup,
+    running_normal: AnimationGroup,
+    running_fast: AnimationGroup,
+
 }
 
 export interface MeshInstanceResult {
@@ -98,7 +105,7 @@ export class AssetManager {
             };
 
             // --- RECURSO 2: Modelo GLB Externo ---
-            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver5.glb");
+            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver6.glb");
             tareaGLB.onSuccess = (task) => {
                 // Buscamos el nodo raíz que crea automáticamente Babylon para los GLB
 
@@ -279,17 +286,27 @@ export class AssetManager {
         const floating = find("floating");
         //const falling_to_landing = find("falling ro landing"); repetido
 
+        const jump_on_board = find("jump on board");
+        const walking_forward = find("walking forward");
+        const walking_backwards = find("walking backwards");
+        const running_normal = find("running normal");
+        const running_fast = find("running fast");
+
+
 
         if (!standing_idle || !cruising_forward_idle || !cruising_faster_idle || !cruising_maxVel_idle ||
             !standing_to_crouch || !crouch_to_standing || !jump || !falling || !falling_idle ||
-            !flying || !floating) {
+            !flying || !floating || !jump_on_board || !walking_forward || !walking_backwards ||
+            !running_normal || !running_fast) {
             console.warn("AssetManager: faltan animaciones de 'character' — revisar nombres de clips en el GLB.");
             return;
         }
 
         const mold: ICharacterAnimations = {
             standing_idle, cruising_forward_idle, cruising_faster_idle, cruising_maxVel_idle,
-            standing_to_crouch, crouch_to_standing, jump, falling, floating, flying, falling_idle
+            standing_to_crouch, crouch_to_standing, jump, falling, floating, flying,
+            falling_idle, jump_on_board, walking_forward, walking_backwards,
+            running_fast,running_normal
         };
 
         Object.values(mold).forEach((ag) => {
@@ -323,7 +340,14 @@ export class AssetManager {
             falling: cloneOne(mold.falling),
             floating: cloneOne(mold.floating),
             flying: cloneOne(mold.flying),
-            falling_idle: cloneOne(mold.falling_idle)
+            falling_idle: cloneOne(mold.falling_idle),
+
+            walking_backwards: cloneOne(mold.walking_backwards),
+            walking_forward: cloneOne(mold.walking_forward),
+            jump_on_board: cloneOne(mold.jump_on_board),
+            running_fast: cloneOne(mold.running_fast),
+            running_normal: cloneOne(mold.running_normal),
+            
         };
     }
 

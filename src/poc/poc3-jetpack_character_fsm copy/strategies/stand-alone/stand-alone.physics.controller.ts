@@ -15,7 +15,7 @@ const GROUND_FRICTION = 0.8;
 const GROUND_RESTITUTION = 0;
 const GROUND_RAY_MARGIN = 0.15;
 const UPWARD_VELOCITY_THRESHOLD = 0.5;
-const JUMP_IMPULSE = 6;
+const JUMP_IMPULSE = 10;
 
 /** Física de OnGround/OnAir: girar con A/D, mover adelante/atrás con W/S (relativo a facing), detectar piso, saltar. */
 export class StandAlonePhysicsController implements IPhysicsController {
@@ -48,26 +48,20 @@ export class StandAlonePhysicsController implements IPhysicsController {
     }
   }
 
-  tick(dt: number): void {
-    this._updateGroundDetection();
+tick(dt: number): void {
+  this._updateGroundDetection();
 
-    const { forward, backward, left, right, cruise } = this.getInput();
+  const { forward, backward, left, right, cruise } = this.getInput();
 
-    this._applyTurn(left, right, dt);
-    this._applyMove(forward, backward, cruise);
-  }
+  this._applyTurn(left, right); // ← ya no necesita dt, la física integra la velocidad angular sola
+  this._applyMove(forward, backward, cruise);
+}
 
   /** A/D: rotación pura en Y, transversal a Idle/Walking/Running (funciona esté o no en movimiento). */
-  private _applyTurn(left: boolean, right: boolean, dt: number): void {
-    if (!left && !right) return;
-
-    const transformNode = this.characterAggregate.transformNode;
-    if (!transformNode.rotationQuaternion) return;
-
-    const turnDir = (right ? 1 : 0) - (left ? 1 : 0);
-    const deltaRotation = Quaternion.RotationAxis(Vector3.Up(), turnDir * TURN_SPEED * dt);
-    transformNode.rotationQuaternion = deltaRotation.multiply(transformNode.rotationQuaternion);
-  }
+private _applyTurn(left: boolean, right: boolean): void {
+  const turnDir = (right ? 1 : 0) - (left ? 1 : 0);
+  this.characterAggregate.body.setAngularVelocity(new Vector3(0, turnDir * TURN_SPEED, 0));
+}
 
   /** W/S: avanza/retrocede según el forward actual (ya rotado por _applyTurn). Sin input, frena en seco horizontalmente. */
   private _applyMove(forward: boolean, backward: boolean, cruise: boolean): void {

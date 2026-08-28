@@ -1,5 +1,5 @@
 import { generalConfig } from "@/poc/config.general";
-import { BaseFsm, TransitionTable } from "../abstract/base-fsm";
+import { BaseFsm, TransitionTable } from "../../abstract/base-fsm";
 
 export type HoveringSubState =
   | "CruisingIdle"
