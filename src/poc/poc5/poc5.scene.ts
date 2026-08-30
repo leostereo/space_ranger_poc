@@ -1,6 +1,7 @@
-import { MeshBuilder, PhysicsAggregate, PhysicsShapeType, Scene } from "@babylonjs/core";
+import { Mesh, MeshBuilder, PhysicsAggregate, PhysicsShapeType, Scene } from "@babylonjs/core";
 import { Poc } from "../types";
 import { AssetManager } from "@/services/assets-manager";
+import { inicializarPersonajePoc5 } from "./character/inicializarPersonajePoc5"
 
 export default class poc5 implements  Poc { 
 
@@ -12,6 +13,13 @@ export default class poc5 implements  Poc {
           // _builGrounds() esté activo en AssetManager (hoy está comentado ahí).
           const ground = MeshBuilder.CreateGround("ground", { width: 10, height: 10 }, scene);
           const groundAggregate = new PhysicsAggregate(ground, PhysicsShapeType.BOX, { mass: 0 }, scene);
+
+        const characterResult = AssetManager.getMesh("character", "character");
+        
+        if (characterResult?.mesh) {
+            characterResult.mesh.position.y = 5;
+            inicializarPersonajePoc5(scene, characterResult?.mesh as Mesh);
+        }
 
         return Promise.resolve();   
     }
