@@ -3,12 +3,13 @@ import { StandAloneFsm, type StandAloneSubState } from "./character.fsm.stand-al
 import { JetpackFsm, type JetpackSubState } from "./character.fsm.jetpack";
 import { BoardFsm } from "./board-fsm/board.fsm";
 import { OnGroundSubState } from "./character.fsm.stand-alone.on-ground";
+import type { HoveringSubState } from "./board-fsm/board.fsm.hovering";
+import type { FallingSubState } from "./board-fsm/board.fsm.falling";
 
 export type CharacterMainState =
   | "StandAlone"
   | "EquippingJetpack"
   | "Jetpack"
-  | "EquippingBoard"
   | "HoverBoard";
 
 export interface CharacterFsmDeps {
@@ -23,7 +24,7 @@ export interface CharacterFsmDeps {
   isMoveHeld: () => boolean;
   isRunHeld: () => boolean;
   /** Se dispara al ENTRAR a EquippingBoard: por ahora, sólo console.log + auto-advance (ver character.base.ts). */
-  onEnterEquippingBoard: () => void;
+  onEnterHoverBoard: () => void;
 
   // --------------------------------------------------------------
   // Threading hacia BoardFsmDeps. TEMPORAL: stubbeados en character.base.ts
@@ -85,7 +86,7 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
     this.transitions = {
       StandAlone: {
         EquippingJetpack: true,
-        EquippingBoard: true,
+        HoverBoard: true, // vía notifyBoardReady(), manual — mismo patrón que Jetpack
       },
       EquippingJetpack: {
         Jetpack: true,
@@ -93,11 +94,8 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
       Jetpack: {
         StandAlone: () => !this.deps.hasFuel() || this.unequipRequested,
       },
-      EquippingBoard: {
-        HoverBoard: true, // vía notifyBoardReady(), manual — mismo patrón que notifyJetpackReady()
-      },
       HoverBoard: {
-        // placeholder: sin salida todavía, se define junto con el strategy real de hoverboard
+        // placeholder: sin salida todavía
       },
     };
   }
@@ -127,14 +125,16 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
       return;
     }
 
-    if (
-      this.standAloneSubFsm.getState() === "OnGround" &&
-      this.standAloneSubFsm.onGroundSubFsm.getState() === "Running"
-    ) {
-      this.setState("EquippingBoard");
-      return;
+    // antes saltaba directo a "EquippingBoard"; ahora delega al bridge del sub-FSM,
+    // que recién dispara el swap real cuando termina la animación.
+    this.standAloneSubFsm.onGroundSubFsm.requestEquipHoverBoard();
+  }
+
+  /** Llamado por el AnimationEvent del clip de equip al llegar al frame clave — dispara el swap real. */
+  notifyBoardReady(): void {
+    if (this.state === "StandAlone") {
+      this.setState("HoverBoard");
     }
-    // ni OnAir ni OnGround+Running: no pasa nada
   }
 
   notifyJetpackReady(): void {
@@ -143,12 +143,7 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
     }
   }
 
-  /** Llamado al terminar la animación puente + crear el board + hacer el parenting. */
-  notifyBoardReady(): void {
-    if (this.state === "EquippingBoard") {
-      this.setState("HoverBoard");
-    }
-  }
+
 
   requestUnequipJetpack(): void {
     if (this.state === "Jetpack") {
@@ -156,21 +151,23 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
     }
   }
 
-getActiveSubState(): StandAloneSubState | OnGroundSubState | JetpackSubState | "Loading" {
-  if (this.state === "StandAlone") return this.standAloneSubFsm.getActiveSubState();
-  if (this.state === "Jetpack") return this.jetpackSubFsm.getState();
-  return "Loading";
-}
+  getActiveSubState(): StandAloneSubState | OnGroundSubState | JetpackSubState | HoveringSubState | FallingSubState | "Loading" {
+    if (this.state === "StandAlone") return this.standAloneSubFsm.getActiveSubState();
+    if (this.state === "Jetpack") return this.jetpackSubFsm.getState();
+    if (this.state === "HoverBoard") return this.boardSubFsm.getActiveSubState();
+    return "Loading";
+  }
+
   protected onEnter(state: CharacterMainState): void {
     if (state === "EquippingJetpack") this.deps.onEnterEquippingJetpack();
-    if (state === "EquippingBoard") this.deps.onEnterEquippingBoard();
+    if (state === "HoverBoard") this.deps.onEnterHoverBoard(); // ← reemplaza onEnterEquippingBoard
     if (state === "StandAlone") {
       this.deps.onEnterStandAlone();
       this.unequipRequested = false;
     }
   }
 
-  protected onExit(_state: CharacterMainState): void {}
+  protected onExit(_state: CharacterMainState): void { }
 
   dispose(): void {
     this.standAloneSubFsm.dispose();

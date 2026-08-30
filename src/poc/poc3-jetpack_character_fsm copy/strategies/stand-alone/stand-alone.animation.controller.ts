@@ -48,6 +48,8 @@ export class StandAloneAnimationController implements IAnimationController {
         return { animation: this.animations.walking_forward, loop: true };
       case "Running":
         return { animation: this.animations.running_normal, loop: true };
+      case "EquippingHoverBoardStart":
+        return { animation: this.animations.jump_on_board, loop: false };
       case "JumpImpulseStart":
         return { animation: this.animations.jump, loop: false };
       case "OnAir":

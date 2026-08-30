@@ -14,8 +14,11 @@ import { character_builder, scene_builder } from "./utils/utils";
 import { buildStandAloneStrategy, type StandAloneStrategyResult } from "./strategies/stand-alone/stand-alone.strategy";
 import { buildJetpackStrategy, type JetpackStrategyResult } from "./strategies/jetpack/jetpack.strategy";
 import type { IVehicleStrategy } from "./strategies/contracts/ivehicle-strategy";
+import { board_builder } from "./strategies/hover-board/board.builder";
+import { generalConfig } from "../config.general";
 
 const JUMP_IMPULSE_FRAME = 30;
+const EQUIP_BOARD_FRAME = 60; // placeholder — ajustar cuando definan el frame real del clip
 
 export default class CharacterBase implements Poc {
   private scene: Scene;
@@ -35,6 +38,9 @@ export default class CharacterBase implements Poc {
 
   private beforePhysicsObserver: Nullable<Observer<Scene>> = null;
   private afterPhysicsObserver: Nullable<Observer<Scene>> = null;
+
+  private _activeBoardMesh: Mesh | null = null;
+  private _activeBoardAggregate: PhysicsAggregate | null = null;
 
   async build(scene: Scene): Promise<void> {
     this.scene = scene;
@@ -60,22 +66,7 @@ export default class CharacterBase implements Poc {
       isCruiseHeld: () => this.input.current.cruise,
       isMoveHeld: () => this.input.current.forward || this.input.current.backward,
       isRunHeld: () => this.input.current.cruise,
-
-      // ----------------------------------------------------------------
-      // POC4 — bridge hacia hoverboard. Por ahora sólo console.log +
-      // auto-advance a HoverBoard, para validar el pipeline end-to-end.
-      // Cuando se porte la animación real, notifyBoardReady() se mueve al
-      // callback de fin de animación en vez de llamarse acá directo.
-      // ----------------------------------------------------------------
-      onEnterEquippingBoard: () => {
-        console.log("[CharacterFsm] EquippingBoard: animación puente + crear board + parenting (TODO)");
-        this.fsm.notifyBoardReady();
-      },
-
-      // ----------------------------------------------------------------
-      // TEMPORAL — stubs de BoardFsmDeps hasta portar board.physics.controller.ts
-      // de POC2. No representan comportamiento real todavía.
-      // ----------------------------------------------------------------
+      onEnterHoverBoard: () => this._swapToHoverBoard(),
       groundLostElapsed: () => 0,
       coyoteTime: 0.2,
       onEnterHovering: () => { },
@@ -91,6 +82,7 @@ export default class CharacterBase implements Poc {
     });
 
     this._wireJumpAnimationEvent();
+    this._wireEquipBoardAnimationEvent();
 
     const { strategy, physicsController } = await buildStandAloneStrategy(
       this.scene,
@@ -115,6 +107,18 @@ export default class CharacterBase implements Poc {
     jumpAnimation.addEvent(
       new AnimationEvent(JUMP_IMPULSE_FRAME, () => {
         this.fsm.standAloneSubFsm.notifyJumpImpulseFrame();
+      }, false),
+    );
+  }
+
+  private _wireEquipBoardAnimationEvent(): void {
+    const equipAnimation = this.characterAnimations?.jump_on_board.targetedAnimations[0]?.animation;
+    if (!equipAnimation) return;
+
+    equipAnimation.addEvent(
+      new AnimationEvent(EQUIP_BOARD_FRAME, () => {
+        this.fsm.standAloneSubFsm.onGroundSubFsm.notifyEquipAnimationFrame();
+        this.fsm.notifyBoardReady();
       }, false),
     );
   }
@@ -160,6 +164,42 @@ export default class CharacterBase implements Poc {
     );
     this.activeStrategy = strategy;
     this.activeStandAlonePhysics = physicsController;
+  }
+
+  private async _swapToHoverBoard(): Promise<void> {
+    this.activeStandAlonePhysics = null;
+    this.activeStrategy?.dispose();
+
+    // La cápsula deja de tener su propio PhysicsAggregate — el del board pasa a mover
+    // todo por parenting. Se conserva la posición actual para spawnear el board ahí
+    // (sin salto visual), y se conserva characterMesh (con el skater ya adentro) tal cual.
+    const spawnPosition = this.characterAggregate.transformNode.getAbsolutePosition().clone();
+    this.characterAggregate.dispose();
+
+    const { boardMesh, boardAggregate } = board_builder(this.scene, spawnPosition);
+
+    // Parenting — mismos offsets que board_character_builder (POC2), con capsuleHeight
+    // corregido al valor real de POC4 (generalConfig.playerConfig.height = 0.8, no el 2
+    // hardcodeado de POC2).
+    this.characterMesh.setParent(boardMesh);
+    this.characterMesh.rotationQuaternion = null;
+
+    const capsuleHeight = generalConfig.playerConfig.height;
+    const offsetX_Capsule = 0.15;
+    const offsetZ_Capsule = -0.15;
+    const boardThicknessOffset = 0.1;
+    const capsuleYOffset = capsuleHeight / 2 + boardThicknessOffset;
+
+    this.characterMesh.position.set(offsetX_Capsule, capsuleYOffset, offsetZ_Capsule);
+    this.characterMesh.rotation.set(0, -Math.PI / 8, 0);
+
+    this._activeBoardMesh = boardMesh;
+    this._activeBoardAggregate = boardAggregate;
+
+    // TODO: HoverBoardStrategy real (physics/input/animation portados de BoardController) —
+    // placeholder por ahora, sólo para confirmar que el board se crea y el parenting queda bien.
+    this.activeStrategy = null;
+    console.log("[CharacterFsm] HoverBoard: board creado + parenting aplicado. Falta HoverBoardStrategy real.");
   }
 
   dispose(): void {

@@ -1,16 +1,9 @@
 import { BaseFsm, TransitionTable } from "../abstract/base-fsm";
 
-/**
- * Sub-FSM de OnGround: Idle <-> Walking <-> Running.
- * A diferencia de JumpImpulseStart (edge-triggered vía requestJump()), estas transiciones
- * son level-triggered por input sostenido — mismo criterio que Jetpack Cruising (isCruiseHeld).
- */
-export type OnGroundSubState = "Idle" | "Walking" | "Running";
+export type OnGroundSubState = "Idle" | "Walking" | "Running" | "EquippingHoverBoardStart";
 
 export interface OnGroundFsmDeps {
-  /** true mientras W o S está presionado */
   isMoveHeld: () => boolean;
-  /** true mientras Shift está presionado */
   isRunHeld: () => boolean;
 }
 
@@ -19,7 +12,7 @@ export class OnGroundFsm extends BaseFsm<OnGroundSubState> {
 
   constructor(private deps: OnGroundFsmDeps) {
     super();
-    this.state = "Idle"; // estado inicial: asignado directo, no vía setState
+    this.state = "Idle";
 
     this.transitions = {
       Idle: {
@@ -30,11 +23,31 @@ export class OnGroundFsm extends BaseFsm<OnGroundSubState> {
         Running: () => this.deps.isMoveHeld() && this.deps.isRunHeld(),
       },
       Running: {
-        // Sin W/S, Running no puede sostenerse aunque Shift siga presionado
         Idle: () => !this.deps.isMoveHeld(),
         Walking: () => this.deps.isMoveHeld() && !this.deps.isRunHeld(),
+        EquippingHoverBoardStart: true, // vía requestEquipHoverBoard(), edge-triggered
+      },
+      // Bridge — nunca sale sola en tick(), sólo vía notifyEquipAnimationFrame(),
+      // mismo patrón que JumpImpulseStart -> OnAir en StandAloneFsm.
+      EquippingHoverBoardStart: {
+        Idle: true, // destino irrelevante en la práctica: el sub-FSM entero se destruye
+                    // al hacer el swap de strategy a HoverBoard.
       },
     };
+  }
+
+  /** Único punto de entrada — sólo tiene efecto si estás en Running. */
+  requestEquipHoverBoard(): void {
+    if (this.state === "Running") {
+      this.setState("EquippingHoverBoardStart");
+    }
+  }
+
+  /** Llamado por el AnimationEvent del clip "jump_on_board" al llegar al frame clave. */
+  notifyEquipAnimationFrame(): void {
+    if (this.state === "EquippingHoverBoardStart") {
+      this.setState("Idle");
+    }
   }
 
   protected onEnter(_state: OnGroundSubState): void {}
