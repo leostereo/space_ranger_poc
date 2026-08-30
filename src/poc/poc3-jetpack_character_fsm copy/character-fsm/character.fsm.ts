@@ -95,7 +95,7 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
         StandAlone: () => !this.deps.hasFuel() || this.unequipRequested,
       },
       HoverBoard: {
-        // placeholder: sin salida todavía
+        StandAlone: true, // vía requestUnequipBoard(), manual — mismo criterio que requestUnequipJetpack
       },
     };
   }
@@ -143,11 +143,15 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
     }
   }
 
-
-
   requestUnequipJetpack(): void {
     if (this.state === "Jetpack") {
       this.unequipRequested = true;
+    }
+  }
+
+  requestUnequipBoard(): void {
+    if (this.state === "HoverBoard") {
+      this.setState("StandAlone");
     }
   }
 

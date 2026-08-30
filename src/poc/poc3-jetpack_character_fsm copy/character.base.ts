@@ -1,10 +1,9 @@
 import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
-import type { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import type { Observer } from "@babylonjs/core/Misc/observable";
 import type { Nullable } from "@babylonjs/core/types";
 import { Quaternion } from "@babylonjs/core/Maths/math.vector";
-import { AnimationEvent } from "@babylonjs/core";
+import { AnimationEvent, PhysicsShapeType } from "@babylonjs/core";
 import type { ICharacterAnimations } from "@/services/assets-manager";
 import { Poc } from "../types";
 import { CharacterFsm } from "./character-fsm/character.fsm";
@@ -16,6 +15,8 @@ import { buildJetpackStrategy, type JetpackStrategyResult } from "./strategies/j
 import type { IVehicleStrategy } from "./strategies/contracts/ivehicle-strategy";
 import { board_builder } from "./strategies/hover-board/board.builder";
 import { generalConfig } from "../config.general";
+import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
+
 
 const JUMP_IMPULSE_FRAME = 30;
 const EQUIP_BOARD_FRAME = 60; // placeholder — ajustar cuando definan el frame real del clip
@@ -128,11 +129,16 @@ export default class CharacterBase implements Poc {
       const dt = this.scene.getEngine().getDeltaTime() / 1000;
       this.activeStrategy?.tick(dt);
       this.fsm.tick();
+      if (this.fsm.getState() === "HoverBoard" && this.input.consumeEquipRequest()) {
+        this.fsm.requestUnequipBoard();
+      }
     });
 
     this.afterPhysicsObserver = this.scene.onAfterPhysicsObservable.add(() => {
       this.activeJetpackPhysics?.applyVisualRoll();
     });
+
+
   }
 
   private async _swapToJetpack(): Promise<void> {
@@ -154,6 +160,29 @@ export default class CharacterBase implements Poc {
   private async _swapToStandAlone(): Promise<void> {
     this.activeJetpackPhysics = null;
     this.activeStrategy?.dispose();
+
+    // Si veníamos de HoverBoard: deshacer el parenting del board y recrear el
+    // PhysicsAggregate individual de la cápsula (se había disponido al entrar a HoverBoard).
+    if (this._activeBoardMesh && this._activeBoardAggregate) {
+      const spawnPosition = this.characterMesh.getAbsolutePosition().clone();
+
+      this.characterMesh.setParent(null);
+      this.characterMesh.position.copyFrom(spawnPosition);
+      this.characterMesh.rotationQuaternion = Quaternion.Identity();
+      this.characterMesh.rotation.set(0, 0, 0);
+
+      this._activeBoardAggregate.dispose();
+      this._activeBoardMesh.dispose();
+      this._activeBoardMesh = null;
+      this._activeBoardAggregate = null;
+
+      this.characterAggregate = new PhysicsAggregate(
+        this.characterMesh,
+        PhysicsShapeType.CAPSULE,
+        { mass: 70 }, // TMP_CONFIG.characterMass, mismo valor que character_builder
+        this.scene,
+      );
+    }
 
     const { strategy, physicsController } = await buildStandAloneStrategy(
       this.scene,
