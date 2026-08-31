@@ -53,6 +53,7 @@ export async function buildHoverBoardStrategy(
         dispose() {
             physics.dispose();
             inputController.dispose();
+            animation.dispose();
         },
     };
 
