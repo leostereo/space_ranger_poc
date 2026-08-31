@@ -129,8 +129,7 @@ export class HoverBoardPhysicsController {
 
   getVerticalVelocity(): number { return this.verticalVelocity; }
   getVerticalAcceleration(): number { return this.verticalAcceleration; }
-  getForwardSpeed(): number { return this.forwardSpeedTelemetry; }
-
+  getForwardSpeed(): number { return this._currentForwardSpeed; }
   /** Deps para BoardFsm (ver character.base.ts). */
   isGroundDetected(): boolean { return this._groundDetected; }
   groundLostElapsed(): number { return this.groundLostTimer; }

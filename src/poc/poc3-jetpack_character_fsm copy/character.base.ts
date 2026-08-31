@@ -3,8 +3,8 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { Observer } from "@babylonjs/core/Misc/observable";
 import type { Nullable } from "@babylonjs/core/types";
 import { Quaternion } from "@babylonjs/core/Maths/math.vector";
-import { AnimationEvent, PhysicsShapeType } from "@babylonjs/core";
-import type { ICharacterAnimations } from "@/services/assets-manager";
+import { AnimationEvent, FollowCamera, PhysicsShapeType } from "@babylonjs/core";
+import { AssetManager, type ICharacterAnimations } from "@/services/assets-manager";
 import { Poc } from "../types";
 import { CharacterFsm } from "./character-fsm/character.fsm";
 import { CharacterInput } from "./character.input";
@@ -26,8 +26,8 @@ const EQUIP_BOARD_FRAME = 60; // placeholder — ajustar cuando definan el frame
 
 export default class CharacterBase implements Poc {
   private scene: Scene;
-  private groundAggregates: PhysicsAggregate[];
-
+  //private groundAggregates: PhysicsAggregate[];
+  private followCamera: FollowCamera | null = null;
   private characterMesh: Mesh;
   private characterAggregate: PhysicsAggregate;
   private characterAnimations: ICharacterAnimations | null;
@@ -51,7 +51,7 @@ export default class CharacterBase implements Poc {
 
   async build(scene: Scene): Promise<void> {
     this.scene = scene;
-    this.groundAggregates = scene_builder(scene);
+    scene_builder(scene);
 
     const { characterMesh, characterAggregate, characterAnimations } = character_builder(scene);
     this.characterMesh = characterMesh;
@@ -62,6 +62,7 @@ export default class CharacterBase implements Poc {
       this.characterMesh.rotationQuaternion = Quaternion.Identity();
     }
 
+    this.followCamera = AssetManager.getCamera('follow', false, 'camera') as FollowCamera;
     this.input = new CharacterInput();
 
     this.fsm = new CharacterFsm({
@@ -197,6 +198,11 @@ export default class CharacterBase implements Poc {
         { mass: 70 }, // TMP_CONFIG.characterMass, mismo valor que character_builder
         this.scene,
       );
+      
+      if (this.followCamera) {
+        this.followCamera.lockedTarget = this.characterMesh;
+      }
+
     }
 
     const { strategy, physicsController } = await buildStandAloneStrategy(
@@ -223,6 +229,10 @@ export default class CharacterBase implements Poc {
 
     const { boardMesh, boardAggregate } = board_builder(this.scene, spawnPosition);
 
+    if (this.followCamera) {
+      this.followCamera.lockedTarget = boardMesh;
+    }
+
     // Parenting — mismos offsets que board_character_builder (POC2), con capsuleHeight
     // corregido al valor real de POC4 (generalConfig.playerConfig.height = 0.8, no el 2
     // hardcodeado de POC2).
@@ -230,9 +240,9 @@ export default class CharacterBase implements Poc {
     this.characterMesh.rotationQuaternion = null;
 
     const capsuleHeight = generalConfig.playerConfig.height;
-    const offsetX_Capsule = 0.15;
-    const offsetZ_Capsule = -0.15;
-    const boardThicknessOffset = 0.1;
+    const offsetX_Capsule = 0.05;
+    const offsetZ_Capsule = -0.25;
+    const boardThicknessOffset = 0.05;
     const capsuleYOffset = capsuleHeight / 2 + boardThicknessOffset;
 
     this.characterMesh.position.set(offsetX_Capsule, capsuleYOffset, offsetZ_Capsule);
@@ -249,7 +259,7 @@ export default class CharacterBase implements Poc {
       this.fsm,
       this.characterAnimations,
     );
-    
+
     this.activeStrategy = strategy;
     this.activeBoardPhysics = physicsController;
     this._activeBoardInputAdapter = new HoverBoardInputAdapter(this.input);
@@ -268,6 +278,6 @@ export default class CharacterBase implements Poc {
     if (this.characterAnimations) {
       Object.values(this.characterAnimations).forEach((ag) => ag.dispose());
     }
-    this.groundAggregates?.forEach((g) => g.dispose());
+    // this.groundAggregates?.forEach((g) => g.dispose());
   }
 }

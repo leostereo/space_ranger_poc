@@ -6,6 +6,7 @@ import { Ray } from "@babylonjs/core/Culling/ray";
 import { generalConfig } from "@/poc/config.general";
 import type { IPhysicsController } from "../contracts/iphysics-controller";
 import type { CharacterInputState } from "../../character.input";
+import { Color3, RayHelper } from "@babylonjs/core";
 
 // TODO: mover a config.general.ts junto con el resto de TMP_CONFIG de utils.ts
 const WALK_SPEED = 4; // m/s
@@ -95,6 +96,7 @@ private _applyTurn(left: boolean, right: boolean): void {
   private _updateGroundDetection(): void {
     const capsuleHeight = generalConfig.playerConfig.height;
     const rayLength = capsuleHeight / 2 + GROUND_RAY_MARGIN;
+    //const rayLength = 10;
 
     const origin = this.characterAggregate.transformNode.getAbsolutePosition();
     this._ray.origin.set(origin.x, origin.y, origin.z);
@@ -106,10 +108,14 @@ private _applyTurn(left: boolean, right: boolean): void {
         mesh !== this.characterAggregate.transformNode
         && mesh.name !== 'playerCapsule'
     );
+    
+  //  console.log(hit?.pickedMesh?.name)
+  //   const rayHelper = new RayHelper(this._ray);
+  //   rayHelper.show(this.scene, new Color3(1, 0, 0));
 
     const verticalVelocity = this.characterAggregate.body.getLinearVelocity().y;
     const isMovingUpward = verticalVelocity > UPWARD_VELOCITY_THRESHOLD;
-
+    
     this._groundDetected = !!(hit && hit.hit) && !isMovingUpward;
   }
 

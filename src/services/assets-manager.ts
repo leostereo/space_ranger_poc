@@ -442,7 +442,7 @@ export class AssetManager {
     private static _buildCamerasAndLights(canvas: HTMLCanvasElement, scene: Scene): void {
         const { alpha, beta, radius, target } = generalConfig.camera;
         const camera1 = new ArcRotateCamera(
-            "poc-camera",
+            "arc_camera",
             alpha,
             beta,
             radius,
@@ -453,7 +453,7 @@ export class AssetManager {
         camera1.setEnabled(false)
         this.cams['arc'] = camera1
 
-        const camera2 = new FollowCamera("boardCamera", new Vector3(0, 5, 10), scene);
+        const camera2 = new FollowCamera("mainFollowCamera", new Vector3(0, 5, 10), scene);
         camera2.radius = 6;          // Distancia horizontal (hacia atrás) en unidades de Babylon
         camera2.heightOffset = 2.0;  // Altura vertical por encima de la patineta
         camera2.rotationOffset = 180;// 180 grados para que mire exactamente desde atrás (0 la miraría de frente)
@@ -569,7 +569,7 @@ export class AssetManager {
         // =========================================================================
         // Definimos sus dimensiones en base a tus reglas:
         const tailDiameterX = depth / 4; // El ancho de la cola es la mitad del largo de la tabla
-        const tailDiameterY = height;    // Mismo espesor para que encajen al ras
+        const tailDiameterY = height / 2;    // mitad del espesor
         const tailDiameterZ = width;     // El eje principal es del mismo largo que el ancho del cuerpo
 
         const tailMesh = MeshBuilder.CreateSphere("board-tail", {
@@ -584,7 +584,7 @@ export class AssetManager {
 
         // Posicionamos la cola en el extremo trasero de la patineta (Z negativo)
         // La elevamos levemente en Y (ej: height * 0.4) para darle el look de alerón elevado
-        tailMesh.position.set(0, height * 0.4, -(depth / 2));
+        tailMesh.position.set(0, height * 0.3, -(depth / 2));
 
         // Rotamos la cola:
         // - 90 grados en Y para cruzarla de lado a lado (perpendicular al cuerpo principal)

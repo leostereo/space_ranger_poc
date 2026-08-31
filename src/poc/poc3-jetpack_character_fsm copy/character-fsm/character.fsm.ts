@@ -165,6 +165,29 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
     return "Loading";
   }
 
+  /** Ruta completa de estados para debug/HUD — ej. ["StandAlone","OnGround","Running"],
+   * ["HoverBoard","Falling","Dropping"], ["Jetpack","Cruising"]. */
+  getStatePath(): string[] {
+    if (this.state === "StandAlone") {
+      const mid = this.standAloneSubFsm.getState(); // "OnGround" | "JumpImpulseStart" | "OnAir"
+      if (mid === "OnGround") {
+        return [this.state, mid, this.standAloneSubFsm.onGroundSubFsm.getState()];
+      }
+      return [this.state, mid];
+    }
+
+    if (this.state === "Jetpack") {
+      return [this.state, this.jetpackSubFsm.getState()];
+    }
+
+    if (this.state === "HoverBoard") {
+      const mid = this.boardSubFsm.getState(); // "Hovering" | "Falling"
+      return [this.state, mid, this.boardSubFsm.getActiveSubState()];
+    }
+
+    return [this.state]; // EquippingJetpack u otro estado sin hijos
+  }
+
   protected onEnter(state: CharacterMainState): void {
     if (state === "EquippingJetpack") this.deps.onEnterEquippingJetpack();
     if (state === "HoverBoard") this.deps.onEnterHoverBoard(); // ← reemplaza onEnterEquippingBoard

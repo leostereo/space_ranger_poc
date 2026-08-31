@@ -50,7 +50,7 @@ export class CharacterHud {
 
   private _renderState(): void {
     if (!this.stateLine) return;
-    this.stateLine.textContent = `${this.fsm.getState()} > ${this.fsm.getActiveSubState()}`;
+    this.stateLine.textContent = this.fsm.getStatePath().join(" > ");
   }
 
   dispose(): void {

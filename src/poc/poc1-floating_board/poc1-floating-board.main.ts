@@ -68,7 +68,7 @@ export default class FloatingBoardPoc implements Poc {
 
   private _buildFollowCamera() {
 
-    const camera = new FollowCamera("boardCamera", new Vector3(0, 5, 10), this.scene);
+    const camera = new FollowCamera("boardCameraPoc1", new Vector3(0, 5, 10), this.scene);
     camera.lockedTarget = this.boardMesh;
     camera.radius = 6;          // Distancia horizontal (hacia atrás) en unidades de Babylon
     camera.heightOffset = 2.0;  // Altura vertical por encima de la patineta
