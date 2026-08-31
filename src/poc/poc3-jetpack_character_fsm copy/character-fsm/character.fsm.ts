@@ -17,6 +17,7 @@ export interface CharacterFsmDeps {
   onEnterEquippingJetpack: () => void;
   onEnterStandAlone: () => void;
   isGroundDetected: () => boolean;
+  isBoardGroundDetected: () => boolean; // ← nuevo, raycast propio del board
   onEnterOnAir: () => void;
   /** Threading hacia JetpackFsmDeps, mismo criterio que isGroundDetected/onEnterOnAir hacia StandAloneFsmDeps. */
   isCruiseHeld: () => boolean;
@@ -43,6 +44,8 @@ export interface CharacterFsmDeps {
   isBoostSettled: () => boolean;
   onEnterDiving: () => void;
   onEnterGliderBoost: () => void;
+
+
 }
 
 export class CharacterFsm extends BaseFsm<CharacterMainState> {
@@ -68,7 +71,7 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
       isCruiseHeld: this.deps.isCruiseHeld,
     });
     this.boardSubFsm = new BoardFsm({
-      isGroundDetected: this.deps.isGroundDetected,
+      isGroundDetected: this.deps.isBoardGroundDetected,
       groundLostElapsed: this.deps.groundLostElapsed,
       coyoteTime: this.deps.coyoteTime,
       onEnterHovering: this.deps.onEnterHovering,

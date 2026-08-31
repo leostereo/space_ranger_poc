@@ -16,6 +16,9 @@ import type { IVehicleStrategy } from "./strategies/contracts/ivehicle-strategy"
 import { board_builder } from "./strategies/hover-board/board.builder";
 import { generalConfig } from "../config.general";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
+import { HoverBoardPhysicsController } from "./strategies/hover-board/hover-board.physics.controller";
+import { HoverBoardInputAdapter } from "./strategies/hover-board/hover-board.input.adapter";
+import { buildHoverBoardStrategy } from "./strategies/hover-board/hover-board.strategy";
 
 
 const JUMP_IMPULSE_FRAME = 30;
@@ -43,6 +46,9 @@ export default class CharacterBase implements Poc {
   private _activeBoardMesh: Mesh | null = null;
   private _activeBoardAggregate: PhysicsAggregate | null = null;
 
+  private activeBoardPhysics: HoverBoardPhysicsController | null = null;
+  private _activeBoardInputAdapter: HoverBoardInputAdapter | null = null;
+
   async build(scene: Scene): Promise<void> {
     this.scene = scene;
     this.groundAggregates = scene_builder(scene);
@@ -61,25 +67,28 @@ export default class CharacterBase implements Poc {
     this.fsm = new CharacterFsm({
       hasFuel: () => this.activeJetpackPhysics?.hasFuel() ?? true,
       onEnterEquippingJetpack: () => this._swapToJetpack(),
-      onEnterStandAlone: () => this._swapToStandAlone(),
+      onEnterStandAlone: () => queueMicrotask(() => this._swapToStandAlone()),
       isGroundDetected: () => this.activeStandAlonePhysics?.isGroundDetected() ?? false,
       onEnterOnAir: () => this.activeStandAlonePhysics?.applyJumpImpulse(),
       isCruiseHeld: () => this.input.current.cruise,
       isMoveHeld: () => this.input.current.forward || this.input.current.backward,
       isRunHeld: () => this.input.current.cruise,
       onEnterHoverBoard: () => this._swapToHoverBoard(),
-      groundLostElapsed: () => 0,
-      coyoteTime: 0.2,
-      onEnterHovering: () => { },
+      isBoardGroundDetected: () => this.activeBoardPhysics?.isGroundDetected() ?? false,
+      groundLostElapsed: () => this.activeBoardPhysics?.groundLostElapsed() ?? 0,
+      coyoteTime: generalConfig.groundCheck.coyoteTime,
+      onEnterHovering: () => this.activeBoardPhysics?.onEnterHovering(),
       onEnterFalling: () => { },
-      isJumpSettled: () => true,
-      onEnterJumping: () => { },
-      getForwardSpeed: () => 0,
-      isForwardHeld: () => this.input.current.forward,
-      isPitchDownHeld: () => this.input.current.backward,
-      isBoostSettled: () => true,
+      isJumpSettled: () => this.activeBoardPhysics?.isJumpSettled() ?? true,
+      onEnterJumping: () => this.activeBoardPhysics?.onEnterJumping(),
+      getForwardSpeed: () => this.activeBoardPhysics?.getForwardSpeed() ?? 0,
+      isForwardHeld: () => this._activeBoardInputAdapter?.current.forward ?? false,
+      isPitchDownHeld: () => this._activeBoardInputAdapter?.current.pitchDown ?? false,
+      isBoostSettled: () => this.activeBoardPhysics?.isBoostSettled() ?? true,
       onEnterDiving: () => { },
-      onEnterGliderBoost: () => { },
+      onEnterGliderBoost: () => this.activeBoardPhysics?.onEnterGliderBoost(),
+
+
     });
 
     this._wireJumpAnimationEvent();
@@ -108,6 +117,7 @@ export default class CharacterBase implements Poc {
     jumpAnimation.addEvent(
       new AnimationEvent(JUMP_IMPULSE_FRAME, () => {
         this.fsm.standAloneSubFsm.notifyJumpImpulseFrame();
+        this.fsm.boardSubFsm.hoveringSubFsm.notifyJumpImpulseFrame();
       }, false),
     );
   }
@@ -136,6 +146,7 @@ export default class CharacterBase implements Poc {
 
     this.afterPhysicsObserver = this.scene.onAfterPhysicsObservable.add(() => {
       this.activeJetpackPhysics?.applyVisualRoll();
+      this.activeBoardPhysics?.applyVisualRoll();
     });
 
 
@@ -160,6 +171,7 @@ export default class CharacterBase implements Poc {
   private async _swapToStandAlone(): Promise<void> {
     this.activeJetpackPhysics = null;
     this.activeStrategy?.dispose();
+    this.activeStrategy = null;
 
     // Si veníamos de HoverBoard: deshacer el parenting del board y recrear el
     // PhysicsAggregate individual de la cápsula (se había disponido al entrar a HoverBoard).
@@ -175,6 +187,9 @@ export default class CharacterBase implements Poc {
       this._activeBoardMesh.dispose();
       this._activeBoardMesh = null;
       this._activeBoardAggregate = null;
+
+      this.activeBoardPhysics = null;
+      this._activeBoardInputAdapter = null;
 
       this.characterAggregate = new PhysicsAggregate(
         this.characterMesh,
@@ -198,6 +213,7 @@ export default class CharacterBase implements Poc {
   private async _swapToHoverBoard(): Promise<void> {
     this.activeStandAlonePhysics = null;
     this.activeStrategy?.dispose();
+    this.activeStrategy = null; // ← evita que se siga tickeando la strategy vieja durante el await de abajo
 
     // La cápsula deja de tener su propio PhysicsAggregate — el del board pasa a mover
     // todo por parenting. Se conserva la posición actual para spawnear el board ahí
@@ -225,10 +241,20 @@ export default class CharacterBase implements Poc {
     this._activeBoardMesh = boardMesh;
     this._activeBoardAggregate = boardAggregate;
 
-    // TODO: HoverBoardStrategy real (physics/input/animation portados de BoardController) —
-    // placeholder por ahora, sólo para confirmar que el board se crea y el parenting queda bien.
-    this.activeStrategy = null;
-    console.log("[CharacterFsm] HoverBoard: board creado + parenting aplicado. Falta HoverBoardStrategy real.");
+    const { strategy, physicsController } = await buildHoverBoardStrategy(
+      this.scene,
+      boardMesh,
+      boardAggregate,
+      this.input,
+      this.fsm,
+      this.characterAnimations,
+    );
+    
+    this.activeStrategy = strategy;
+    this.activeBoardPhysics = physicsController;
+    this._activeBoardInputAdapter = new HoverBoardInputAdapter(this.input);
+
+
   }
 
   dispose(): void {

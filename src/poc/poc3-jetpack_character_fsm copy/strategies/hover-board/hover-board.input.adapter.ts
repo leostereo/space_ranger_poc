@@ -1,16 +1,19 @@
+// src/poc4-.../strategies/hover-board/hover-board.input.adapter.ts
 import type { CharacterInput } from "../../character.input";
-import type { BoardInputState } from "./board-fsm/board.input.contract"; // o donde termine viviendo el type
+
+/** Mismo shape que BoardInputState de POC2 — se redefine acá para no importar
+ * board.input.ts entero (esa clase trae sus propios window listeners, que no queremos duplicar). */
+export interface BoardInputState {
+  forward: boolean;
+  turnLeft: boolean;
+  turnRight: boolean;
+  pitchDown: boolean;
+}
 
 /**
- * Traduce CharacterInput (WASD/Shift/Space, ya escuchado por un solo listener global)
- * a la forma que espera BoardController (BoardInputState), sin duplicar listeners de teclado.
- * Mapeo (placeholder, a confirmar con el feel real una vez portado el controller):
- *   forward   (Shift en POC2) <- CharacterInput.cruise (Shift)
- *   pitchDown (W en POC2)     <- CharacterInput.forward (W)
- *   turnLeft  (A)             <- CharacterInput.left (A)
- *   turnRight (D)             <- CharacterInput.right (D)
- *   jump      (Space)         <- CharacterInput.consumeJumpRequest() (mismo flag que StandAlone/salto)
- *   testImpulse (T)           <- no mapeado todavía, siempre false (feature de debug de POC2)
+ * Traduce CharacterInput (un solo listener global de teclado) a la forma que espera
+ * HoverBoardPhysicsController. Mapeo confirmado (no tocar): Shift=forward del board,
+ * W=pitchDown, A/D=turn. Ya funciona bien así.
  */
 export class HoverBoardInputAdapter {
   constructor(private characterInput: CharacterInput) {}
@@ -23,13 +26,5 @@ export class HoverBoardInputAdapter {
       turnLeft: left,
       turnRight: right,
     };
-  }
-
-  consumeJumpRequest(): boolean {
-    return this.characterInput.consumeJumpRequest();
-  }
-
-  consumeTestImpulseRequest(): boolean {
-    return false; // placeholder — sin key mapeada todavía en CharacterInput
   }
 }
