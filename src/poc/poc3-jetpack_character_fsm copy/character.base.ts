@@ -176,36 +176,39 @@ export default class CharacterBase implements Poc {
 
     if (this._activeBoardMesh && this._activeBoardAggregate) {
       const spawnPosition = this.characterMesh.getAbsolutePosition().clone();
+      const spawnRotationY = this._getYawFromTransformNode(this._activeBoardMesh);
 
-    // NUEVO: capturar el yaw del board ANTES de unparentear
-    const spawnRotationY = this._getYawFromTransformNode(this._activeBoardMesh);
+      // NUEVO: capturar velocidades del board ANTES de disponerlo
+      const spawnLinearVelocity = this._activeBoardAggregate.body.getLinearVelocity().clone();
+      const spawnAngularVelocity = this._activeBoardAggregate.body.getAngularVelocity().clone();
 
-    this.characterMesh.setParent(null);
-    this.characterMesh.position.copyFrom(spawnPosition);
+      this.characterMesh.setParent(null);
+      this.characterMesh.position.copyFrom(spawnPosition);
+      this.characterMesh.rotationQuaternion = Quaternion.FromEulerAngles(0, spawnRotationY, 0);
 
-    // CAMBIADO: en vez de Quaternion.Identity() + rotation.set(0,0,0),
-    // aplicamos el yaw capturado del board
-    this.characterMesh.rotationQuaternion = Quaternion.FromEulerAngles(0, spawnRotationY, 0);
+      this._activeBoardAggregate.dispose();
+      this._activeBoardMesh.dispose();
+      this._activeBoardMesh = null;
+      this._activeBoardAggregate = null;
 
-    this._activeBoardAggregate.dispose();
-    this._activeBoardMesh.dispose();
-    this._activeBoardMesh = null;
-    this._activeBoardAggregate = null;
+      this.activeBoardPhysics = null;
+      this._activeBoardInputAdapter = null;
 
-    this.activeBoardPhysics = null;
-    this._activeBoardInputAdapter = null;
+      this.characterAggregate = new PhysicsAggregate(
+        this.characterMesh,
+        PhysicsShapeType.CAPSULE,
+        { mass: 70 },
+        this.scene,
+      );
 
-    this.characterAggregate = new PhysicsAggregate(
-      this.characterMesh,
-      PhysicsShapeType.CAPSULE,
-      { mass: 70 },
-      this.scene,
-    );
+      // NUEVO: aplicar velocidades heredadas al nuevo aggregate del personaje
+      this.characterAggregate.body.setLinearVelocity(spawnLinearVelocity);
+      this.characterAggregate.body.setAngularVelocity(spawnAngularVelocity);
 
-    if (this.followCamera) {
-      this.followCamera.lockedTarget = this.characterMesh;
+      if (this.followCamera) {
+        this.followCamera.lockedTarget = this.characterMesh;
+      }
     }
-  }
 
     const { strategy, physicsController } = await buildStandAloneStrategy(
       this.scene,
@@ -224,16 +227,22 @@ export default class CharacterBase implements Poc {
     this.activeStrategy = null;
 
     const spawnPosition = this.characterAggregate.transformNode.getAbsolutePosition().clone();
-
-    // NUEVO: capturar el yaw del personaje ANTES de disponer su aggregate
     const spawnRotationY = this._getYawFromTransformNode(this.characterAggregate.transformNode);
+
+    // NUEVO: capturar velocidades del personaje ANTES de disponer su aggregate
+    const spawnLinearVelocity = this.characterAggregate.body.getLinearVelocity().clone();
+    const spawnAngularVelocity = this.characterAggregate.body.getAngularVelocity().clone();
 
     this.characterAggregate.dispose();
 
-    const { boardMesh, boardAggregate } = board_builder(this.scene, spawnPosition);
+    // CAMBIADO: pasamos spawnRotationY directo al builder en vez de setearlo después
+    const { boardMesh, boardAggregate } = board_builder(this.scene, spawnPosition, spawnRotationY);
 
-    // NUEVO: aplicar el yaw capturado al board recién creado
-    boardMesh.rotationQuaternion = Quaternion.FromEulerAngles(0, spawnRotationY, 0);
+    // ELIMINADO: boardMesh.rotationQuaternion = Quaternion.FromEulerAngles(0, spawnRotationY, 0);
+    // (ya no hace falta, board_builder lo aplica antes de crear el aggregate)
+
+    boardAggregate.body.setLinearVelocity(spawnLinearVelocity);
+    boardAggregate.body.setAngularVelocity(spawnAngularVelocity);
 
     if (this.followCamera) {
       this.followCamera.lockedTarget = boardMesh;
@@ -267,7 +276,6 @@ export default class CharacterBase implements Poc {
     this.activeBoardPhysics = physicsController;
     this._activeBoardInputAdapter = new HoverBoardInputAdapter(this.input);
   }
-
 
   // Helper nuevo — agregalo como método privado de la clase (cerca de _swapToStandAlone/_swapToHoverBoard)
   private _getYawFromTransformNode(node: TransformNode): number {

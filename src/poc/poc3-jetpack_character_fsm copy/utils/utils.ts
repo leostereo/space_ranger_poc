@@ -123,7 +123,6 @@ const platformsData = [
   { name: "ground-baja", depth: 60, heightOffset: -260.0, zStart: 210 }  // Tercera plataforma (Baja, tras otro hueco de 15 unidades)
 ];
 
-
 const createPlatforms = (scene: Scene) => {
 
   const { width, depth, thickness, friction, color } = generalConfig.ground;
