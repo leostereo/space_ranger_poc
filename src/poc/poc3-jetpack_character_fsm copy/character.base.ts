@@ -3,7 +3,7 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { Observer } from "@babylonjs/core/Misc/observable";
 import type { Nullable } from "@babylonjs/core/types";
 import { Quaternion } from "@babylonjs/core/Maths/math.vector";
-import { AnimationEvent, FollowCamera, PhysicsShapeType } from "@babylonjs/core";
+import { AnimationEvent, FollowCamera, PhysicsShapeType, TransformNode } from "@babylonjs/core";
 import { AssetManager, type ICharacterAnimations } from "@/services/assets-manager";
 import { Poc } from "../types";
 import { CharacterFsm } from "./character-fsm/character.fsm";
@@ -174,36 +174,38 @@ export default class CharacterBase implements Poc {
     this.activeStrategy?.dispose();
     this.activeStrategy = null;
 
-    // Si veníamos de HoverBoard: deshacer el parenting del board y recrear el
-    // PhysicsAggregate individual de la cápsula (se había disponido al entrar a HoverBoard).
     if (this._activeBoardMesh && this._activeBoardAggregate) {
       const spawnPosition = this.characterMesh.getAbsolutePosition().clone();
 
-      this.characterMesh.setParent(null);
-      this.characterMesh.position.copyFrom(spawnPosition);
-      this.characterMesh.rotationQuaternion = Quaternion.Identity();
-      this.characterMesh.rotation.set(0, 0, 0);
+    // NUEVO: capturar el yaw del board ANTES de unparentear
+    const spawnRotationY = this._getYawFromTransformNode(this._activeBoardMesh);
 
-      this._activeBoardAggregate.dispose();
-      this._activeBoardMesh.dispose();
-      this._activeBoardMesh = null;
-      this._activeBoardAggregate = null;
+    this.characterMesh.setParent(null);
+    this.characterMesh.position.copyFrom(spawnPosition);
 
-      this.activeBoardPhysics = null;
-      this._activeBoardInputAdapter = null;
+    // CAMBIADO: en vez de Quaternion.Identity() + rotation.set(0,0,0),
+    // aplicamos el yaw capturado del board
+    this.characterMesh.rotationQuaternion = Quaternion.FromEulerAngles(0, spawnRotationY, 0);
 
-      this.characterAggregate = new PhysicsAggregate(
-        this.characterMesh,
-        PhysicsShapeType.CAPSULE,
-        { mass: 70 }, // TMP_CONFIG.characterMass, mismo valor que character_builder
-        this.scene,
-      );
-      
-      if (this.followCamera) {
-        this.followCamera.lockedTarget = this.characterMesh;
-      }
+    this._activeBoardAggregate.dispose();
+    this._activeBoardMesh.dispose();
+    this._activeBoardMesh = null;
+    this._activeBoardAggregate = null;
 
+    this.activeBoardPhysics = null;
+    this._activeBoardInputAdapter = null;
+
+    this.characterAggregate = new PhysicsAggregate(
+      this.characterMesh,
+      PhysicsShapeType.CAPSULE,
+      { mass: 70 },
+      this.scene,
+    );
+
+    if (this.followCamera) {
+      this.followCamera.lockedTarget = this.characterMesh;
     }
+  }
 
     const { strategy, physicsController } = await buildStandAloneStrategy(
       this.scene,
@@ -219,23 +221,24 @@ export default class CharacterBase implements Poc {
   private async _swapToHoverBoard(): Promise<void> {
     this.activeStandAlonePhysics = null;
     this.activeStrategy?.dispose();
-    this.activeStrategy = null; // ← evita que se siga tickeando la strategy vieja durante el await de abajo
+    this.activeStrategy = null;
 
-    // La cápsula deja de tener su propio PhysicsAggregate — el del board pasa a mover
-    // todo por parenting. Se conserva la posición actual para spawnear el board ahí
-    // (sin salto visual), y se conserva characterMesh (con el skater ya adentro) tal cual.
     const spawnPosition = this.characterAggregate.transformNode.getAbsolutePosition().clone();
+
+    // NUEVO: capturar el yaw del personaje ANTES de disponer su aggregate
+    const spawnRotationY = this._getYawFromTransformNode(this.characterAggregate.transformNode);
+
     this.characterAggregate.dispose();
 
     const { boardMesh, boardAggregate } = board_builder(this.scene, spawnPosition);
+
+    // NUEVO: aplicar el yaw capturado al board recién creado
+    boardMesh.rotationQuaternion = Quaternion.FromEulerAngles(0, spawnRotationY, 0);
 
     if (this.followCamera) {
       this.followCamera.lockedTarget = boardMesh;
     }
 
-    // Parenting — mismos offsets que board_character_builder (POC2), con capsuleHeight
-    // corregido al valor real de POC4 (generalConfig.playerConfig.height = 0.8, no el 2
-    // hardcodeado de POC2).
     this.characterMesh.setParent(boardMesh);
     this.characterMesh.rotationQuaternion = null;
 
@@ -263,8 +266,15 @@ export default class CharacterBase implements Poc {
     this.activeStrategy = strategy;
     this.activeBoardPhysics = physicsController;
     this._activeBoardInputAdapter = new HoverBoardInputAdapter(this.input);
+  }
 
 
+  // Helper nuevo — agregalo como método privado de la clase (cerca de _swapToStandAlone/_swapToHoverBoard)
+  private _getYawFromTransformNode(node: TransformNode): number {
+    if (node.rotationQuaternion) {
+      return node.rotationQuaternion.toEulerAngles().y;
+    }
+    return node.rotation.y;
   }
 
   dispose(): void {
