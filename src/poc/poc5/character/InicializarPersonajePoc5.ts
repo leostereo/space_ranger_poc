@@ -1,8 +1,8 @@
 import { Scene, Mesh } from "@babylonjs/core";
-import { InputController } from "./InputController";
-import { AnimacionController } from "./AnimacionController";
-import { FisicaController } from "./FisicaController";
-import { CharacterMain } from "./CharacterMain";
+import { InputController } from "./controllers/InputController";
+import { AnimacionController } from "./controllers/AnimacionController";
+import { FisicaController } from "./controllers/FisicaController";
+import { CharacterMain } from "./fsm/CharacterMain";
 
 export function inicializarPersonajePoc5(scene: Scene, playerMesh: Mesh) {
   const inputs = new InputController(scene);

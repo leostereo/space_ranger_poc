@@ -1,6 +1,7 @@
-import { LocomotionStrategy } from "./LocomotionStrategy";
+import { InputController } from "../controllers/InputController";
 import { CharacterContext } from "./CharacterMain";
-import { InputController } from "./InputController";
+import { LocomotionStrategy } from "./contracts/LocomotionStrategy";
+
 
 export class PatinetaStrategy implements LocomotionStrategy {
   public readonly name = "Modo_Patineta";

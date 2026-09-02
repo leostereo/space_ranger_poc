@@ -1,9 +1,9 @@
 import { Mesh, Vector3 } from "@babylonjs/core";
-import { LocomotionStrategy } from "./LocomotionStrategy";
+import { LocomotionStrategy } from "./contracts/LocomotionStrategy";
 import { StandAloneStrategy } from "./StandAloneStrategy";
-import { InputController } from "./InputController";
-import { AnimacionController } from "./AnimacionController";
-import { FisicaController } from "./FisicaController";
+import { InputController } from "../controllers/InputController";
+import { AnimacionController } from "../controllers/AnimacionController";
+import { FisicaController } from "../controllers/FisicaController";
 
 export interface CharacterContext {
   mesh: Mesh;
@@ -50,20 +50,22 @@ export class CharacterMain {
     this._estrategiaActiva.entrar(this._contexto);
   }
 
+  // Siguiente ajuste dentro del método actualizar de CharacterMain.ts:
   public actualizar(inputs: InputController, delta: number): void {
-    // 1. Primero corre la simulación física (gravedad, inercia)
-    this._contexto.fisicaController.actualizarFisica(delta);
+    // 1. Enviamos el input a la física real de producción para mover o frenar el cuerpo
+    this._contexto.fisicaController.actualizarFisica(inputs, delta);
 
-    // 2. Sincronizamos las variables del contexto compartido
+    // 2. Sincronizamos las variables del contexto
     this._contexto.alturaActual = this._contexto.mesh.position.y;
     this._contexto.velocidadActual = this._contexto.fisicaController.obtenerVelocidad();
     this._contexto.estaEnElSuelo = this._contexto.fisicaController.estaEnElSuelo();
 
-    // 3. Evaluamos la lógica de estados
+    // 3. Evaluamos la FSM
     if (this._estrategiaActiva) {
       this._estrategiaActiva.actualizar(inputs, delta);
     }
   }
+
 
   public get contexto(): CharacterContext {
     return this._contexto;

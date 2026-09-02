@@ -1,5 +1,5 @@
-import { CharacterContext } from "./CharacterMain";
-import { InputController } from "./InputController";
+import { CharacterContext } from "../CharacterMain";
+import { InputController } from "../../controllers/InputController";
 
 export interface LocomotionStrategy {
   readonly name: string;
