@@ -122,7 +122,122 @@ export class AssetManager {
                 }
             };
 
-            // --- CUANDO TERMINA LA CARGA DESDE EL SERVIDOR ---
+            // --- RECURSO 3: mapa ---
+            const tareaMap = manager.addMeshTask("batalla del pilar", "", "maps/", "topoexport_3D_modeling_batallaDelPilar.glb");
+
+            tareaMap.onSuccess = (task) => {
+                const root = task.loadedMeshes.find(m => m.name === "__root__");
+
+                if (root) {
+                    // 1. Movemos el root a su posición de juego para que las mallas calculen bien sus coordenadas
+                    root.position.x = 0;
+                    root.position.y = -900;
+                    root.position.z = -100;
+                    root.rotate(Axis.X, Math.PI / 2, Space.LOCAL);
+                    root.setEnabled(true);
+
+                    const todasLasMallas = task.loadedMeshes;
+
+                    // =========================================================
+                    // 2. EDIFICIOS
+                    // =========================================================
+                    const edificios = todasLasMallas.filter(m => m.name && m.name.includes("TPX_Buildings") && m instanceof Mesh) as Mesh[];
+                    if (edificios.length > 0) {
+                        edificios.forEach(e => e.computeWorldMatrix(true));
+                        const edificiosFusionados = Mesh.MergeMeshes(edificios, true, true, undefined, false, true);
+                        if (edificiosFusionados) {
+                            edificiosFusionados.name = "FUSION_EDIFICIOS";
+                            // 🌟 SALVAMOS LA MALLA: La sacamos del root original para que no se borre
+                            edificiosFusionados.setParent(null);
+                            this.meshes["mapa_edificios"] = edificiosFusionados;
+                        }
+                    }
+
+                    // =========================================================
+                    // 3. ÁRBOLES
+                    // =========================================================
+                    const regexArboles = /^node\d+/i;
+                    const arboles = todasLasMallas.filter(m => m.name && regexArboles.test(m.name) && m instanceof Mesh) as Mesh[];
+                    if (arboles.length > 0) {
+                        arboles.forEach(a => a.computeWorldMatrix(true));
+                        const arbolesFusionados = Mesh.MergeMeshes(arboles, true, false, undefined, false, true);
+                        if (arbolesFusionados) {
+                            arbolesFusionados.name = "FUSION_ARBOLES";
+                            // 🌟 SALVAMOS LA MALLA:
+                            arbolesFusionados.setParent(null);
+                            this.meshes["mapa_arboles"] = arbolesFusionados;
+                        }
+                    }
+
+                    // =========================================================
+                    // 4. CALLES
+                    // =========================================================
+                    const calles = todasLasMallas.filter(m => m.name && m.name.includes("TPX_RoadsOutlines") && m instanceof Mesh) as Mesh[];
+                    if (calles.length > 0) {
+                        calles.forEach(c => c.computeWorldMatrix(true));
+                        const callesFusionadas = Mesh.MergeMeshes(calles, true, true, undefined, false, true);
+                        if (callesFusionadas) {
+                            callesFusionadas.name = "FUSION_CALLES";
+                            // 🌟 SALVAMOS LA MALLA:
+                            callesFusionadas.setParent(null);
+                            this.meshes["mapa_calles"] = callesFusionadas;
+                        }
+                    }
+
+                    // =========================================================
+                    // 5. ÁREAS VERDES
+                    // =========================================================
+                    const areasVerdes = todasLasMallas.filter(m => m.name && m.name.includes("TPX_GreenAreas") && m instanceof Mesh) as Mesh[];
+                    if (areasVerdes.length > 0) {
+                        areasVerdes.forEach(av => av.computeWorldMatrix(true));
+                        const areasVerdesFusionadas = Mesh.MergeMeshes(areasVerdes, true, true, undefined, false, true);
+                        if (areasVerdesFusionadas) {
+                            areasVerdesFusionadas.name = "FUSION_AREAS_VERDES";
+                            // 🌟 SALVAMOS LA MALLA:
+                            areasVerdesFusionadas.setParent(null);
+                            this.meshes["mapa_areas_verdes"] = areasVerdesFusionadas;
+                        }
+                    }
+
+                    // =========================================================
+                    // 6. VÍAS DE AGUA
+                    // =========================================================
+                    const viasAgua = todasLasMallas.filter(m => m.name && m.name.includes("TPX_Waterways") && m instanceof Mesh) as Mesh[];
+                    if (viasAgua.length > 0) {
+                        viasAgua.forEach(va => va.computeWorldMatrix(true));
+                        const aguaFusionada = Mesh.MergeMeshes(viasAgua, true, true, undefined, false, true);
+                        if (aguaFusionada) {
+                            aguaFusionada.name = "FUSION_AGUA";
+                            // 🌟 SALVAMOS LA MALLA:
+                            aguaFusionada.setParent(null);
+                            this.meshes["mapa_agua"] = aguaFusionada;
+                        }
+                    }
+
+                    // =========================================================
+                    // 7. SUELO BASE INDEPENDIENTE
+                    // =========================================================
+                    const sueloUnico = todasLasMallas.find(m => m.name && m.name.includes("TPX_Ground") && m instanceof Mesh) as Mesh;
+                    if (sueloUnico) {
+                        sueloUnico.computeWorldMatrix(true);
+                        // 🌟 SALVAMOS LA MALLA:
+                        sueloUnico.setParent(null);
+                        sueloUnico.name = "FUSION_SUELO";
+                        this.meshes["suelo_hoverboard"] = sueloUnico;
+                    }
+
+                    // =========================================================
+                    // 🔥 8. EL GRAN LIMPIADOR DE BASURA
+                    // =========================================================
+                    // En este punto, todas nuestras mallas optimizadas ya están a salvo fuera del root.
+                    // Lo que queda adentro de 'root' son solo cáscaras vacías y nodos viejos del GLB.
+                    // Los destruimos para liberar memoria por completo.
+                    root.dispose(false, true);
+
+                    console.log("¡Limpieza total completada! Solo quedan vivas las mallas fusionadas y el suelo.");
+                }
+            };
+                        
             manager.onFinish = () => {
                 // Ahora que las texturas están en memoria, creamos lo que es por código
                 this.buildCodedAssets(canvas, scene);
