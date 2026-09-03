@@ -49,7 +49,7 @@ export class StandAlonePhysicsController implements IPhysicsController {
     }
   }
 
-tick(dt: number): void {
+tick(): void {
   this._updateGroundDetection();
 
   const { forward, backward, left, right, cruise } = this.getInput();

@@ -48,9 +48,9 @@ export async function buildStandAloneStrategy(
     physics,
     input: inputController,
     animation,
-    tick(dt: number) {
+    tick() {
       inputController.tick();
-      physics.tick(dt);
+      physics.tick();
       animation.tick();
     },
     dispose() {
