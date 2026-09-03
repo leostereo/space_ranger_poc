@@ -12,7 +12,7 @@ export class CharacterHud {
   private container: HTMLDivElement | null = null;
   private stateLine: HTMLDivElement | null = null;
 
-  constructor(private fsm: CharacterFsm) {}
+  constructor(private fsm: CharacterFsm) { }
 
   mount(): void {
     this.container = document.createElement("div");
@@ -38,14 +38,19 @@ export class CharacterHud {
 
     this.fsm.onStateChange(() => this._renderState());
     this.fsm.standAloneSubFsm.onStateChange(() => this._renderState());
+    this.fsm.standAloneSubFsm.onGroundSubFsm.onStateChange(() => this._renderState()); // ← nuevo
     this.fsm.jetpackSubFsm.onStateChange(() => this._renderState());
+
+    this.fsm.boardSubFsm.onStateChange(() => this._renderState());
+    this.fsm.boardSubFsm.hoveringSubFsm.onStateChange(() => this._renderState());
+    this.fsm.boardSubFsm.fallingSubFsm.onStateChange(() => this._renderState());
 
     this._renderState();
   }
 
   private _renderState(): void {
     if (!this.stateLine) return;
-    this.stateLine.textContent = `${this.fsm.getState()} > ${this.fsm.getActiveSubState()}`;
+    this.stateLine.textContent = this.fsm.getStatePath().join(" > ");
   }
 
   dispose(): void {

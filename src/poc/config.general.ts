@@ -16,9 +16,9 @@ export const generalConfig = {
   },
   board: {
     // Dimensiones placeholder del mesh de la patineta (a reemplazar por el modelo final)
-    width: 0.6,
-    height: 0.15,
-    depth: 1.6,
+    width: 0.3,
+    height: 0.1,
+    depth: 1.2,
     mass: 20,
     friction: 0.2,
     restitution: 0,
@@ -90,7 +90,8 @@ export const generalConfig = {
   },
   playerConfig: {
     initialLives: 5,
-    height: 1.8,
+    // height: 1.8,
+    height: 0.8,
     capsuleRadius: 0.4,
     aimHeightMultiplier: 0.5,
     capsuleBottomPoint: -0.5,

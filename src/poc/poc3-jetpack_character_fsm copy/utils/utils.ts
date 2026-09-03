@@ -22,19 +22,14 @@ const CHARACTER_NON_PICKABLE_MESH_NAMES = [
   "character.Armature.Alpha_Surface",
 ];
 
-export function scene_builder(scene: Scene): PhysicsAggregate[] {
+export function scene_builder(scene: Scene) {
   const light = AssetManager.getLight("main", false, "light");
   light.setEnabled(true);
-
-  // TODO: reemplazar por AssetManager.getMesh('ground-basic' | 'ground-grid', ...) cuando
-  // _builGrounds() esté activo en AssetManager (hoy está comentado ahí).
-  const ground = MeshBuilder.CreateGround("ground", { width: TMP_CONFIG.groundSize, height: TMP_CONFIG.groundSize }, scene);
-  const groundAggregate = new PhysicsAggregate(ground, PhysicsShapeType.BOX, { mass: 0 }, scene);
 
   createPlatforms(scene);
   addMapAggregate(scene);
 
-  return [groundAggregate];
+  //return [groundAggregate];
 }
 
 export interface CharacterBuildResult {
@@ -110,7 +105,7 @@ export function character_builder(scene: Scene): CharacterBuildResult {
     scene,
   );
 
-  const camera = AssetManager.getCamera('follow', false, 'camera')
+  const camera = AssetManager.getCamera('follow', false, 'main_camera')
   camera.lockedTarget = character;
   scene.activeCamera = camera;
 
@@ -121,13 +116,12 @@ export function character_builder(scene: Scene): CharacterBuildResult {
   };
 }
 
-
 const platformsData = [
+  { name: "ground-inicio", depth: 400, heightOffset: 0.0, zStart: 0 },
   { name: "ground-media", depth: 40, heightOffset: -100, zStart: 300 },
   { name: "ground-alta", depth: 80, heightOffset: 20, zStart: 300 },
   { name: "ground-baja", depth: 60, heightOffset: -260.0, zStart: 210 }  // Tercera plataforma (Baja, tras otro hueco de 15 unidades)
 ];
-
 
 const createPlatforms = (scene: Scene) => {
 
@@ -165,5 +159,4 @@ const addMapAggregate = (scene: Scene) => {
   if (ground) {
     const groundAggregate = new PhysicsAggregate(ground, PhysicsShapeType.BOX, { mass: 0 }, scene);
   }
-
 }

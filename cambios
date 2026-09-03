@@ -1,0 +1,143 @@
+diff --git a/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts b/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts
+index dd63ae4..e7e9c82 100644
+--- a/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts	
++++ b/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts	
+@@ -17,6 +17,7 @@ export interface CharacterFsmDeps {
+   onEnterEquippingJetpack: () => void;
+   onEnterStandAlone: () => void;
+   isGroundDetected: () => boolean;
++  isBoardGroundDetected: () => boolean; // ← nuevo, raycast propio del board
+   onEnterOnAir: () => void;
+   /** Threading hacia JetpackFsmDeps, mismo criterio que isGroundDetected/onEnterOnAir hacia StandAloneFsmDeps. */
+   isCruiseHeld: () => boolean;
+@@ -43,6 +44,8 @@ export interface CharacterFsmDeps {
+   isBoostSettled: () => boolean;
+   onEnterDiving: () => void;
+   onEnterGliderBoost: () => void;
++
++
+ }
+ 
+ export class CharacterFsm extends BaseFsm<CharacterMainState> {
+@@ -68,7 +71,7 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
+       isCruiseHeld: this.deps.isCruiseHeld,
+     });
+     this.boardSubFsm = new BoardFsm({
+-      isGroundDetected: this.deps.isGroundDetected,
++      isGroundDetected: this.deps.isBoardGroundDetected,
+       groundLostElapsed: this.deps.groundLostElapsed,
+       coyoteTime: this.deps.coyoteTime,
+       onEnterHovering: this.deps.onEnterHovering,
+diff --git a/src/poc/poc3-jetpack_character_fsm copy/character.base.ts b/src/poc/poc3-jetpack_character_fsm copy/character.base.ts
+index 6207a9f..b9e16a2 100644
+--- a/src/poc/poc3-jetpack_character_fsm copy/character.base.ts	
++++ b/src/poc/poc3-jetpack_character_fsm copy/character.base.ts	
+@@ -16,6 +16,9 @@ import type { IVehicleStrategy } from "./strategies/contracts/ivehicle-strategy"
+ import { board_builder } from "./strategies/hover-board/board.builder";
+ import { generalConfig } from "../config.general";
+ import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
++import { HoverBoardPhysicsController } from "./strategies/hover-board/hover-board.physics.controller";
++import { HoverBoardInputAdapter } from "./strategies/hover-board/hover-board.input.adapter";
++import { buildHoverBoardStrategy } from "./strategies/hover-board/hover-board.strategy";
+ 
+ 
+ const JUMP_IMPULSE_FRAME = 30;
+@@ -43,6 +46,9 @@ export default class CharacterBase implements Poc {
+   private _activeBoardMesh: Mesh | null = null;
+   private _activeBoardAggregate: PhysicsAggregate | null = null;
+ 
++  private activeBoardPhysics: HoverBoardPhysicsController | null = null;
++  private _activeBoardInputAdapter: HoverBoardInputAdapter | null = null;
++
+   async build(scene: Scene): Promise<void> {
+     this.scene = scene;
+     this.groundAggregates = scene_builder(scene);
+@@ -80,6 +86,7 @@ export default class CharacterBase implements Poc {
+       isBoostSettled: () => true,
+       onEnterDiving: () => { },
+       onEnterGliderBoost: () => { },
++      isBoardGroundDetected: () => this.activeBoardPhysics?.isGroundDetected() ?? false,
+     });
+ 
+     this._wireJumpAnimationEvent();
+@@ -176,6 +183,9 @@ export default class CharacterBase implements Poc {
+       this._activeBoardMesh = null;
+       this._activeBoardAggregate = null;
+ 
++      this.activeBoardPhysics = null;
++      this._activeBoardInputAdapter = null;
++
+       this.characterAggregate = new PhysicsAggregate(
+         this.characterMesh,
+         PhysicsShapeType.CAPSULE,
+@@ -225,10 +235,18 @@ export default class CharacterBase implements Poc {
+     this._activeBoardMesh = boardMesh;
+     this._activeBoardAggregate = boardAggregate;
+ 
+-    // TODO: HoverBoardStrategy real (physics/input/animation portados de BoardController) —
+-    // placeholder por ahora, sólo para confirmar que el board se crea y el parenting queda bien.
+-    this.activeStrategy = null;
+-    console.log("[CharacterFsm] HoverBoard: board creado + parenting aplicado. Falta HoverBoardStrategy real.");
++    const { strategy, physicsController } = await buildHoverBoardStrategy(
++      this.scene,
++      boardMesh,
++      boardAggregate,
++      this.input,
++      this.fsm,
++    );
++    this.activeStrategy = strategy;
++    this.activeBoardPhysics = physicsController;
++    this._activeBoardInputAdapter = new HoverBoardInputAdapter(this.input);
++
++
+   }
+ 
+   dispose(): void {
+diff --git a/src/poc/poc3-jetpack_character_fsm copy/strategies/hover-board/hover-board.input.adapter.ts b/src/poc/poc3-jetpack_character_fsm copy/strategies/hover-board/hover-board.input.adapter.ts
+index 9fe9f9b..8706c05 100644
+--- a/src/poc/poc3-jetpack_character_fsm copy/strategies/hover-board/hover-board.input.adapter.ts	
++++ b/src/poc/poc3-jetpack_character_fsm copy/strategies/hover-board/hover-board.input.adapter.ts	
+@@ -1,16 +1,19 @@
++// src/poc4-.../strategies/hover-board/hover-board.input.adapter.ts
+ import type { CharacterInput } from "../../character.input";
+-import type { BoardInputState } from "./board-fsm/board.input.contract"; // o donde termine viviendo el type
++
++/** Mismo shape que BoardInputState de POC2 — se redefine acá para no importar
++ * board.input.ts entero (esa clase trae sus propios window listeners, que no queremos duplicar). */
++export interface BoardInputState {
++  forward: boolean;
++  turnLeft: boolean;
++  turnRight: boolean;
++  pitchDown: boolean;
++}
+ 
+ /**
+- * Traduce CharacterInput (WASD/Shift/Space, ya escuchado por un solo listener global)
+- * a la forma que espera BoardController (BoardInputState), sin duplicar listeners de teclado.
+- * Mapeo (placeholder, a confirmar con el feel real una vez portado el controller):
+- *   forward   (Shift en POC2) <- CharacterInput.cruise (Shift)
+- *   pitchDown (W en POC2)     <- CharacterInput.forward (W)
+- *   turnLeft  (A)             <- CharacterInput.left (A)
+- *   turnRight (D)             <- CharacterInput.right (D)
+- *   jump      (Space)         <- CharacterInput.consumeJumpRequest() (mismo flag que StandAlone/salto)
+- *   testImpulse (T)           <- no mapeado todavía, siempre false (feature de debug de POC2)
++ * Traduce CharacterInput (un solo listener global de teclado) a la forma que espera
++ * HoverBoardPhysicsController. Mapeo confirmado (no tocar): Shift=forward del board,
++ * W=pitchDown, A/D=turn. Ya funciona bien así.
+  */
+ export class HoverBoardInputAdapter {
+   constructor(private characterInput: CharacterInput) {}
+@@ -24,12 +27,4 @@ export class HoverBoardInputAdapter {
+       turnRight: right,
+     };
+   }
+-
+-  consumeJumpRequest(): boolean {
+-    return this.characterInput.consumeJumpRequest();
+-  }
+-
+-  consumeTestImpulseRequest(): boolean {
+-    return false; // placeholder — sin key mapeada todavía en CharacterInput
+-  }
+ }
+\ No newline at end of file
