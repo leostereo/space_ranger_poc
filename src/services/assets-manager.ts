@@ -55,6 +55,13 @@ export interface ICharacterAnimations {
     floating: AnimationGroup;
     flying: AnimationGroup;
     falling_idle: AnimationGroup,
+
+    jump_on_board: AnimationGroup,
+    walking_forward: AnimationGroup,
+    walking_backwards: AnimationGroup,
+    running_normal: AnimationGroup,
+    running_fast: AnimationGroup,
+
 }
 
 export interface MeshInstanceResult {
@@ -98,7 +105,7 @@ export class AssetManager {
             };
 
             // --- RECURSO 2: Modelo GLB Externo ---
-            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver5.glb");
+            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver6.glb");
             tareaGLB.onSuccess = (task) => {
                 // Buscamos el nodo raíz que crea automáticamente Babylon para los GLB
 
@@ -112,30 +119,6 @@ export class AssetManager {
                     // Guardamos las animaciones que traía este GLB específico
                     this.animationGroups["character"] = task.loadedAnimationGroups;
                     this.animationGroups['character'].forEach((ag) => ag.stop());
-                }
-            };
-
-            // --- RECURSO 3: mapa ---
-            const tareaMap = manager.addMeshTask("batalla del pilar", "", "maps/", "topoexport_3D_modeling_batallaDelPilar.glb");
-            tareaMap.onSuccess = (task) => {
-                // Buscamos el nodo raíz que crea automáticamente Babylon para los GLB
-
-                const root = task.loadedMeshes.find(m => m.name === "__root__");
-
-                if (root) {
-
-                    //root.scaling = new Vector3(0.1, 0.1, 0.1); 
-                    
-                    if (root.rotationQuaternion) {
-                        // root.rotationQuaternion = Quaternion.Identity();
-                    }
-                    root.position.x =  0;
-                    root.position.y = -900;
-                    root.position.z = -100;
-                    root.rotate(Axis.X, Math.PI / 2, Space.LOCAL);
-                    // Desactivamos el nodo raíz (apaga al personaje entero y sus hijos)
-                    root.setEnabled(true);
-                    this.meshes["batalla del pilar"] = root;
                 }
             };
 
@@ -188,17 +171,27 @@ export class AssetManager {
         const floating = find("floating");
         //const falling_to_landing = find("falling ro landing"); repetido
 
+        const jump_on_board = find("jump on board");
+        const walking_forward = find("walking forward");
+        const walking_backwards = find("walking backwards");
+        const running_normal = find("running normal");
+        const running_fast = find("running fast");
+
+
 
         if (!standing_idle || !cruising_forward_idle || !cruising_faster_idle || !cruising_maxVel_idle ||
             !standing_to_crouch || !crouch_to_standing || !jump || !falling || !falling_idle ||
-            !flying || !floating) {
+            !flying || !floating || !jump_on_board || !walking_forward || !walking_backwards ||
+            !running_normal || !running_fast) {
             console.warn("AssetManager: faltan animaciones de 'character' — revisar nombres de clips en el GLB.");
             return;
         }
 
         const mold: ICharacterAnimations = {
             standing_idle, cruising_forward_idle, cruising_faster_idle, cruising_maxVel_idle,
-            standing_to_crouch, crouch_to_standing, jump, falling, floating, flying, falling_idle
+            standing_to_crouch, crouch_to_standing, jump, falling, floating, flying,
+            falling_idle, jump_on_board, walking_forward, walking_backwards,
+            running_fast,running_normal
         };
 
         Object.values(mold).forEach((ag) => {
@@ -232,7 +225,14 @@ export class AssetManager {
             falling: cloneOne(mold.falling),
             floating: cloneOne(mold.floating),
             flying: cloneOne(mold.flying),
-            falling_idle: cloneOne(mold.falling_idle)
+            falling_idle: cloneOne(mold.falling_idle),
+
+            walking_backwards: cloneOne(mold.walking_backwards),
+            walking_forward: cloneOne(mold.walking_forward),
+            jump_on_board: cloneOne(mold.jump_on_board),
+            running_fast: cloneOne(mold.running_fast),
+            running_normal: cloneOne(mold.running_normal),
+            
         };
     }
 
@@ -327,7 +327,7 @@ export class AssetManager {
     private static _buildCamerasAndLights(canvas: HTMLCanvasElement, scene: Scene): void {
         const { alpha, beta, radius, target } = generalConfig.camera;
         const camera1 = new ArcRotateCamera(
-            "poc-camera",
+            "arc_camera",
             alpha,
             beta,
             radius,
@@ -338,7 +338,7 @@ export class AssetManager {
         camera1.setEnabled(false)
         this.cams['arc'] = camera1
 
-        const camera2 = new FollowCamera("boardCamera", new Vector3(0, 5, 10), scene);
+        const camera2 = new FollowCamera("mainFollowCamera", new Vector3(0, 5, 10), scene);
         camera2.radius = 6;          // Distancia horizontal (hacia atrás) en unidades de Babylon
         camera2.heightOffset = 2.0;  // Altura vertical por encima de la patineta
         camera2.rotationOffset = 180;// 180 grados para que mire exactamente desde atrás (0 la miraría de frente)
@@ -454,7 +454,7 @@ export class AssetManager {
         // =========================================================================
         // Definimos sus dimensiones en base a tus reglas:
         const tailDiameterX = depth / 4; // El ancho de la cola es la mitad del largo de la tabla
-        const tailDiameterY = height;    // Mismo espesor para que encajen al ras
+        const tailDiameterY = height / 2;    // mitad del espesor
         const tailDiameterZ = width;     // El eje principal es del mismo largo que el ancho del cuerpo
 
         const tailMesh = MeshBuilder.CreateSphere("board-tail", {
@@ -469,7 +469,7 @@ export class AssetManager {
 
         // Posicionamos la cola en el extremo trasero de la patineta (Z negativo)
         // La elevamos levemente en Y (ej: height * 0.4) para darle el look de alerón elevado
-        tailMesh.position.set(0, height * 0.4, -(depth / 2));
+        tailMesh.position.set(0, height * 0.3, -(depth / 2));
 
         // Rotamos la cola:
         // - 90 grados en Y para cruzarla de lado a lado (perpendicular al cuerpo principal)
