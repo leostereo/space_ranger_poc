@@ -13,6 +13,7 @@ import type { FallingSubState } from "../../character-fsm/board-fsm/board.fsm.fa
  */
 export class HoverBoardAnimationController implements IAnimationController {
   private currentAnimation: AnimationGroup | null = null;
+  private isPlayingTransient = false; // NUEVO
 
   constructor(
     private animations: ICharacterAnimations | null,
@@ -25,13 +26,15 @@ export class HoverBoardAnimationController implements IAnimationController {
     this._render();
   }
 
-  tick(): void {}
+  tick(): void { }
 
   dispose(): void {
     this.currentAnimation?.stop();
   }
 
   private _render(): void {
+    if (this.isPlayingTransient) return; // NUEVO: no interrumpe el jump mientras suena
+
     const macroState = this.boardFsm.getState();
     const subState = this.boardFsm.getActiveSubState();
     const resolved = this._resolve(macroState, subState);
@@ -39,13 +42,24 @@ export class HoverBoardAnimationController implements IAnimationController {
 
     this.currentAnimation?.stop();
     this.currentAnimation = resolved.animation;
-    resolved.animation.play(resolved.loop);
+
+    if (!resolved.loop) {
+      // NUEVO: mismo criterio que playTransient() de POC2
+      this.isPlayingTransient = true;
+      resolved.animation.play(false);
+      resolved.animation.onAnimationGroupEndObservable.addOnce(() => {
+        this.isPlayingTransient = false;
+      });
+    } else {
+      resolved.animation.play(true);
+    }
   }
 
   private _resolve(
     macroState: BoardMotionState,
     subState: HoveringSubState | FallingSubState,
   ): { animation: AnimationGroup; loop: boolean } | null {
+    // sin cambios
     if (!this.animations) return null;
 
     if (macroState === "Hovering") {
@@ -59,15 +73,12 @@ export class HoverBoardAnimationController implements IAnimationController {
         case "JumpImpulseStart":
           return { animation: this.animations.jump, loop: false };
         case "Jumping":
-          // Mismo criterio que SkaterAnimator: no hace nada, se sostiene el jump
-          // hasta que la física lo asiente y la fsm transicione sola.
           return null;
         default:
           return null;
       }
     }
 
-    // Falling
     switch (subState as FallingSubState) {
       case "GliderBoost":
         return { animation: this.animations.jump, loop: true };
