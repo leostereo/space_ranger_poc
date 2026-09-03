@@ -10,6 +10,7 @@ export type TransitionTable<TState extends string> =
 export abstract class BaseFsm<TState extends string> implements IBaseFsm<TState> {
 
   protected state!: TState;
+  protected previousState: TState | null = null; // NUEVO
   protected _isBlocking = false;
   private stateObservable = new Observable<TState>();
 
@@ -20,6 +21,7 @@ export abstract class BaseFsm<TState extends string> implements IBaseFsm<TState>
     if (!this.isValidTransition(next)) return;
 
     const prev = this.state;
+    this.previousState = prev; // NUEVO
     this.state = next;
     this.onExit(prev);
     this.onEnter(next);

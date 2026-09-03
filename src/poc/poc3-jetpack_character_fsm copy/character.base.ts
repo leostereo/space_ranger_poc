@@ -173,6 +173,7 @@ export default class CharacterBase implements Poc {
     this.activeJetpackPhysics = null;
     this.activeStrategy?.dispose();
     this.activeStrategy = null;
+    const initialGroundDetectedOverride = this.activeBoardPhysics?.isGroundDetected();
 
     if (this._activeBoardMesh && this._activeBoardAggregate) {
       const spawnPosition = this.characterMesh.getAbsolutePosition().clone();
@@ -216,6 +217,7 @@ export default class CharacterBase implements Poc {
       this.input,
       this.fsm,
       this.characterAnimations,
+      initialGroundDetectedOverride, // NUEVO
     );
     this.activeStrategy = strategy;
     this.activeStandAlonePhysics = physicsController;

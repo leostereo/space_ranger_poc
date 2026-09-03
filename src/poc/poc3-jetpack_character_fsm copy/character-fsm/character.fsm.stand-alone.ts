@@ -39,6 +39,8 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
     this.transitions = {
       OnGround: {
         JumpImpulseStart: true, // vía requestJump()
+        OnAir: () => !this.deps.isGroundDetected(), // NUEVO: caída sin salto (borde sin saltar)
+
       },
       JumpImpulseStart: {
         OnAir: true, // vía notifyJumpImpulseFrame(), manual — nunca automático en tick()
@@ -77,10 +79,12 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
   }
 
   protected onEnter(state: StandAloneSubState): void {
-    if (state === "OnAir") this.deps.onEnterOnAir();
+    if (state === "OnAir" && this.previousState === "JumpImpulseStart") {
+      this.deps.onEnterOnAir();
+    }
   }
 
-  protected onExit(_state: StandAloneSubState): void {}
+  protected onExit(_state: StandAloneSubState): void { }
 
   dispose(): void {
     this.onGroundSubFsm.dispose();
