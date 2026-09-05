@@ -124,30 +124,6 @@ export class AssetManager {
 
             // --- RECURSO 3: mapa ---
             const tareaMap = manager.addMeshTask("batalla del pilar", "", "maps/", "topoexport_3D_modeling_batallaDelPilar.glb");
-            tareaMap.onSuccess = (task) => {
-                // Buscamos el nodo raíz que crea automáticamente Babylon para los GLB
-
-                const root = task.loadedMeshes.find(m => m.name === "__root__");
-
-                if (root) {
-
-                    //root.scaling = new Vector3(0.1, 0.1, 0.1); 
-                    
-                    if (root.rotationQuaternion) {
-                        // root.rotationQuaternion = Quaternion.Identity();
-                    }
-                    root.position.x =  0;
-                    root.position.y = -900;
-                    root.position.z = -100;
-                    root.rotate(Axis.X, Math.PI / 2, Space.LOCAL);
-                    // Desactivamos el nodo raíz (apaga al personaje entero y sus hijos)
-                    root.setEnabled(true);
-                    this.meshes["batalla del pilar"] = root;
-                }
-            };
-
-            // --- RECURSO 3: mapa ---
-            const tareaMap = manager.addMeshTask("batalla del pilar", "", "maps/", "topoexport_3D_modeling_batallaDelPilar.glb");
 
             tareaMap.onSuccess = (task) => {
                 const root = task.loadedMeshes.find(m => m.name === "__root__");
