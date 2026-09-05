@@ -136,9 +136,9 @@ export const board_character_builder = (scene: Scene): { boardMesh: Mesh, boardA
         capsule.rotationQuaternion = null; // Liberamos por si la cápsula también venía de GLTF
 
         //capsule offset position on the table
-        const offsetX_Capsule = 0.15;  
-        const offsetZ_Capsule = -0.15;  
-        const boardThicknessOffset = 0.1;
+        const offsetX_Capsule = 0.05;  
+        const offsetZ_Capsule = -0.25;  
+        const boardThicknessOffset = 0.05;
         const capsuleYOffset = (capsuleHeight / 2) + boardThicknessOffset;
 
         capsule.position.set(offsetX_Capsule, capsuleYOffset, offsetZ_Capsule);

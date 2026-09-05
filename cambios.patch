@@ -1,0 +1,20 @@
+diff --git a/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts b/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts
+--- a/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts
++++ b/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts
+@@ -1,6 +1,9 @@
+ import { BaseFsm, TransitionTable } from "../abstract/base-fsm";
+ import { StandAloneFsm, type StandAloneSubState } from "./character.fsm.stand-alone";
+ import { JetpackFsm, type JetpackSubState } from "./character.fsm.jetpack";
+ import { BoardFsm } from "./board-fsm/board.fsm";
++import type { HoveringSubState } from "./board-fsm/board.fsm.hovering";
++import type { FallingSubState } from "./board-fsm/board.fsm.falling";
++import type { OnGroundSubState } from "./character.fsm.stand-alone.on-ground";
+ 
+@@ -152,6 +155,7 @@
+-  getActiveSubState(): StandAloneSubState | OnGroundSubState | JetpackSubState | "Loading" {
++  getActiveSubState(): StandAloneSubState | OnGroundSubState | JetpackSubState | HoveringSubState | FallingSubState | "Loading" {
+     if (this.state === "StandAlone") return this.standAloneSubFsm.getActiveSubState();
+     if (this.state === "Jetpack") return this.jetpackSubFsm.getState();
++    if (this.state === "HoverBoard") return this.boardSubFsm.getActiveSubState();
+     return "Loading";
+   }
