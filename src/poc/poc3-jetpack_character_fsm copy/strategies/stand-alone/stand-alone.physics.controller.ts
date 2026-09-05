@@ -49,26 +49,27 @@ export class StandAlonePhysicsController implements IPhysicsController {
     }
   }
 
-tick(dt: number): void {
-  this._updateGroundDetection();
+  tick(dt: number): void {
+    this._updateGroundDetection();
 
-  const { forward, backward, left, right, cruise } = this.getInput();
+    const { forward, backward, left, right, cruise } = this.getInput();
 
-  this._applyTurn(left, right); // ← ya no necesita dt, la física integra la velocidad angular sola
-  this._applyMove(forward, backward, cruise);
-}
+    this._applyTurn(left, right); // ← ya no necesita dt, la física integra la velocidad angular sola
+    this._applyMove(forward, backward, cruise);
+  }
 
   /** A/D: rotación pura en Y, transversal a Idle/Walking/Running (funciona esté o no en movimiento). */
-private _applyTurn(left: boolean, right: boolean): void {
-  const turnDir = (right ? 1 : 0) - (left ? 1 : 0);
-  this.characterAggregate.body.setAngularVelocity(new Vector3(0, turnDir * TURN_SPEED, 0));
-}
+  private _applyTurn(left: boolean, right: boolean): void {
+    const turnDir = (right ? 1 : 0) - (left ? 1 : 0);
+    this.characterAggregate.body.setAngularVelocity(new Vector3(0, turnDir * TURN_SPEED, 0));
+  }
 
   /** W/S: avanza/retrocede según el forward actual (ya rotado por _applyTurn). Sin input, frena en seco horizontalmente. */
   private _applyMove(forward: boolean, backward: boolean, cruise: boolean): void {
     const currentVelocity = this.characterAggregate.body.getLinearVelocity();
 
     if (!forward && !backward) {
+      if (!this._groundDetected) return; // NUEVO: en el aire, no frena horizontal — deja la inercia intacta
       this.characterAggregate.body.setLinearVelocity(new Vector3(0, currentVelocity.y, 0));
       return;
     }
@@ -108,16 +109,16 @@ private _applyTurn(left: boolean, right: boolean): void {
         mesh !== this.characterAggregate.transformNode
         && mesh.name !== 'playerCapsule'
     );
-    
-  //  console.log(hit?.pickedMesh?.name)
-  //   const rayHelper = new RayHelper(this._ray);
-  //   rayHelper.show(this.scene, new Color3(1, 0, 0));
+
+    //  console.log(hit?.pickedMesh?.name)
+    //   const rayHelper = new RayHelper(this._ray);
+    //   rayHelper.show(this.scene, new Color3(1, 0, 0));
 
     const verticalVelocity = this.characterAggregate.body.getLinearVelocity().y;
     const isMovingUpward = verticalVelocity > UPWARD_VELOCITY_THRESHOLD;
-    
+
     this._groundDetected = !!(hit && hit.hit) && !isMovingUpward;
   }
 
-  dispose(): void {}
+  dispose(): void { }
 }

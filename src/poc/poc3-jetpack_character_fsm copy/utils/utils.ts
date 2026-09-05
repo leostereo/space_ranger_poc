@@ -155,8 +155,25 @@ const createPlatforms = (scene: Scene) => {
 }
 
 const addMapAggregate = (scene: Scene) => {
-  const ground = scene.getMeshByName('FUSION_SUELO')
+  const ground = scene.getMeshByName('FUSION_SUELO');
   if (ground) {
-    const groundAggregate = new PhysicsAggregate(ground, PhysicsShapeType.BOX, { mass: 0 }, scene);
+    const groundAggregate = new PhysicsAggregate(
+      ground,
+      PhysicsShapeType.MESH, // CAMBIADO: BOX → MESH, respeta el relieve real
+      { mass: 0 },
+      scene,
+    );
   }
+
+  const edificiosFusionados = scene.getMeshByName('FUSION_EDIFICIOS');
+
+  if (edificiosFusionados) {
+    const edificiosAggregate = new PhysicsAggregate(
+      edificiosFusionados,
+      PhysicsShapeType.MESH,
+      { mass: 0 },
+      scene,
+    );
 }
+
+};
