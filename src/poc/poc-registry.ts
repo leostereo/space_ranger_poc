@@ -29,4 +29,10 @@ export const pocRegistry: PocDefinition[] = [
     description: "Integrate character , jetcp and hoverBoard",
     load: () => import("./poc3-jetpack_character_fsm copy/character.base"),
   },
+  {
+    id: "poc5-HFSM model",
+    label: "POC 5 · Implements HFSM",
+    description: "Only for complex character features",
+    load: () => import("./poc5/poc5.scene"),
+  },
 ];
