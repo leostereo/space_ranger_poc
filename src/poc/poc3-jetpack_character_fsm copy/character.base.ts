@@ -156,7 +156,7 @@ export default class CharacterBase implements Poc {
 
     const NORMAL_LAST_FRAME  = 60;
     const CRASH_LAST_FRAME  = 96;
-    const ROLL_LAST_FRAME  = 100;
+    const ROLL_LAST_FRAME  = 90;
 
     wireOnComplete(this.characterAnimations?.normal_landing,NORMAL_LAST_FRAME);
     wireOnComplete(this.characterAnimations?.crash_landing,CRASH_LAST_FRAME);

@@ -27,6 +27,8 @@ export class StandAloneAnimationController implements IAnimationController {
       this.animations.normal_landing.from = 20;
       this.animations.normal_landing.speedRatio = 1.6;
       this.animations.crash_landing.from = 20;
+      this.animations.roll_landing.from = 10;
+      this.animations.roll_landing.speedRatio = 1.6;
     }
   }
 

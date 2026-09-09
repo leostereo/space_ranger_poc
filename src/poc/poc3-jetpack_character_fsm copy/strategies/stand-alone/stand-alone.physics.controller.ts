@@ -157,7 +157,7 @@ export class StandAlonePhysicsController implements IPhysicsController {
     const verticalVelocity = this.characterAggregate.body.getLinearVelocity().y;
     const isMovingUpward = verticalVelocity > UPWARD_VELOCITY_THRESHOLD;
 
-    console.log(hit?.distance, hit?.pickedMesh?.name, hit?.hit, verticalVelocity, isMovingUpward)
+    //console.log(hit?.distance, hit?.pickedMesh?.name, hit?.hit, verticalVelocity, isMovingUpward)
 
     this._groundDetected = !!(hit && hit.hit) && !isMovingUpward;
 
