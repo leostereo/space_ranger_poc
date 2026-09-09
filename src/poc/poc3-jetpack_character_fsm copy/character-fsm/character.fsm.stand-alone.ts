@@ -1,25 +1,18 @@
 import { BaseFsm, TransitionTable } from "../abstract/base-fsm";
 import { OnGroundFsm, type OnGroundSubState } from "./character.fsm.stand-alone.on-ground";
 
-/**
- * A — A pie. `OnLadder` (roadmap original) queda para más adelante.
- * OnGround ahora es un sub-FSM propio (Idle/Walking/Running) en vez de un estado flat —
- * ver character.fsm.stand-alone.on-ground.ts.
- * Salto: OnGround -> JumpImpulseStart -> OnAir -> OnGround, mismo patrón puente que
- * BoardFsmHovering (JumpImpulseStart -> Jumping) en poc2 — el estado puente nunca se
- * auto-dispara en tick(), sólo sale vía notifyJumpImpulseFrame(), llamado por quien
- * reproduce la animación de salto al llegar al frame de impulso.
- */
 export type StandAloneSubState = "OnGround" | "JumpImpulseStart" | "OnAir";
 
 export interface StandAloneFsmDeps {
-  /** Vía raycast en el physics controller activo — ver stand-alone.physics.controller.ts. */
   isGroundDetected: () => boolean;
-  /** Aplica el impulso físico del salto. Se dispara al ENTRAR a OnAir (frame de impulso), no al presionar la tecla. */
   onEnterOnAir: () => void;
-  /** Threading hacia OnGroundFsmDeps, mismo criterio que isGroundDetected/onEnterOnAir. */
   isMoveHeld: () => boolean;
   isRunHeld: () => boolean;
+  /** Threading hacia OnGroundFsmDeps, mismo criterio que isMoveHeld/isRunHeld. */
+  getVerticalSpeed: () => number;
+  getHorizontalSpeed: () => number;
+  onEnterLandingRoll: () => void;
+  onExitLandingRoll: () => void;
 }
 
 export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
@@ -29,29 +22,31 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
 
   constructor(private deps: StandAloneFsmDeps) {
     super();
-    this.state = "OnGround"; // estado inicial: asignado directo, no vía setState
+    this.state = "OnGround";
 
     this.onGroundSubFsm = new OnGroundFsm({
       isMoveHeld: this.deps.isMoveHeld,
       isRunHeld: this.deps.isRunHeld,
+      getVerticalSpeed: this.deps.getVerticalSpeed,
+      getHorizontalSpeed: this.deps.getHorizontalSpeed,
+      onEnterLandingRoll: this.deps.onEnterLandingRoll,
+      onExitLandingRoll: this.deps.onExitLandingRoll,
     });
 
     this.transitions = {
       OnGround: {
-        JumpImpulseStart: true, // vía requestJump()
-        OnAir: () => !this.deps.isGroundDetected(), // NUEVO: caída sin salto (borde sin saltar)
-
+        JumpImpulseStart: true,
+        OnAir: () => !this.deps.isGroundDetected(),
       },
       JumpImpulseStart: {
-        OnAir: true, // vía notifyJumpImpulseFrame(), manual — nunca automático en tick()
+        OnAir: true,
       },
       OnAir: {
-        OnGround: () => this.deps.isGroundDetected(), // guard automático, mismo criterio que ground detection en poc2
+        OnGround: () => this.deps.isGroundDetected(),
       },
     };
   }
 
-  /** Le da cuerda al sub-FSM de OnGround mientras ese sea el estado activo. */
   public override tick(): void {
     super.tick();
     if (this.state === "OnGround") {
@@ -59,21 +54,18 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
     }
   }
 
-  /** Único punto de entrada de input — mismo patrón que requestJump() en BoardFsm. */
   requestJump(): void {
     if (this.state === "OnGround") {
       this.setState("JumpImpulseStart");
     }
   }
 
-  /** Llamado por quien reproduce la animación de salto al llegar al frame de impulso (ver character.base.ts). */
   notifyJumpImpulseFrame(): void {
     if (this.state === "JumpImpulseStart") {
       this.setState("OnAir");
     }
   }
 
-  /** Para el HUD/CharacterFsm: expone el sub-estado real de OnGround en vez del flat "OnGround". */
   getActiveSubState(): OnGroundSubState | "JumpImpulseStart" | "OnAir" {
     return this.state === "OnGround" ? this.onGroundSubFsm.getState() : this.state;
   }
@@ -81,6 +73,9 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
   protected onEnter(state: StandAloneSubState): void {
     if (state === "OnAir" && this.previousState === "JumpImpulseStart") {
       this.deps.onEnterOnAir();
+    }
+    if (state === "OnGround" && this.previousState === "OnAir") {
+      this.onGroundSubFsm.notifyLanding();
     }
   }
 

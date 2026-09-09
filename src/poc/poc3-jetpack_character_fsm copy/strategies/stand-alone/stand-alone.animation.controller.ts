@@ -22,6 +22,12 @@ export class StandAloneAnimationController implements IAnimationController {
     this.standAloneFsm.onGroundSubFsm.onStateChange(() => this._render(this.standAloneFsm.getActiveSubState()));
 
     this._render(this.standAloneFsm.getActiveSubState());
+
+    if(this.animations){
+      this.animations.normal_landing.from = 20;
+      this.animations.normal_landing.speedRatio = 1.6;
+      this.animations.crash_landing.from = 20;
+    }
   }
 
   tick(): void {}
@@ -54,6 +60,12 @@ export class StandAloneAnimationController implements IAnimationController {
         return { animation: this.animations.jump, loop: false };
       case "OnAir":
         return { animation: this.animations.falling_idle, loop: true };
+      case "LandingSoft":
+        return { animation: this.animations.normal_landing, loop: false };
+      case "LandingRoll":
+        return { animation: this.animations.roll_landing, loop: false };
+      case "LandingCrash":
+        return { animation: this.animations.crash_landing, loop: false };
       default:
         return null;
     }

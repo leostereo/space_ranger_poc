@@ -3,7 +3,7 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { Observer } from "@babylonjs/core/Misc/observable";
 import type { Nullable } from "@babylonjs/core/types";
 import { Quaternion } from "@babylonjs/core/Maths/math.vector";
-import { AnimationEvent, FollowCamera, PhysicsShapeType, TransformNode } from "@babylonjs/core";
+import { AnimationEvent, AnimationGroup, FollowCamera, PhysicsShapeType, TransformNode } from "@babylonjs/core";
 import { AssetManager, type ICharacterAnimations } from "@/services/assets-manager";
 import { Poc } from "../types";
 import { CharacterFsm } from "./character-fsm/character.fsm";
@@ -75,6 +75,14 @@ export default class CharacterBase implements Poc {
       isMoveHeld: () => this.input.current.forward || this.input.current.backward,
       isRunHeld: () => this.input.current.cruise,
       onEnterHoverBoard: () => this._swapToHoverBoard(),
+      // NUEVO — landing states de StandAlone>OnGround
+      getVerticalSpeed: () => this.characterAggregate.body.getLinearVelocity().y,
+      getHorizontalSpeed: () => {
+        const v = this.characterAggregate.body.getLinearVelocity();
+        return Math.sqrt(v.x ** 2 + v.z ** 2);
+      },
+      onEnterLandingRoll: () => this.activeStandAlonePhysics?.notifyLandingRollStart(),
+      onExitLandingRoll: () => this.activeStandAlonePhysics?.notifyLandingRollEnd(),
       isBoardGroundDetected: () => this.activeBoardPhysics?.isGroundDetected() ?? false,
       groundLostElapsed: () => this.activeBoardPhysics?.groundLostElapsed() ?? 0,
       coyoteTime: generalConfig.groundCheck.coyoteTime,
@@ -88,12 +96,11 @@ export default class CharacterBase implements Poc {
       isBoostSettled: () => this.activeBoardPhysics?.isBoostSettled() ?? true,
       onEnterDiving: () => { },
       onEnterGliderBoost: () => this.activeBoardPhysics?.onEnterGliderBoost(),
-
-
     });
 
     this._wireJumpAnimationEvent();
     this._wireEquipBoardAnimationEvent();
+    this._wireLandingAnimationEvents(); // NUEVO
 
     const { strategy, physicsController } = await buildStandAloneStrategy(
       this.scene,
@@ -133,6 +140,27 @@ export default class CharacterBase implements Poc {
         this.fsm.notifyBoardReady();
       }, false),
     );
+  }
+
+  private _wireLandingAnimationEvents(): void {
+    const wireOnComplete = (group: AnimationGroup | undefined, notify_frame:number) => {
+      const anim = group?.targetedAnimations[0]?.animation;
+      if (!anim) return;
+
+      anim.addEvent(
+        new AnimationEvent(notify_frame, () => {
+          this.fsm.standAloneSubFsm.onGroundSubFsm.notifyLandingAnimationComplete();
+        }, false),
+      );
+    };
+
+    const NORMAL_LAST_FRAME  = 60;
+    const CRASH_LAST_FRAME  = 96;
+    const ROLL_LAST_FRAME  = 100;
+
+    wireOnComplete(this.characterAnimations?.normal_landing,NORMAL_LAST_FRAME);
+    wireOnComplete(this.characterAnimations?.crash_landing,CRASH_LAST_FRAME);
+    wireOnComplete(this.characterAnimations?.roll_landing,ROLL_LAST_FRAME);
   }
 
   private _bindObservables(): void {

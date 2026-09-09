@@ -17,21 +17,18 @@ export interface CharacterFsmDeps {
   onEnterEquippingJetpack: () => void;
   onEnterStandAlone: () => void;
   isGroundDetected: () => boolean;
-  isBoardGroundDetected: () => boolean; // ← nuevo, raycast propio del board
+  isBoardGroundDetected: () => boolean;
   onEnterOnAir: () => void;
-  /** Threading hacia JetpackFsmDeps, mismo criterio que isGroundDetected/onEnterOnAir hacia StandAloneFsmDeps. */
   isCruiseHeld: () => boolean;
-  /** Threading hacia OnGroundFsmDeps, mismo criterio que el resto. */
   isMoveHeld: () => boolean;
   isRunHeld: () => boolean;
-  /** Se dispara al ENTRAR a EquippingBoard: por ahora, sólo console.log + auto-advance (ver character.base.ts). */
   onEnterHoverBoard: () => void;
+  /** Threading hacia OnGroundFsmDeps, vía StandAloneFsmDeps — mismo criterio que isMoveHeld/isRunHeld. */
+  getVerticalSpeed: () => number;
+  getHorizontalSpeed: () => number;
+  onEnterLandingRoll: () => void;
+  onExitLandingRoll: () => void;
 
-  // --------------------------------------------------------------
-  // Threading hacia BoardFsmDeps. TEMPORAL: stubbeados en character.base.ts
-  // hasta que se porte la física real del board (board.physics.controller.ts)
-  // desde POC2. No representan comportamiento real todavía.
-  // --------------------------------------------------------------
   groundLostElapsed: () => number;
   coyoteTime: number;
   onEnterHovering: () => void;
@@ -44,8 +41,6 @@ export interface CharacterFsmDeps {
   isBoostSettled: () => boolean;
   onEnterDiving: () => void;
   onEnterGliderBoost: () => void;
-
-
 }
 
 export class CharacterFsm extends BaseFsm<CharacterMainState> {
@@ -66,6 +61,10 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
       onEnterOnAir: this.deps.onEnterOnAir,
       isMoveHeld: this.deps.isMoveHeld,
       isRunHeld: this.deps.isRunHeld,
+      getVerticalSpeed: this.deps.getVerticalSpeed,
+      getHorizontalSpeed: this.deps.getHorizontalSpeed,
+      onEnterLandingRoll: this.deps.onEnterLandingRoll,
+      onExitLandingRoll: this.deps.onExitLandingRoll,
     });
     this.jetpackSubFsm = new JetpackFsm({
       isCruiseHeld: this.deps.isCruiseHeld,

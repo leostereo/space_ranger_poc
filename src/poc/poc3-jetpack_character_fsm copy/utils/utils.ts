@@ -101,7 +101,7 @@ export function character_builder(scene: Scene): CharacterBuildResult {
   const characterAggregate = new PhysicsAggregate(
     capsule,
     PhysicsShapeType.CAPSULE,
-    { mass: TMP_CONFIG.characterMass },
+    { mass: TMP_CONFIG.characterMass , restitution:0},
     scene,
   );
 
