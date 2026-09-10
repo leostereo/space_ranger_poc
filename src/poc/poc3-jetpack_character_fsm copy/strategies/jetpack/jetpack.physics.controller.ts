@@ -36,6 +36,10 @@ const CRUISE_LATERAL_GRIP = 0.9;
 const CRUISE_PITCH_FORCE = 1600; // Newtons, según intensidad de pitch — simétrico arriba/abajo (gravedad se compensa aparte, siempre)
 const MAX_HOVER_CATCH_SPEED = 4; // m/s — tope de velocidad vertical que se le "perdona" al hover al retomar
 const ON_HORIZONTAL_BRAKE_FACTOR = 4; // mismo criterio que brakingDragFactor/CRUISE_LATERAL_GRIP — a ojo, ajustar sintiendo el frenado
+//shoot
+const SHOOTING_MAX_PITCH_ANGLE = Tools.ToRadians(45);
+const SHOOTING_PITCH_LERP_SPEED = 8;
+
 export class JetpackPhysicsController implements IPhysicsController {
   private fuel = MAX_FUEL;
   private hoverTargetHeight: number;
@@ -81,23 +85,18 @@ export class JetpackPhysicsController implements IPhysicsController {
 
     if (subState === "Cruising") {
       this._updateCruisePitch(dt); // lerp del ángulo ANTES de decidir si hay fuerza que aplicar
+    } else if (subState === "Shooting") {
+      this._updateShootingPitch(dt); // NUEVO — mismo lerp visual, sin fuerza asociada
     }
 
     const cruisePitching = subState === "Cruising" && (forward || backward);
 
     if (cruisePitching) {
-      // Hover spring 100% apagado mientras se pitchea — mismo criterio 1:1 que poc2:
-      // Hovering vs Falling son mutuamente excluyentes. Acá: el spring sólo corre si NO
-      // estás empujando W/S en Cruising. La gravedad ya está compensada aparte arriba;
-      // sumamos la fuerza de pitch (bidireccional) encima.
       this.hoverTargetHeight = this.characterAggregate.transformNode.getAbsolutePosition().y;
       this._applyCruisePitchForce();
       this.wasCruisePitching = true;
     } else {
       if (this.wasCruisePitching) {
-        // Al soltar W/S mientras se venía rápido, no dejamos que el hover tenga que atajar
-        // toda esa velocidad de un golpe con su damping — eso producía el rebote. Se
-        // clampea UNA vez, en la transición, no en cada frame.
         const velocity = this.characterAggregate.body.getLinearVelocity();
         const clampedY = Scalar.Clamp(velocity.y, -MAX_HOVER_CATCH_SPEED, MAX_HOVER_CATCH_SPEED);
         this.characterAggregate.body.setLinearVelocity(new Vector3(velocity.x, clampedY, velocity.z));
@@ -111,16 +110,34 @@ export class JetpackPhysicsController implements IPhysicsController {
       this._applyCruiseSteering(dt);
       this._applyCruiseLateralFriction();
     } else {
-      this._applyTurn(dt);
-      this._decayCruiseVisuals(dt); // relaja roll Y pitch a 0 al volver a "On"
-      this._applyOnHorizontalBrake(); // nuevo
-
+      this._applyTurn(dt); // también cubre Shooting: A/D siguen siendo yaw puro, igual que "On"
+      this._decayVisuals(dt, subState); // CAMBIADO — antes _decayCruiseVisuals(dt), ver abajo
+      this._applyOnHorizontalBrake();
     }
+  }
+
+  private _updateShootingPitch(dt: number): void {
+    const { forward, backward } = this.getInput();
+    let targetPitch = 0;
+    // Mismo mapeo de signo que Cruising (W = nose abajo, S = nose arriba), por consistencia.
+    if (forward) targetPitch = -SHOOTING_MAX_PITCH_ANGLE;
+    if (backward) targetPitch = SHOOTING_MAX_PITCH_ANGLE;
+
+    const lerpFactor = 1 - Math.exp(-SHOOTING_PITCH_LERP_SPEED * dt);
+    this.pitchAngle += (targetPitch - this.pitchAngle) * lerpFactor;
   }
 
   /** Leído por character.base.ts para armar el dep hasFuel() de CharacterFsm. */
   hasFuel(): boolean {
     return this.fuel > 0;
+  }
+
+  notifyShootingEnter(): void {
+    this.pitchAngle = 0;
+  }
+
+  notifyShootingExit(): void {
+    this.pitchAngle = 0;
   }
 
   /** Compensación de gravedad pura — separada del spring del hover para poder desactivar
@@ -130,6 +147,18 @@ export class JetpackPhysicsController implements IPhysicsController {
       new Vector3(0, CHARACTER_MASS * GRAVITY, 0),
       this.characterAggregate.transformNode.getAbsolutePosition(),
     );
+  }
+
+  private _decayVisuals(dt: number, subState: JetpackSubState): void {
+    const lerpFactor = 1 - Math.exp(-CRUISE_ROLL_LERP_SPEED * dt);
+
+    if (this.rollAngle !== 0) {
+      this.rollAngle += (0 - this.rollAngle) * lerpFactor;
+    }
+
+    if (subState === "On" && this.pitchAngle !== 0) {
+      this.pitchAngle += (0 - this.pitchAngle) * lerpFactor;
+    }
   }
 
   private _applyOnHorizontalBrake(): void {
@@ -143,20 +172,20 @@ export class JetpackPhysicsController implements IPhysicsController {
     this.characterAggregate.body.applyForce(brakeForce, this.characterAggregate.transformNode.getAbsolutePosition());
   }
 
-private _updateCruisePitch(dt: number): void {
-  const { forward, backward } = this.getInput();
-  let targetPitch = 0;
-  // Invertido a propósito respecto al mapeo anterior — convención de palanca de vuelo:
-  // W (adelante) empuja el nose hacia abajo y desciende (picar); S (atrás) levanta el
-  // nose y asciende (trepar). El signo de pitchAngle sigue siendo el mismo que ya
-  // maneja correctamente tanto la fuerza real como el visual — sólo se intercambia
-  // qué tecla dispara cada signo.
-  if (forward) targetPitch = -CRUISE_MAX_PITCH_ANGLE;
-  if (backward) targetPitch = CRUISE_MAX_PITCH_ANGLE;
+  private _updateCruisePitch(dt: number): void {
+    const { forward, backward } = this.getInput();
+    let targetPitch = 0;
+    // Invertido a propósito respecto al mapeo anterior — convención de palanca de vuelo:
+    // W (adelante) empuja el nose hacia abajo y desciende (picar); S (atrás) levanta el
+    // nose y asciende (trepar). El signo de pitchAngle sigue siendo el mismo que ya
+    // maneja correctamente tanto la fuerza real como el visual — sólo se intercambia
+    // qué tecla dispara cada signo.
+    if (forward) targetPitch = -CRUISE_MAX_PITCH_ANGLE;
+    if (backward) targetPitch = CRUISE_MAX_PITCH_ANGLE;
 
-  const pitchLerpFactor = 1 - Math.exp(-CRUISE_PITCH_LERP_SPEED * dt);
-  this.pitchAngle += (targetPitch - this.pitchAngle) * pitchLerpFactor;
-}
+    const pitchLerpFactor = 1 - Math.exp(-CRUISE_PITCH_LERP_SPEED * dt);
+    this.pitchAngle += (targetPitch - this.pitchAngle) * pitchLerpFactor;
+  }
 
   /**
    * Fuerza vertical — mismo patrón 1:1 que _applyDiveForce en poc2 (board.controller.ts):

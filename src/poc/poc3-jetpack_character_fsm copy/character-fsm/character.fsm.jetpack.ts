@@ -6,6 +6,8 @@ export type JetpackSubState = "On" | "Cruising" | "Shooting";
 export interface JetpackFsmDeps {
   isCruiseHeld: () => boolean;
   isShootHeld: () => boolean;
+  onEnterShooting: () => void; // NUEVO
+  onExitShooting: () => void;  // NUEVO
 }
 
 export class JetpackFsm extends BaseFsm<JetpackSubState> {
@@ -32,7 +34,12 @@ export class JetpackFsm extends BaseFsm<JetpackSubState> {
     this.state = "On";
   }
 
-  protected onEnter(_state: JetpackSubState): void {}
-  protected onExit(_state: JetpackSubState): void {}
+protected onEnter(state: JetpackSubState): void {
+  if (state === "Shooting") this.deps.onEnterShooting();
+}
+
+protected onExit(state: JetpackSubState): void {
+  if (state === "Shooting") this.deps.onExitShooting();
+}
   dispose(): void {}
 }
