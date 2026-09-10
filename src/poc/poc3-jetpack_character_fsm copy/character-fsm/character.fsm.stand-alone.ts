@@ -37,7 +37,10 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
     this.transitions = {
       OnGround: {
         JumpImpulseStart: true,
-        OnAir: () => !this.deps.isGroundDetected(),
+        // NUEVO: mientras hay un landing en curso, ignorar rebotes transitorios del
+        // ground detection — evita que la animación de landing se corte por un
+        // micro-rebote físico (ej. mesh nuevo sin restitution configurado).
+        OnAir: () => !this.deps.isGroundDetected() && !this._isLandingInProgress(),
       },
       JumpImpulseStart: {
         OnAir: true,
@@ -46,6 +49,11 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
         OnGround: () => this.deps.isGroundDetected(),
       },
     };
+  }
+
+  private _isLandingInProgress(): boolean {
+    const state = this.onGroundSubFsm.getState();
+    return state === "LandingSoft" || state === "LandingRoll" || state === "LandingCrash";
   }
 
   public override tick(): void {
