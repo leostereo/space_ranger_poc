@@ -26,7 +26,8 @@ export class StandAlonePhysicsController implements IPhysicsController {
   private _isRolling = false;
   private _rollElapsed = 0;
   private _rollDirection = Vector3.Zero();
-
+private _lastImpactVerticalSpeed = 0;
+private _lastImpactHorizontalSpeed = 0;
   constructor(
     private scene: Scene,
     private characterAggregate: PhysicsAggregate,
@@ -53,19 +54,29 @@ export class StandAlonePhysicsController implements IPhysicsController {
     }
   }
 
-  tick(dt: number): void {
-    this._updateGroundDetection();
+tick(dt: number): void {
+  const wasGrounded = this._groundDetected;
+  this._updateGroundDetection();
 
-    if (this._isRolling) {
-      this._tickRoll(dt);
-      return; // input normal (turn/move) suspendido mientras rollea
-    }
-
-    const { forward, backward, left, right, cruise } = this.getInput();
-
-    this._applyTurn(left, right);
-    this._applyMove(forward, backward, cruise);
+  // Capturar la velocidad de impacto ANTES de que _applyMove() (o cualquier otra
+  // rama) la toque — si no hay forward/backward sostenido, _applyMove() zapea la
+  // horizontal a 0 en este mismo tick, antes de que fsm.tick() -> notifyLanding() la lea.
+  if (!wasGrounded && this._groundDetected) {
+    const v = this.characterAggregate.body.getLinearVelocity();
+    this._lastImpactVerticalSpeed = v.y;
+    this._lastImpactHorizontalSpeed = Math.sqrt(v.x ** 2 + v.z ** 2);
   }
+
+  if (this._isRolling) {
+    this._tickRoll(dt);
+    return; // input normal (turn/move) suspendido mientras rollea
+  }
+
+  const { forward, backward, left, right, cruise } = this.getInput();
+
+  this._applyTurn(left, right);
+  this._applyMove(forward, backward, cruise);
+}
 
   /** Decae ROLL_INITIAL_SPEED -> 0 mientras dure el roll, en la dirección capturada al entrar. */
   private _tickRoll(dt: number): void {
@@ -162,6 +173,14 @@ export class StandAlonePhysicsController implements IPhysicsController {
     this._groundDetected = !!(hit && hit.hit) && !isMovingUpward;
 
   }
+
+getLastImpactVerticalSpeed(): number {
+  return this._lastImpactVerticalSpeed;
+}
+
+getLastImpactHorizontalSpeed(): number {
+  return this._lastImpactHorizontalSpeed;
+}
 
   dispose(): void { }
 }

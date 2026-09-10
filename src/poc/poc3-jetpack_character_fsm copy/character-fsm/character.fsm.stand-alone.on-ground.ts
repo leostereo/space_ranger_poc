@@ -92,22 +92,34 @@ export class OnGroundFsm extends BaseFsm<OnGroundSubState> {
    * Llamado por StandAloneFsm.onEnter() al entrar a OnGround viniendo de OnAir.
    * Decide a cuál de los 3 landing states forzar según la velocidad al tocar el suelo.
    */
-  notifyLanding(): void {
-    const verticalSpeed = this.deps.getVerticalSpeed(); // negativo = cayendo
-    const horizontalSpeed = this.deps.getHorizontalSpeed();
-
-    const isFastVerticalFall = verticalSpeed <= LANDING_CRASH_VERTICAL_THRESHOLD;
-    const ratio = horizontalSpeed / Math.max(Math.abs(verticalSpeed), 0.001);
-    const isFastHorizontal = ratio > LANDING_ROLL_RATIO_THRESHOLD;
-    if (isFastVerticalFall) {
-      this.setState("LandingCrash");
-    } else if (isFastHorizontal) {
-      this.deps.onEnterLandingRoll();
-      this.setState("LandingRoll");
-    } else {
-      this.setState("LandingSoft");
-    }
+notifyLanding(): void {
+  // Evita reprocesar el landing si ya estamos en medio de uno — un rebote físico
+  // puede volver a disparar OnAir->OnGround mientras la animación anterior todavía
+  // está en curso, y sin este guard se reinicia el roll o se corrompe el estado.
+  if (
+    this.state === "LandingSoft" ||
+    this.state === "LandingRoll" ||
+    this.state === "LandingCrash"
+  ) {
+    return;
   }
+
+  const verticalSpeed = this.deps.getVerticalSpeed();
+  const horizontalSpeed = this.deps.getHorizontalSpeed();
+
+  const isFastVerticalFall = verticalSpeed <= LANDING_CRASH_VERTICAL_THRESHOLD;
+  const ratio = horizontalSpeed / Math.max(Math.abs(verticalSpeed), 0.001);
+  const isFastHorizontal = ratio > LANDING_ROLL_RATIO_THRESHOLD;
+
+  if (isFastVerticalFall) {
+    this.setState("LandingCrash");
+  } else if (isFastHorizontal) {
+    this.deps.onEnterLandingRoll();
+    this.setState("LandingRoll");
+  } else {
+    this.setState("LandingSoft");
+  }
+}
 
   /** Llamado por el AnimationEvent del clip de landing correspondiente, al llegar al frame final. */
   notifyLandingAnimationComplete(): void {

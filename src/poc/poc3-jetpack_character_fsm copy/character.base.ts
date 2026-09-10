@@ -76,11 +76,8 @@ export default class CharacterBase implements Poc {
       isRunHeld: () => this.input.current.cruise,
       onEnterHoverBoard: () => this._swapToHoverBoard(),
       // NUEVO — landing states de StandAlone>OnGround
-      getVerticalSpeed: () => this.characterAggregate.body.getLinearVelocity().y,
-      getHorizontalSpeed: () => {
-        const v = this.characterAggregate.body.getLinearVelocity();
-        return Math.sqrt(v.x ** 2 + v.z ** 2);
-      },
+      getVerticalSpeed: () => this.activeStandAlonePhysics?.getLastImpactVerticalSpeed() ?? 0,
+      getHorizontalSpeed: () => this.activeStandAlonePhysics?.getLastImpactHorizontalSpeed() ?? 0,
       onEnterLandingRoll: () => this.activeStandAlonePhysics?.notifyLandingRollStart(),
       onExitLandingRoll: () => this.activeStandAlonePhysics?.notifyLandingRollEnd(),
       isBoardGroundDetected: () => this.activeBoardPhysics?.isGroundDetected() ?? false,
@@ -143,7 +140,7 @@ export default class CharacterBase implements Poc {
   }
 
   private _wireLandingAnimationEvents(): void {
-    const wireOnComplete = (group: AnimationGroup | undefined, notify_frame:number) => {
+    const wireOnComplete = (group: AnimationGroup | undefined, notify_frame: number) => {
       const anim = group?.targetedAnimations[0]?.animation;
       if (!anim) return;
 
@@ -154,13 +151,13 @@ export default class CharacterBase implements Poc {
       );
     };
 
-    const NORMAL_LAST_FRAME  = 60;
-    const CRASH_LAST_FRAME  = 96;
-    const ROLL_LAST_FRAME  = 90;
+    const NORMAL_LAST_FRAME = 60;
+    const CRASH_LAST_FRAME = 96;
+    const ROLL_LAST_FRAME = 90;
 
-    wireOnComplete(this.characterAnimations?.normal_landing,NORMAL_LAST_FRAME);
-    wireOnComplete(this.characterAnimations?.crash_landing,CRASH_LAST_FRAME);
-    wireOnComplete(this.characterAnimations?.roll_landing,ROLL_LAST_FRAME);
+    wireOnComplete(this.characterAnimations?.normal_landing, NORMAL_LAST_FRAME);
+    wireOnComplete(this.characterAnimations?.crash_landing, CRASH_LAST_FRAME);
+    wireOnComplete(this.characterAnimations?.roll_landing, ROLL_LAST_FRAME);
   }
 
   private _bindObservables(): void {
@@ -226,7 +223,7 @@ export default class CharacterBase implements Poc {
       this.characterAggregate = new PhysicsAggregate(
         this.characterMesh,
         PhysicsShapeType.CAPSULE,
-        { mass: 70 },
+        { mass: 70, restitution: 0 },
         this.scene,
       );
 
