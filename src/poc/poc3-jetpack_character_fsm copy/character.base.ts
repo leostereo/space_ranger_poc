@@ -75,11 +75,12 @@ export default class CharacterBase implements Poc {
       isMoveHeld: () => this.input.current.forward || this.input.current.backward,
       isRunHeld: () => this.input.current.cruise,
       onEnterHoverBoard: () => this._swapToHoverBoard(),
-      // NUEVO — landing states de StandAlone>OnGround
       getVerticalSpeed: () => this.activeStandAlonePhysics?.getLastImpactVerticalSpeed() ?? 0,
       getHorizontalSpeed: () => this.activeStandAlonePhysics?.getLastImpactHorizontalSpeed() ?? 0,
       onEnterLandingRoll: () => this.activeStandAlonePhysics?.notifyLandingRollStart(),
       onExitLandingRoll: () => this.activeStandAlonePhysics?.notifyLandingRollEnd(),
+      onEnterJumpWindup: () => this.activeStandAlonePhysics?.notifyJumpWindupStart(),
+      onExitJumpWindup: () => this.activeStandAlonePhysics?.notifyJumpWindupEnd(),
       isBoardGroundDetected: () => this.activeBoardPhysics?.isGroundDetected() ?? false,
       groundLostElapsed: () => this.activeBoardPhysics?.groundLostElapsed() ?? 0,
       coyoteTime: generalConfig.groundCheck.coyoteTime,

@@ -8,11 +8,12 @@ export interface StandAloneFsmDeps {
   onEnterOnAir: () => void;
   isMoveHeld: () => boolean;
   isRunHeld: () => boolean;
-  /** Threading hacia OnGroundFsmDeps, mismo criterio que isMoveHeld/isRunHeld. */
   getVerticalSpeed: () => number;
   getHorizontalSpeed: () => number;
   onEnterLandingRoll: () => void;
   onExitLandingRoll: () => void;
+  onEnterJumpWindup: () => void;
+  onExitJumpWindup: () => void;
 }
 
 export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
@@ -77,9 +78,16 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
     if (state === "OnGround" && this.previousState === "OnAir") {
       this.onGroundSubFsm.notifyLanding();
     }
+    if (state === "JumpImpulseStart") {
+      this.deps.onEnterJumpWindup();
+    }
   }
 
-  protected onExit(_state: StandAloneSubState): void { }
+  protected onExit(state: StandAloneSubState): void {
+    if (state === "JumpImpulseStart") {
+      this.deps.onExitJumpWindup();
+    }
+  }
 
   dispose(): void {
     this.onGroundSubFsm.dispose();

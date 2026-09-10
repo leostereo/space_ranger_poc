@@ -28,7 +28,8 @@ export interface CharacterFsmDeps {
   getHorizontalSpeed: () => number;
   onEnterLandingRoll: () => void;
   onExitLandingRoll: () => void;
-
+  onEnterJumpWindup: () => void;
+  onExitJumpWindup: () => void;
   groundLostElapsed: () => number;
   coyoteTime: number;
   onEnterHovering: () => void;
@@ -65,6 +66,8 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
       getHorizontalSpeed: this.deps.getHorizontalSpeed,
       onEnterLandingRoll: this.deps.onEnterLandingRoll,
       onExitLandingRoll: this.deps.onExitLandingRoll,
+      onEnterJumpWindup: this.deps.onEnterJumpWindup,
+      onExitJumpWindup: this.deps.onExitJumpWindup,
     });
     this.jetpackSubFsm = new JetpackFsm({
       isCruiseHeld: this.deps.isCruiseHeld,
