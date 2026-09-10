@@ -22,6 +22,7 @@ export interface CharacterFsmDeps {
   isCruiseHeld: () => boolean;
   isMoveHeld: () => boolean;
   isRunHeld: () => boolean;
+  isShootHeld: () => boolean; // NUEVO
   onEnterHoverBoard: () => void;
   /** Threading hacia OnGroundFsmDeps, vía StandAloneFsmDeps — mismo criterio que isMoveHeld/isRunHeld. */
   getVerticalSpeed: () => number;
@@ -69,9 +70,12 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
       onEnterJumpWindup: this.deps.onEnterJumpWindup,
       onExitJumpWindup: this.deps.onExitJumpWindup,
     });
+
     this.jetpackSubFsm = new JetpackFsm({
       isCruiseHeld: this.deps.isCruiseHeld,
+      isShootHeld: this.deps.isShootHeld,
     });
+
     this.boardSubFsm = new BoardFsm({
       isGroundDetected: this.deps.isBoardGroundDetected,
       groundLostElapsed: this.deps.groundLostElapsed,

@@ -65,6 +65,8 @@ export interface ICharacterAnimations {
     running_normal: AnimationGroup,
     running_fast: AnimationGroup,
 
+    aiming_jetpack: AnimationGroup,
+
 }
 
 export interface MeshInstanceResult {
@@ -296,12 +298,14 @@ export class AssetManager {
         const running_normal = find("standard run");
         const running_fast = find("running fast");
 
+        const aiming_jetpack = find("aiming in the air");
+
 
 
         if (!standing_idle || !cruising_forward_idle || !cruising_faster_idle || !cruising_maxVel_idle ||
             !standing_to_crouch || !crouch_to_standing || !jump || !normal_landing || !crash_landing || !roll_landing || !falling_idle ||
-            !flying || !floating || !jump_on_board || !walking_forward || !walking_backwards ||
-            !running_normal || !running_fast) {
+            !flying || !floating || !jump_on_board || !walking_forward || !walking_backwards || 
+            !running_normal || !running_fast || !aiming_jetpack) {
             console.warn("AssetManager: faltan animaciones de 'character' — revisar nombres de clips en el GLB.");
             return;
         }
@@ -310,7 +314,7 @@ export class AssetManager {
             standing_idle, cruising_forward_idle, cruising_faster_idle, cruising_maxVel_idle,
             standing_to_crouch, crouch_to_standing, jump, normal_landing, crash_landing , roll_landing, floating, flying,
             falling_idle, jump_on_board, walking_forward, walking_backwards,
-            running_fast,running_normal
+            running_fast,running_normal,aiming_jetpack
         };
 
         Object.values(mold).forEach((ag) => {
@@ -352,6 +356,7 @@ export class AssetManager {
             jump_on_board: cloneOne(mold.jump_on_board),
             running_fast: cloneOne(mold.running_fast),
             running_normal: cloneOne(mold.running_normal),
+            aiming_jetpack: cloneOne(mold.aiming_jetpack),
             
         };
     }

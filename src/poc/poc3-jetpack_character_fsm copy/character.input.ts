@@ -5,6 +5,7 @@ export interface CharacterInputState {
   right: boolean;    // D
   up: boolean;       // Space (empuje del jetpack mientras está equipado)
   cruise: boolean;   // Shift — mantenido en Jetpack/On dispara Cruising, al soltar vuelve a On
+  shoot: boolean;     // "/" — mantenido en Jetpack/On dispara Shooting, Shift tiene prioridad
 }
 
 export class CharacterInput {
@@ -15,6 +16,7 @@ export class CharacterInput {
     right: false,
     up: false,
     cruise: false,
+    shoot: false,
   };
 
   /**
@@ -61,6 +63,9 @@ export class CharacterInput {
       case "ShiftRight":
         this.state.cruise = true;
         break;
+      case "Slash": // NUEVO — tecla "/"
+        this.state.shoot = true;
+        break;
       case "ControlLeft":
       case "ControlRight":
         this.equipRequested = true;
@@ -78,6 +83,9 @@ export class CharacterInput {
       case "ShiftLeft":
       case "ShiftRight":
         this.state.cruise = false;
+        break;
+      case "Slash": // NUEVO
+        this.state.shoot = false;
         break;
     }
   };

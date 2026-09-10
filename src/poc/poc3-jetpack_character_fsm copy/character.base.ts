@@ -72,6 +72,7 @@ export default class CharacterBase implements Poc {
       isGroundDetected: () => this.activeStandAlonePhysics?.isGroundDetected() ?? false,
       onEnterOnAir: () => this.activeStandAlonePhysics?.applyJumpImpulse(),
       isCruiseHeld: () => this.input.current.cruise,
+      isShootHeld: () => this.input.current.shoot, // ¿está esta línea?
       isMoveHeld: () => this.input.current.forward || this.input.current.backward,
       isRunHeld: () => this.input.current.cruise,
       onEnterHoverBoard: () => this._swapToHoverBoard(),

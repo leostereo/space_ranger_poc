@@ -40,6 +40,8 @@ export class JetpackAnimationController implements IAnimationController {
         return this.animations.floating;
       case "Cruising":
         return this.animations.flying;
+      case "Shooting":
+        return this.animations.aiming_jetpack;
       default:
         return null;
     }
