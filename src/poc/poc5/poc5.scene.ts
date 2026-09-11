@@ -4,7 +4,7 @@ import { InputController } from "./character/controllers/InputController";
 import { AnimacionController } from "./character/controllers/AnimacionController";
 import { FisicaController } from "./character/controllers/FisicaController";
 import { MeshBuilder, PhysicsAggregate, PhysicsShapeType, Scene } from "@babylonjs/core";
-import { character_builder } from "../poc3-jetpack_character_fsm copy/utils/utils";
+import { character_builder } from "../poc3-jetpack_character_fsm copy/utils/buildUtils";
 import { AssetManager } from "@/services/assets-manager";
 import { Poc } from "../types";
 

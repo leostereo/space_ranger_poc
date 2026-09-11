@@ -9,7 +9,7 @@ import { Poc } from "../types";
 import { CharacterFsm } from "./character-fsm/character.fsm";
 import { CharacterInput } from "./character.input";
 import { CharacterHud } from "./character.hud";
-import { character_builder, scene_builder } from "./utils/utils";
+import { character_builder, scene_builder, weapon_builder } from "./utils/buildUtils";
 import { buildStandAloneStrategy, type StandAloneStrategyResult } from "./strategies/stand-alone/stand-alone.strategy";
 import { buildJetpackStrategy, type JetpackStrategyResult } from "./strategies/jetpack/jetpack.strategy";
 import type { IVehicleStrategy } from "./strategies/contracts/ivehicle-strategy";
@@ -49,6 +49,9 @@ export default class CharacterBase implements Poc {
   private activeBoardPhysics: HoverBoardPhysicsController | null = null;
   private _activeBoardInputAdapter: HoverBoardInputAdapter | null = null;
 
+  private weaponRoot: TransformNode | null = null;
+  private weaponMuzzle: TransformNode | null = null;
+
   async build(scene: Scene): Promise<void> {
     this.scene = scene;
     scene_builder(scene);
@@ -61,6 +64,10 @@ export default class CharacterBase implements Poc {
     if (!this.characterMesh.rotationQuaternion) {
       this.characterMesh.rotationQuaternion = Quaternion.Identity();
     }
+
+    const { weaponRoot, muzzle } = weapon_builder();
+    this.weaponRoot = weaponRoot;
+    this.weaponMuzzle = muzzle;
 
     this.followCamera = AssetManager.getCamera('follow', false, 'camera') as FollowCamera;
     this.input = new CharacterInput();
@@ -327,6 +334,6 @@ export default class CharacterBase implements Poc {
     if (this.characterAnimations) {
       Object.values(this.characterAnimations).forEach((ag) => ag.dispose());
     }
-    // this.groundAggregates?.forEach((g) => g.dispose());
+    this.weaponRoot?.dispose();
   }
 }

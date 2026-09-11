@@ -6,7 +6,7 @@ import { Axis, Space } from "@babylonjs/core";
 import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { generalConfig } from "@/poc/config.general";
-import { AssetManager, type ICharacterAnimations } from "@/services/assets-manager";
+import { AssetManager, WeaponBuildResult, type ICharacterAnimations } from "@/services/assets-manager";
 import { Tools } from "@babylonjs/lite-compat";
 
 // TODO: mover a src/config.general.ts cuando se integre al repo real.
@@ -101,7 +101,7 @@ export function character_builder(scene: Scene): CharacterBuildResult {
   const characterAggregate = new PhysicsAggregate(
     capsule,
     PhysicsShapeType.CAPSULE,
-    { mass: TMP_CONFIG.characterMass , restitution:0},
+    { mass: TMP_CONFIG.characterMass, restitution: 0 },
     scene,
   );
 
@@ -174,6 +174,14 @@ const addMapAggregate = (scene: Scene) => {
       { mass: 0 },
       scene,
     );
-}
+  }
 
 };
+
+export function weapon_builder(): WeaponBuildResult {
+  const result = AssetManager.getWeapon();
+  if (!result) {
+    throw new Error("weapon_builder: no se pudo obtener 'player_weapon' del AssetManager.");
+  }
+  return result;
+}
