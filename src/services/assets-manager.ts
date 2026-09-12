@@ -52,6 +52,7 @@ export interface ICharacterAnimations {
     standing_to_crouch: AnimationGroup;
     crouch_to_standing: AnimationGroup;
     jump: AnimationGroup;
+    jump_while_running: AnimationGroup;
     normal_landing: AnimationGroup;
     crash_landing: AnimationGroup;
     roll_landing: AnimationGroup;
@@ -277,50 +278,50 @@ export class AssetManager {
 
     private static _buildWeapons(scene: Scene): void {
         const bodyLength = 0.35;
-    const bodyDiameter = 0.045;
-    const tipLength = 0.08;
-    const tipDiameter = 0.065;
+        const bodyDiameter = 0.045;
+        const tipLength = 0.08;
+        const tipDiameter = 0.065;
 
-    const weaponRoot = MeshBuilder.CreateBox("weaponRoot", { size: 0.0001 }, scene);
-    weaponRoot.isVisible = false;
-    weaponRoot.isPickable = false; // NUEVO
+        const weaponRoot = MeshBuilder.CreateBox("weaponRoot", { size: 0.0001 }, scene);
+        weaponRoot.isVisible = false;
+        weaponRoot.isPickable = false; // NUEVO
 
-    const body = MeshBuilder.CreateCylinder(
-        "weaponBody",
-        { diameter: bodyDiameter, height: bodyLength, tessellation: 16 },
-        scene,
-    );
-    body.parent = weaponRoot;
-    body.rotation.x = Math.PI / 2;
-    body.position.z = bodyLength / 2;
-    body.isPickable = false; // NUEVO — parte del jugador, no debe recibir sus propios disparos
+        const body = MeshBuilder.CreateCylinder(
+            "weaponBody",
+            { diameter: bodyDiameter, height: bodyLength, tessellation: 16 },
+            scene,
+        );
+        body.parent = weaponRoot;
+        body.rotation.x = Math.PI / 2;
+        body.position.z = bodyLength / 2;
+        body.isPickable = false; // NUEVO — parte del jugador, no debe recibir sus propios disparos
 
-    const tip = MeshBuilder.CreateCylinder(
-        "weaponTip",
-        { diameter: tipDiameter, height: tipLength, tessellation: 16 },
-        scene,
-    );
-    tip.parent = weaponRoot;
-    tip.rotation.x = Math.PI / 2;
-    tip.position.z = bodyLength + tipLength / 2;
-    tip.isPickable = false; // NUEVO
+        const tip = MeshBuilder.CreateCylinder(
+            "weaponTip",
+            { diameter: tipDiameter, height: tipLength, tessellation: 16 },
+            scene,
+        );
+        tip.parent = weaponRoot;
+        tip.rotation.x = Math.PI / 2;
+        tip.position.z = bodyLength + tipLength / 2;
+        tip.isPickable = false; // NUEVO
 
-    const weaponMat = new StandardMaterial("weaponMat", scene);
-    weaponMat.diffuseColor = new Color3(0.2, 0.55, 0.85);
-    body.material = weaponMat;
-    tip.material = weaponMat;
+        const weaponMat = new StandardMaterial("weaponMat", scene);
+        weaponMat.diffuseColor = new Color3(0.2, 0.55, 0.85);
+        body.material = weaponMat;
+        tip.material = weaponMat;
 
-    const muzzle = MeshBuilder.CreateBox("weaponMuzzle", { size: 0.0001 }, scene);
-    muzzle.isVisible = false;
-    muzzle.isPickable = false; // NUEVO — es un marcador de transform, nunca debería ser blanco
+        const muzzle = MeshBuilder.CreateBox("weaponMuzzle", { size: 0.0001 }, scene);
+        muzzle.isVisible = false;
+        muzzle.isPickable = false; // NUEVO — es un marcador de transform, nunca debería ser blanco
 
-    muzzle.parent = weaponRoot;
-    muzzle.position.z = bodyLength + tipLength;
+        muzzle.parent = weaponRoot;
+        muzzle.position.z = bodyLength + tipLength;
 
-    weaponRoot.setEnabled(false);
+        weaponRoot.setEnabled(false);
 
-    this.weaponResult = { weaponRoot, muzzle };
-}
+        this.weaponResult = { weaponRoot, muzzle };
+    }
     /**
      * Arma el molde semántico UNA sola vez (mismo trabajo que hacía
      * SkaterAnimator.setupAnimations() en poc2: buscar por nombre de clip exacto, activar
@@ -338,6 +339,7 @@ export class AssetManager {
         const standing_to_crouch = find("skate standing to crouch");
         const crouch_to_standing = find("skate crouch to standing");
         const jump = find("jump in place2");
+        const jump_while_running = find("jump on board");
         const normal_landing = find("skate falling to landing");
         const crash_landing = find("flat crash");
         const roll_landing = find("landing to roll");
@@ -345,7 +347,7 @@ export class AssetManager {
         const falling_idle = find("falling idle");
         const flying = find("flying");
         const floating = find("floating");
-
+        
         const jump_on_board = find("jump on board");
         const walking_forward = find("walking forward");
         const walking_backwards = find("walking backwards");
@@ -356,7 +358,7 @@ export class AssetManager {
 
 
 
-        if (!standing_idle || !cruising_forward_idle || !cruising_faster_idle || !cruising_maxVel_idle ||
+        if (!standing_idle || !cruising_forward_idle || !cruising_faster_idle || !cruising_maxVel_idle || !jump_while_running || 
             !standing_to_crouch || !crouch_to_standing || !jump || !normal_landing || !crash_landing || !roll_landing || !falling_idle ||
             !flying || !floating || !jump_on_board || !walking_forward || !walking_backwards ||
             !running_normal || !running_fast || !aiming_jetpack) {
@@ -368,7 +370,7 @@ export class AssetManager {
             standing_idle, cruising_forward_idle, cruising_faster_idle, cruising_maxVel_idle,
             standing_to_crouch, crouch_to_standing, jump, normal_landing, crash_landing, roll_landing, floating, flying,
             falling_idle, jump_on_board, walking_forward, walking_backwards,
-            running_fast, running_normal, aiming_jetpack
+            running_fast, running_normal, aiming_jetpack, jump_while_running
         };
 
         Object.values(mold).forEach((ag) => {
@@ -399,6 +401,7 @@ export class AssetManager {
             standing_to_crouch: cloneOne(mold.standing_to_crouch),
             crouch_to_standing: cloneOne(mold.crouch_to_standing),
             jump: cloneOne(mold.jump),
+            jump_while_running: cloneOne(mold.jump_while_running),
             normal_landing: cloneOne(mold.normal_landing),
             crash_landing: cloneOne(mold.crash_landing),
             roll_landing: cloneOne(mold.roll_landing),

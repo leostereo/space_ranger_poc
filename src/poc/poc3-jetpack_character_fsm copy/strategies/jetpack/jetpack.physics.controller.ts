@@ -38,7 +38,7 @@ const MAX_HOVER_CATCH_SPEED = 4; // m/s — tope de velocidad vertical que se le
 const ON_HORIZONTAL_BRAKE_FACTOR = 4; // mismo criterio que brakingDragFactor/CRUISE_LATERAL_GRIP — a ojo, ajustar sintiendo el frenado
 //shoot
 const SHOOTING_MAX_PITCH_ANGLE = Tools.ToRadians(45);
-const SHOOTING_PITCH_LERP_SPEED = 8;
+const SHOOTING_PITCH_RATE = Tools.ToRadians(90); // rad/s — velocidad de ajuste mientras se sostiene W/S
 
 export class JetpackPhysicsController implements IPhysicsController {
   private fuel = MAX_FUEL;
@@ -118,14 +118,12 @@ export class JetpackPhysicsController implements IPhysicsController {
 
   private _updateShootingPitch(dt: number): void {
     const { forward, backward } = this.getInput();
-    let targetPitch = 0;
-    // Mismo mapeo de signo que Cruising (W = nose abajo, S = nose arriba), por consistencia.
-    if (forward) targetPitch = -SHOOTING_MAX_PITCH_ANGLE;
-    if (backward) targetPitch = SHOOTING_MAX_PITCH_ANGLE;
 
-    const lerpFactor = 1 - Math.exp(-SHOOTING_PITCH_LERP_SPEED * dt);
-    this.pitchAngle += (targetPitch - this.pitchAngle) * lerpFactor;
-  }
+  if (forward) this.pitchAngle -= SHOOTING_PITCH_RATE * dt;
+  if (backward) this.pitchAngle += SHOOTING_PITCH_RATE * dt;
+
+  this.pitchAngle = Scalar.Clamp(this.pitchAngle, -SHOOTING_MAX_PITCH_ANGLE, SHOOTING_MAX_PITCH_ANGLE);
+}
 
   /** Leído por character.base.ts para armar el dep hasFuel() de CharacterFsm. */
   hasFuel(): boolean {
