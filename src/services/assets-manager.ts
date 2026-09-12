@@ -277,49 +277,50 @@ export class AssetManager {
 
     private static _buildWeapons(scene: Scene): void {
         const bodyLength = 0.35;
-        const bodyThickness = 0.06;
-        const tipLength = 0.08;
-        const tipThickness = 0.045;
+    const bodyDiameter = 0.045;
+    const tipLength = 0.08;
+    const tipDiameter = 0.065;
 
-        const weaponRoot = MeshBuilder.CreateBox("weaponRoot", { size: 0.0001 }, scene);
-        weaponRoot.isVisible = false;
+    const weaponRoot = MeshBuilder.CreateBox("weaponRoot", { size: 0.0001 }, scene);
+    weaponRoot.isVisible = false;
+    weaponRoot.isPickable = false; // NUEVO
 
-        const body = MeshBuilder.CreateBox(
-            "weaponBody",
-            { width: bodyThickness, height: bodyThickness, depth: bodyLength },
-            scene,
-        );
-        body.parent = weaponRoot;
-        body.position.z = bodyLength / 2;
+    const body = MeshBuilder.CreateCylinder(
+        "weaponBody",
+        { diameter: bodyDiameter, height: bodyLength, tessellation: 16 },
+        scene,
+    );
+    body.parent = weaponRoot;
+    body.rotation.x = Math.PI / 2;
+    body.position.z = bodyLength / 2;
+    body.isPickable = false; // NUEVO — parte del jugador, no debe recibir sus propios disparos
 
-        const tip = MeshBuilder.CreateBox(
-            "weaponTip",
-            { width: tipThickness, height: tipThickness, depth: tipLength },
-            scene,
-        );
-        tip.parent = weaponRoot;
-        tip.position.z = bodyLength + tipLength / 2;
+    const tip = MeshBuilder.CreateCylinder(
+        "weaponTip",
+        { diameter: tipDiameter, height: tipLength, tessellation: 16 },
+        scene,
+    );
+    tip.parent = weaponRoot;
+    tip.rotation.x = Math.PI / 2;
+    tip.position.z = bodyLength + tipLength / 2;
+    tip.isPickable = false; // NUEVO
 
-        const bodyMat = new StandardMaterial("weaponBodyMat", scene);
-        bodyMat.diffuseColor = new Color3(0.15, 0.15, 0.15);
-        body.material = bodyMat;
+    const weaponMat = new StandardMaterial("weaponMat", scene);
+    weaponMat.diffuseColor = new Color3(0.2, 0.55, 0.85);
+    body.material = weaponMat;
+    tip.material = weaponMat;
 
-        const tipMat = new StandardMaterial("weaponTipMat", scene);
-        tipMat.diffuseColor = new Color3(0.6, 0.1, 0.1);
-        tip.material = tipMat;
+    const muzzle = MeshBuilder.CreateBox("weaponMuzzle", { size: 0.0001 }, scene);
+    muzzle.isVisible = false;
+    muzzle.isPickable = false; // NUEVO — es un marcador de transform, nunca debería ser blanco
 
-        const muzzle = MeshBuilder.CreateBox("weaponMuzzle", { size: 0.0001 }, scene);
-        muzzle.isVisible = false;
-        muzzle.parent = weaponRoot;
-        muzzle.position.z = bodyLength + tipLength;
+    muzzle.parent = weaponRoot;
+    muzzle.position.z = bodyLength + tipLength;
 
-        weaponRoot.setEnabled(false);
+    weaponRoot.setEnabled(false);
 
-        // CAMBIADO: sin clonado por ahora — un solo personaje jugable, se guarda la
-        // referencia directa. Si más adelante hace falta más de una instancia (ej. enemigos
-        // con la misma arma), ahí sí se vuelve a introducir el clonado vía getWeapon(instanceName).
-        this.weaponResult = { weaponRoot, muzzle };
-    }
+    this.weaponResult = { weaponRoot, muzzle };
+}
     /**
      * Arma el molde semántico UNA sola vez (mismo trabajo que hacía
      * SkaterAnimator.setupAnimations() en poc2: buscar por nombre de clip exacto, activar

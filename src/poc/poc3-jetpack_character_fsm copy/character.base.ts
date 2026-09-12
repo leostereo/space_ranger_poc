@@ -4,7 +4,7 @@ import type { Observer } from "@babylonjs/core/Misc/observable";
 import type { Nullable } from "@babylonjs/core/types";
 import { Quaternion } from "@babylonjs/core/Maths/math.vector";
 import { AnimationEvent, AnimationGroup, FollowCamera, PhysicsShapeType, TransformNode } from "@babylonjs/core";
-import { AssetManager, type ICharacterAnimations } from "@/services/assets-manager";
+import { AssetManager, WeaponBuildResult, type ICharacterAnimations } from "@/services/assets-manager";
 import { Poc } from "../types";
 import { CharacterFsm } from "./character-fsm/character.fsm";
 import { CharacterInput } from "./character.input";
@@ -49,8 +49,8 @@ export default class CharacterBase implements Poc {
   private activeBoardPhysics: HoverBoardPhysicsController | null = null;
   private _activeBoardInputAdapter: HoverBoardInputAdapter | null = null;
 
-  private weaponRoot: TransformNode | null = null;
-  private weaponMuzzle: TransformNode | null = null;
+  private weaponRoot: WeaponBuildResult["weaponRoot"] | null = null;
+  private weaponMuzzle: WeaponBuildResult["muzzle"] | null = null;
 
   async build(scene: Scene): Promise<void> {
     this.scene = scene;
@@ -66,6 +66,8 @@ export default class CharacterBase implements Poc {
     }
 
     const { weaponRoot, muzzle } = weapon_builder();
+    weaponRoot.parent = this.characterMesh;
+    weaponRoot.position.set(-0.1, 0.16, 0); // offset a ojo — ajustar contra el modelo real
     this.weaponRoot = weaponRoot;
     this.weaponMuzzle = muzzle;
 
@@ -109,6 +111,7 @@ export default class CharacterBase implements Poc {
     this._wireJumpAnimationEvent();
     this._wireEquipBoardAnimationEvent();
     this._wireLandingAnimationEvents(); // NUEVO
+    this._wireWeaponVisibility(); // NUEVO
 
     const { strategy, physicsController } = await buildStandAloneStrategy(
       this.scene,
@@ -124,6 +127,16 @@ export default class CharacterBase implements Poc {
     this.hud.mount();
 
     this._bindObservables();
+  }
+
+  private _wireWeaponVisibility(): void {
+    const update = () => {
+      this.weaponRoot?.setEnabled(this.fsm.getActiveSubState() === "Shooting");
+    };
+
+    this.fsm.onStateChange(update);               // cubre salir de Jetpack por completo
+    this.fsm.jetpackSubFsm.onStateChange(update);  // cubre entrar/salir de Shooting específicamente
+    update(); // estado inicial
   }
 
   private _wireJumpAnimationEvent(): void {
@@ -193,12 +206,19 @@ export default class CharacterBase implements Poc {
     this.activeStandAlonePhysics = null;
     this.activeStrategy?.dispose();
 
+    if (!this.weaponMuzzle) {
+      throw new Error("_swapToJetpack: weaponMuzzle no está inicializado — revisar build().");
+    }
+
     const { strategy, physicsController } = await buildJetpackStrategy(
+      this.scene,
       this.characterAggregate,
       this.input,
       this.fsm,
       this.characterAnimations,
+      this.weaponMuzzle,
     );
+
     this.activeStrategy = strategy;
     this.activeJetpackPhysics = physicsController;
 
