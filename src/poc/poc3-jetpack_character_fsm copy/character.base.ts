@@ -111,7 +111,6 @@ export default class CharacterBase implements Poc {
     this._wireJumpAnimationEvent();
     this._wireEquipBoardAnimationEvent();
     this._wireLandingAnimationEvents(); // NUEVO
-    this._wireWeaponVisibility(); // NUEVO
 
     const { strategy, physicsController } = await buildStandAloneStrategy(
       this.scene,
@@ -119,7 +118,9 @@ export default class CharacterBase implements Poc {
       this.input,
       this.fsm,
       this.characterAnimations,
+      this.weaponMuzzle,
     );
+
     this.activeStrategy = strategy;
     this.activeStandAlonePhysics = physicsController;
 
@@ -129,14 +130,20 @@ export default class CharacterBase implements Poc {
     this._bindObservables();
   }
 
-  private _wireWeaponVisibility(): void {
-    const update = () => {
-      this.weaponRoot?.setEnabled(this.fsm.getActiveSubState() === "Shooting");
-    };
+  private _isAimingActive(): boolean {
+    if (this.fsm.getState() === "Jetpack") {
+      return this.fsm.jetpackSubFsm.getState() === "Shooting";
+    }
+    if (this.fsm.getState() === "StandAlone") {
+      const groundState = this.fsm.getActiveSubState();
+      const canAimHere = groundState === "Idle" || groundState === "Walking" || groundState === "Running";
+      return canAimHere && this.input.current.shoot;
+    }
+    return false;
+  }
 
-    this.fsm.onStateChange(update);               // cubre salir de Jetpack por completo
-    this.fsm.jetpackSubFsm.onStateChange(update);  // cubre entrar/salir de Shooting específicamente
-    update(); // estado inicial
+  private _updateWeaponVisibility(): void {
+    this.weaponRoot?.setEnabled(this._isAimingActive());
   }
 
   private _wireJumpAnimationEvent(): void {
@@ -189,6 +196,7 @@ export default class CharacterBase implements Poc {
       const dt = this.scene.getEngine().getDeltaTime() / 1000;
       this.activeStrategy?.tick(dt);
       this.fsm.tick();
+      this._updateWeaponVisibility();
       if (this.fsm.getState() === "HoverBoard" && this.input.consumeEquipRequest()) {
         this.fsm.requestUnequipBoard();
       }
@@ -267,14 +275,20 @@ export default class CharacterBase implements Poc {
       }
     }
 
+    if (!this.weaponMuzzle) {
+      throw new Error("_swapToStandAlone: weaponMuzzle no está inicializado — revisar build().");
+    }
+
     const { strategy, physicsController } = await buildStandAloneStrategy(
       this.scene,
       this.characterAggregate,
       this.input,
       this.fsm,
       this.characterAnimations,
-      initialGroundDetectedOverride, // NUEVO
+      this.weaponMuzzle, // NUEVO
+      initialGroundDetectedOverride,
     );
+    
     this.activeStrategy = strategy;
     this.activeStandAlonePhysics = physicsController;
   }

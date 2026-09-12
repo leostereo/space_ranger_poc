@@ -15,12 +15,10 @@ export class StandAloneAnimationController implements IAnimationController {
   constructor(
     private animations: ICharacterAnimations | null,
     private standAloneFsm: StandAloneFsm,
+    private isAiming: () => boolean, // NUEVO
   ) {
     this.standAloneFsm.onStateChange(() => this._render(this.standAloneFsm.getActiveSubState()));
-    // Nuevo — sin esto, Idle/Walking/Running (hijos de OnGround) nunca disparan re-render,
-    // igual bug que tenía character.hud.ts antes de suscribirse a onGroundSubFsm.
     this.standAloneFsm.onGroundSubFsm.onStateChange(() => this._render(this.standAloneFsm.getActiveSubState()));
-
     this._render(this.standAloneFsm.getActiveSubState());
 
     if(this.animations){
@@ -32,7 +30,9 @@ export class StandAloneAnimationController implements IAnimationController {
     }
   }
 
-  tick(): void {}
+  tick(): void {
+    this._render(this.standAloneFsm.getActiveSubState());
+  }
 
   dispose(): void {
     this.currentAnimation?.stop();
@@ -49,6 +49,21 @@ export class StandAloneAnimationController implements IAnimationController {
 
   private _resolve(state: ResolvedStandAloneState): { animation: AnimationGroup; loop: boolean } | null {
     if (!this.animations) return null;
+
+    // NUEVO — preparado para cuando subas aiming_idle/aiming_walking/aiming_running.
+    // Mientras no existan (undefined), cae al switch normal de abajo sin romper nada.
+    if (this.isAiming()) {
+      if (state === "Idle" && this.animations.standing_idle) {
+        return { animation: this.animations.standing_idle, loop: true };
+      }
+      if (state === "Walking" && this.animations.standing_idle) {
+        return { animation: this.animations.standing_idle, loop: true };
+      }
+      if (state === "Running" && this.animations.standing_idle) {
+        return { animation: this.animations.standing_idle, loop: true };
+      }
+    }
+
     switch (state) {
       case "Idle":
         return { animation: this.animations.standing_idle, loop: true };
