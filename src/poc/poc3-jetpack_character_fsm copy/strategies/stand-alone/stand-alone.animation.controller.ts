@@ -67,14 +67,14 @@ export class StandAloneAnimationController implements IAnimationController {
     if (!this.animations) return null;
 
     if (this.isAiming()) {
-      if (state === "Idle" && this.animations.standing_idle) {
-        return { animation: this.animations.standing_idle, loop: true };
+      if (state === "Idle" && this.animations.idle_aimming) {
+        return { animation: this.animations.idle_aimming, loop: true };
       }
-      if (state === "Walking" && this.animations.standing_idle) {
-        return { animation: this.animations.standing_idle, loop: true };
+      if (state === "Walking" && this.animations.walking_aimming) {
+        return { animation: this.animations.walking_aimming, loop: true };
       }
-      if (state === "Running" && this.animations.standing_idle) {
-        return { animation: this.animations.standing_idle, loop: true };
+      if (state === "Running" && this.animations.running_aimming) {
+        return { animation: this.animations.running_aimming, loop: true };
       }
     }
 

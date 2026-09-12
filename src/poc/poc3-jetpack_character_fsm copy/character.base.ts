@@ -26,6 +26,12 @@ const EQUIP_BOARD_FRAME = 60; // placeholder — ajustar cuando definan el frame
 const WEAPON_HOVERBOARD_YAW_COMPENSATION = Math.PI / 8; // cancela characterMesh.rotation.y = -PI/8 en HoverBoard
 const RUNNING_JUMP_IMPULSE_FRAME = 10; // placeholder — ajustar al frame real del clip
 
+const WEAPON_OFFSETS = {
+  jetpack: { x: -0.1, y: 0.16, z: 0 },
+  standAlone: { x: -0.08, y: 0.2, z: 0 },
+  hoverBoard: { x: -0.15, y: -0.05, z: 0 },
+} as const;
+
 export default class CharacterBase implements Poc {
   private scene: Scene;
   //private groundAggregates: PhysicsAggregate[];
@@ -69,9 +75,9 @@ export default class CharacterBase implements Poc {
 
     const { weaponRoot, muzzle } = weapon_builder();
     weaponRoot.parent = this.characterMesh;
-    weaponRoot.position.set(-0.1, 0.16, 0); // offset a ojo — ajustar contra el modelo real
     this.weaponRoot = weaponRoot;
     this.weaponMuzzle = muzzle;
+    this._applyWeaponOffset(WEAPON_OFFSETS.standAlone); // arranca en StandAlone — ver build() más abajo
 
     this.followCamera = AssetManager.getCamera('follow', false, 'camera') as FollowCamera;
     this.input = new CharacterInput();
@@ -234,6 +240,8 @@ export default class CharacterBase implements Poc {
       throw new Error("_swapToJetpack: weaponMuzzle no está inicializado — revisar build().");
     }
 
+    this._applyWeaponOffset(WEAPON_OFFSETS.jetpack); // NUEVO
+
     const { strategy, physicsController } = await buildJetpackStrategy(
       this.scene,
       this.characterAggregate,
@@ -296,6 +304,8 @@ export default class CharacterBase implements Poc {
       throw new Error("_swapToStandAlone: weaponMuzzle no está inicializado — revisar build().");
     }
 
+    this._applyWeaponOffset(WEAPON_OFFSETS.standAlone); // NUEVO
+
     const { strategy, physicsController } = await buildStandAloneStrategy(
       this.scene,
       this.characterAggregate,
@@ -357,6 +367,8 @@ export default class CharacterBase implements Poc {
       throw new Error("_swapToHoverBoard: weaponMuzzle no está inicializado — revisar build().");
     }
 
+    this._applyWeaponOffset(WEAPON_OFFSETS.hoverBoard); // NUEVO
+
     const { strategy, physicsController } = await buildHoverBoardStrategy(
       this.scene,
       boardMesh,
@@ -371,6 +383,10 @@ export default class CharacterBase implements Poc {
     this.activeStrategy = strategy;
     this.activeBoardPhysics = physicsController;
     this._activeBoardInputAdapter = new HoverBoardInputAdapter(this.input);
+  }
+
+  private _applyWeaponOffset(offset: { x: number; y: number; z: number }): void {
+    this.weaponRoot?.position.set(offset.x, offset.y, offset.z);
   }
 
   // Helper nuevo — agregalo como método privado de la clase (cerca de _swapToStandAlone/_swapToHoverBoard)

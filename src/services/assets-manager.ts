@@ -68,6 +68,10 @@ export interface ICharacterAnimations {
     running_fast: AnimationGroup,
 
     aiming_jetpack: AnimationGroup,
+    crouch_aimming: AnimationGroup,
+    idle_aimming: AnimationGroup,
+    walking_aimming: AnimationGroup,
+    running_aimming: AnimationGroup,
 
 }
 
@@ -355,13 +359,18 @@ export class AssetManager {
         const running_fast = find("running fast");
 
         const aiming_jetpack = find("aiming in the air");
+        const crouch_aimming = find("crouch aim");
+        const idle_aimming = find("idle aim");
+        const walking_aimming = find("walking aim");
+        const running_aimming = find("running aim");
+
 
 
 
         if (!standing_idle || !cruising_forward_idle || !cruising_faster_idle || !cruising_maxVel_idle || !jump_while_running || 
             !standing_to_crouch || !crouch_to_standing || !jump || !normal_landing || !crash_landing || !roll_landing || !falling_idle ||
             !flying || !floating || !jump_on_board || !walking_forward || !walking_backwards ||
-            !running_normal || !running_fast || !aiming_jetpack) {
+            !running_normal || !running_fast || !aiming_jetpack || !crouch_aimming || !idle_aimming || !walking_aimming || !running_aimming) {
             console.warn("AssetManager: faltan animaciones de 'character' — revisar nombres de clips en el GLB.");
             return;
         }
@@ -369,8 +378,8 @@ export class AssetManager {
         const mold: ICharacterAnimations = {
             standing_idle, cruising_forward_idle, cruising_faster_idle, cruising_maxVel_idle,
             standing_to_crouch, crouch_to_standing, jump, normal_landing, crash_landing, roll_landing, floating, flying,
-            falling_idle, jump_on_board, walking_forward, walking_backwards,
-            running_fast, running_normal, aiming_jetpack, jump_while_running
+            falling_idle, jump_on_board, walking_forward, walking_backwards,running_fast, running_normal, aiming_jetpack,
+            jump_while_running, crouch_aimming, idle_aimming,walking_aimming,running_aimming
         };
 
         Object.values(mold).forEach((ag) => {
@@ -414,7 +423,10 @@ export class AssetManager {
             running_fast: cloneOne(mold.running_fast),
             running_normal: cloneOne(mold.running_normal),
             aiming_jetpack: cloneOne(mold.aiming_jetpack),
-
+            crouch_aimming: cloneOne(mold.crouch_aimming),
+            idle_aimming: cloneOne(mold.idle_aimming),
+            walking_aimming: cloneOne(mold.walking_aimming),
+            running_aimming: cloneOne(mold.running_aimming),
         };
     }
 

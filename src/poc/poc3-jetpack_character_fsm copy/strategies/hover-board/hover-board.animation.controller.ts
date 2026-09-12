@@ -45,8 +45,8 @@ export class HoverBoardAnimationController implements IAnimationController {
     // aiming_idle no exista todavía en el GLB, cae al _resolve() normal de abajo sin
     // romper nada. Un solo clip de apuntado para todo el board por ahora (no hay
     // distinción de sub-estados de movimiento como Walking/Running en StandAlone).
-    const resolved = (this.isAiming() && this.animations?.cruising_faster_idle)
-      ? { animation: this.animations.cruising_faster_idle, loop: true }
+    const resolved = (this.isAiming() && this.animations?.crouch_aimming)
+      ? { animation: this.animations.crouch_aimming, loop: true }
       : this._resolve(macroState, subState);
     if (!resolved || this.currentAnimation === resolved.animation) return;
 
