@@ -19,6 +19,7 @@ export interface CharacterFsmDeps {
   isGroundDetected: () => boolean;
   isBoardGroundDetected: () => boolean;
   onEnterOnAir: () => void;
+  onEnterRunningJumpOnAir: () => void; // NUEVO
   isCruiseHeld: () => boolean;
   isShootHeld: () => boolean;
   onEnterShooting: () => void;
@@ -71,6 +72,7 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
       onExitLandingRoll: this.deps.onExitLandingRoll,
       onEnterJumpWindup: this.deps.onEnterJumpWindup,
       onExitJumpWindup: this.deps.onExitJumpWindup,
+      onEnterRunningJumpOnAir: this.deps.onEnterRunningJumpOnAir,
     });
 
     this.jetpackSubFsm = new JetpackFsm({

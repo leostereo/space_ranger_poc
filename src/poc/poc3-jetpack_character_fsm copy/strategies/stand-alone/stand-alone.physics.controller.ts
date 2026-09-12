@@ -19,6 +19,8 @@ const JUMP_IMPULSE = 10;
 const ROLL_INITIAL_SPEED = 8; // m/s, ajustar a gusto
 const ROLL_MAX_DURATION_SECONDS = 1.2; // safety net si notifyLandingRollEnd() nunca llega
 const JUMP_WINDUP_DAMPING_RATE = 8; // más alto = frena más rápido
+const RUNNING_JUMP_VERTICAL_IMPULSE = 4; // más bajo que JUMP_IMPULSE (10) — trayectoria más chata
+const RUNNING_JUMP_FORWARD_BOOST = 8;    // más alto que antes (6) — más alcance para cruzar el hueco
 
 export class StandAlonePhysicsController implements IPhysicsController {
   private _groundDetected = true;
@@ -135,6 +137,21 @@ export class StandAlonePhysicsController implements IPhysicsController {
 
     this.characterAggregate.body.setLinearVelocity(
       new Vector3(facing.x * speed, currentVelocity.y, facing.z * speed),
+    );
+  }
+
+  /** Suma un boost horizontal extra en la dirección hacia donde mira el personaje,
+   * ENCIMA de la velocidad de carrera que ya trae (no la pisa como applyJumpImpulse). */
+  applyRunningJumpImpulse(): void {
+    const currentVelocity = this.characterAggregate.body.getLinearVelocity();
+    const forward = this.characterAggregate.transformNode.forward;
+
+    this.characterAggregate.body.setLinearVelocity(
+      new Vector3(
+        currentVelocity.x + forward.x * RUNNING_JUMP_FORWARD_BOOST,
+        RUNNING_JUMP_VERTICAL_IMPULSE,
+        currentVelocity.z + forward.z * RUNNING_JUMP_FORWARD_BOOST,
+      ),
     );
   }
 

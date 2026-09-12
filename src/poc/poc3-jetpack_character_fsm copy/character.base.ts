@@ -24,6 +24,7 @@ import { buildHoverBoardStrategy } from "./strategies/hover-board/hover-board.st
 const JUMP_IMPULSE_FRAME = 30;
 const EQUIP_BOARD_FRAME = 60; // placeholder — ajustar cuando definan el frame real del clip
 const WEAPON_HOVERBOARD_YAW_COMPENSATION = Math.PI / 8; // cancela characterMesh.rotation.y = -PI/8 en HoverBoard
+const RUNNING_JUMP_IMPULSE_FRAME = 10; // placeholder — ajustar al frame real del clip
 
 export default class CharacterBase implements Poc {
   private scene: Scene;
@@ -107,11 +108,13 @@ export default class CharacterBase implements Poc {
       isBoostSettled: () => this.activeBoardPhysics?.isBoostSettled() ?? true,
       onEnterDiving: () => { },
       onEnterGliderBoost: () => this.activeBoardPhysics?.onEnterGliderBoost(),
+      onEnterRunningJumpOnAir: () => this.activeStandAlonePhysics?.applyRunningJumpImpulse(),
     });
 
     this._wireJumpAnimationEvent();
     this._wireEquipBoardAnimationEvent();
-    this._wireLandingAnimationEvents(); // NUEVO
+    this._wireLandingAnimationEvents();
+    this._wireRunningJumpAnimationEvent();
 
     const { strategy, physicsController } = await buildStandAloneStrategy(
       this.scene,
@@ -158,6 +161,17 @@ export default class CharacterBase implements Poc {
       new AnimationEvent(JUMP_IMPULSE_FRAME, () => {
         this.fsm.standAloneSubFsm.notifyJumpImpulseFrame();
         this.fsm.boardSubFsm.hoveringSubFsm.notifyJumpImpulseFrame();
+      }, false),
+    );
+  }
+
+  private _wireRunningJumpAnimationEvent(): void {
+    const runningJumpAnimation = this.characterAnimations?.jump_while_running.targetedAnimations[0]?.animation;
+    if (!runningJumpAnimation) return;
+
+    runningJumpAnimation.addEvent(
+      new AnimationEvent(RUNNING_JUMP_IMPULSE_FRAME, () => {
+        this.fsm.standAloneSubFsm.notifyRunningJumpImpulseFrame();
       }, false),
     );
   }

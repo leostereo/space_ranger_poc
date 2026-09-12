@@ -7,10 +7,11 @@ import type { OnGroundSubState } from "../../character-fsm/character.fsm.stand-a
 
 /** Combina el estado flat de StandAloneFsm con el sub-estado real de OnGroundFsm cuando aplica —
  * mismo valor que devuelve StandAloneFsm.getActiveSubState(). */
-type ResolvedStandAloneState = OnGroundSubState | "JumpImpulseStart" | "OnAir";
+type ResolvedStandAloneState = OnGroundSubState | "JumpImpulseStart" | "OnAir" | "RunningJumpImpulseStart";
 
 export class StandAloneAnimationController implements IAnimationController {
   private currentAnimation: AnimationGroup | null = null;
+  private isPlayingTransient = false; // NUEVO
 
   constructor(
     private animations: ICharacterAnimations | null,
@@ -21,7 +22,7 @@ export class StandAloneAnimationController implements IAnimationController {
     this.standAloneFsm.onGroundSubFsm.onStateChange(() => this._render(this.standAloneFsm.getActiveSubState()));
     this._render(this.standAloneFsm.getActiveSubState());
 
-    if(this.animations){
+    if (this.animations) {
       this.animations.normal_landing.from = 20;
       this.animations.normal_landing.speedRatio = 1.6;
       this.animations.crash_landing.from = 20;
@@ -39,19 +40,32 @@ export class StandAloneAnimationController implements IAnimationController {
   }
 
   private _render(state: ResolvedStandAloneState): void {
+    if (this.isPlayingTransient) return;
+
     const resolved = this._resolve(state);
     if (!resolved || this.currentAnimation === resolved.animation) return;
 
     this.currentAnimation?.stop();
     this.currentAnimation = resolved.animation;
-    resolved.animation.play(resolved.loop);
+
+    if (resolved.waitForCompletion) {
+      // CAMBIADO: sólo estados marcados explícitamente esperan a que el clip termine
+      // solo — el salto normal, por ejemplo, necesita seguir cortándose apenas se entra
+      // a OnAir (para pasar a falling_idle), no quedarse en la pose de impulso.
+      this.isPlayingTransient = true;
+      resolved.animation.play(false);
+      resolved.animation.onAnimationGroupEndObservable.addOnce(() => {
+        this.isPlayingTransient = false;
+        this._render(this.standAloneFsm.getActiveSubState());
+      });
+    } else {
+      resolved.animation.play(resolved.loop);
+    }
   }
 
-  private _resolve(state: ResolvedStandAloneState): { animation: AnimationGroup; loop: boolean } | null {
+  private _resolve(state: ResolvedStandAloneState): { animation: AnimationGroup; loop: boolean; waitForCompletion?: boolean } | null {
     if (!this.animations) return null;
 
-    // NUEVO — preparado para cuando subas aiming_idle/aiming_walking/aiming_running.
-    // Mientras no existan (undefined), cae al switch normal de abajo sin romper nada.
     if (this.isAiming()) {
       if (state === "Idle" && this.animations.standing_idle) {
         return { animation: this.animations.standing_idle, loop: true };
@@ -75,6 +89,8 @@ export class StandAloneAnimationController implements IAnimationController {
         return { animation: this.animations.jump_on_board, loop: false };
       case "JumpImpulseStart":
         return { animation: this.animations.jump, loop: false };
+      case "RunningJumpImpulseStart":
+        return { animation: this.animations.jump_while_running, loop: false, waitForCompletion: true };
       case "OnAir":
         return { animation: this.animations.falling_idle, loop: true };
       case "LandingSoft":

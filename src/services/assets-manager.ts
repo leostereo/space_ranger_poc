@@ -118,7 +118,7 @@ export class AssetManager {
             };
 
             // --- RECURSO 2: Modelo GLB Externo ---
-            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver8.glb");
+            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver9.glb");
             tareaGLB.onSuccess = (task) => {
                 // Buscamos el nodo raíz que crea automáticamente Babylon para los GLB
 
@@ -339,7 +339,7 @@ export class AssetManager {
         const standing_to_crouch = find("skate standing to crouch");
         const crouch_to_standing = find("skate crouch to standing");
         const jump = find("jump in place2");
-        const jump_while_running = find("jump on board");
+        const jump_while_running = find("jump while running");
         const normal_landing = find("skate falling to landing");
         const crash_landing = find("flat crash");
         const roll_landing = find("landing to roll");
