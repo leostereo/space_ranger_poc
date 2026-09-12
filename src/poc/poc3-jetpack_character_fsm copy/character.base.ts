@@ -23,6 +23,7 @@ import { buildHoverBoardStrategy } from "./strategies/hover-board/hover-board.st
 
 const JUMP_IMPULSE_FRAME = 30;
 const EQUIP_BOARD_FRAME = 60; // placeholder — ajustar cuando definan el frame real del clip
+const WEAPON_HOVERBOARD_YAW_COMPENSATION = Math.PI / 8; // cancela characterMesh.rotation.y = -PI/8 en HoverBoard
 
 export default class CharacterBase implements Poc {
   private scene: Scene;
@@ -139,6 +140,9 @@ export default class CharacterBase implements Poc {
       const canAimHere = groundState === "Idle" || groundState === "Walking" || groundState === "Running";
       return canAimHere && this.input.current.shoot;
     }
+    if (this.fsm.getState() === "HoverBoard") { // NUEVO — sin restricción de sub-estado
+      return this.input.current.shoot;
+    }
     return false;
   }
 
@@ -206,8 +210,6 @@ export default class CharacterBase implements Poc {
       this.activeJetpackPhysics?.applyVisualRoll();
       this.activeBoardPhysics?.applyVisualRoll();
     });
-
-
   }
 
   private async _swapToJetpack(): Promise<void> {
@@ -250,7 +252,8 @@ export default class CharacterBase implements Poc {
       this.characterMesh.setParent(null);
       this.characterMesh.position.copyFrom(spawnPosition);
       this.characterMesh.rotationQuaternion = Quaternion.FromEulerAngles(0, spawnRotationY, 0);
-
+      this.weaponRoot?.rotation.set(0, 0, 0);
+      
       this._activeBoardAggregate.dispose();
       this._activeBoardMesh.dispose();
       this._activeBoardMesh = null;
@@ -288,7 +291,7 @@ export default class CharacterBase implements Poc {
       this.weaponMuzzle, // NUEVO
       initialGroundDetectedOverride,
     );
-    
+
     this.activeStrategy = strategy;
     this.activeStandAlonePhysics = physicsController;
   }
@@ -331,9 +334,14 @@ export default class CharacterBase implements Poc {
 
     this.characterMesh.position.set(offsetX_Capsule, capsuleYOffset, offsetZ_Capsule);
     this.characterMesh.rotation.set(0, -Math.PI / 8, 0);
+    this.weaponRoot?.rotation.set(0, WEAPON_HOVERBOARD_YAW_COMPENSATION, 0);
 
     this._activeBoardMesh = boardMesh;
     this._activeBoardAggregate = boardAggregate;
+
+    if (!this.weaponMuzzle) {
+      throw new Error("_swapToHoverBoard: weaponMuzzle no está inicializado — revisar build().");
+    }
 
     const { strategy, physicsController } = await buildHoverBoardStrategy(
       this.scene,
@@ -342,6 +350,8 @@ export default class CharacterBase implements Poc {
       this.input,
       this.fsm,
       this.characterAnimations,
+      this.characterMesh, // NUEVO
+      this.weaponMuzzle,  // NUEVO
     );
 
     this.activeStrategy = strategy;
