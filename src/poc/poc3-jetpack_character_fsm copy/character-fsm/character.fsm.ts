@@ -17,21 +17,23 @@ export interface CharacterFsmDeps {
   onEnterEquippingJetpack: () => void;
   onEnterStandAlone: () => void;
   isGroundDetected: () => boolean;
-  isBoardGroundDetected: () => boolean; // ← nuevo, raycast propio del board
+  isBoardGroundDetected: () => boolean;
   onEnterOnAir: () => void;
-  /** Threading hacia JetpackFsmDeps, mismo criterio que isGroundDetected/onEnterOnAir hacia StandAloneFsmDeps. */
+  onEnterRunningJumpOnAir: () => void; // NUEVO
   isCruiseHeld: () => boolean;
-  /** Threading hacia OnGroundFsmDeps, mismo criterio que el resto. */
+  isShootHeld: () => boolean;
+  onEnterShooting: () => void;
+  onExitShooting: () => void; 
   isMoveHeld: () => boolean;
   isRunHeld: () => boolean;
-  /** Se dispara al ENTRAR a EquippingBoard: por ahora, sólo console.log + auto-advance (ver character.base.ts). */
   onEnterHoverBoard: () => void;
-
-  // --------------------------------------------------------------
-  // Threading hacia BoardFsmDeps. TEMPORAL: stubbeados en character.base.ts
-  // hasta que se porte la física real del board (board.physics.controller.ts)
-  // desde POC2. No representan comportamiento real todavía.
-  // --------------------------------------------------------------
+  /** Threading hacia OnGroundFsmDeps, vía StandAloneFsmDeps — mismo criterio que isMoveHeld/isRunHeld. */
+  getVerticalSpeed: () => number;
+  getHorizontalSpeed: () => number;
+  onEnterLandingRoll: () => void;
+  onExitLandingRoll: () => void;
+  onEnterJumpWindup: () => void;
+  onExitJumpWindup: () => void;
   groundLostElapsed: () => number;
   coyoteTime: number;
   onEnterHovering: () => void;
@@ -44,8 +46,6 @@ export interface CharacterFsmDeps {
   isBoostSettled: () => boolean;
   onEnterDiving: () => void;
   onEnterGliderBoost: () => void;
-
-
 }
 
 export class CharacterFsm extends BaseFsm<CharacterMainState> {
@@ -66,10 +66,22 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
       onEnterOnAir: this.deps.onEnterOnAir,
       isMoveHeld: this.deps.isMoveHeld,
       isRunHeld: this.deps.isRunHeld,
+      getVerticalSpeed: this.deps.getVerticalSpeed,
+      getHorizontalSpeed: this.deps.getHorizontalSpeed,
+      onEnterLandingRoll: this.deps.onEnterLandingRoll,
+      onExitLandingRoll: this.deps.onExitLandingRoll,
+      onEnterJumpWindup: this.deps.onEnterJumpWindup,
+      onExitJumpWindup: this.deps.onExitJumpWindup,
+      onEnterRunningJumpOnAir: this.deps.onEnterRunningJumpOnAir,
     });
+
     this.jetpackSubFsm = new JetpackFsm({
       isCruiseHeld: this.deps.isCruiseHeld,
+      isShootHeld: this.deps.isShootHeld,
+      onEnterShooting: this.deps.onEnterShooting,
+      onExitShooting: this.deps.onExitShooting,
     });
+
     this.boardSubFsm = new BoardFsm({
       isGroundDetected: this.deps.isBoardGroundDetected,
       groundLostElapsed: this.deps.groundLostElapsed,

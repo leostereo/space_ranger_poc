@@ -18,6 +18,7 @@ export class HoverBoardAnimationController implements IAnimationController {
   constructor(
     private animations: ICharacterAnimations | null,
     private boardFsm: BoardFsm,
+    private isAiming: () => boolean, // NUEVO
   ) {
     this.boardFsm.onStateChange(() => this._render());
     this.boardFsm.hoveringSubFsm.onStateChange(() => this._render());
@@ -26,18 +27,27 @@ export class HoverBoardAnimationController implements IAnimationController {
     this._render();
   }
 
-  tick(): void { }
+  tick(): void {
+    this._render();
+  }
 
   dispose(): void {
     this.currentAnimation?.stop();
   }
 
   private _render(): void {
-    if (this.isPlayingTransient) return; // NUEVO: no interrumpe el jump mientras suena
+    if (this.isPlayingTransient) return;
 
     const macroState = this.boardFsm.getState();
     const subState = this.boardFsm.getActiveSubState();
-    const resolved = this._resolve(macroState, subState);
+
+    // NUEVO — placeholder, mismo criterio que StandAloneAnimationController: mientras
+    // aiming_idle no exista todavía en el GLB, cae al _resolve() normal de abajo sin
+    // romper nada. Un solo clip de apuntado para todo el board por ahora (no hay
+    // distinción de sub-estados de movimiento como Walking/Running en StandAlone).
+    const resolved = (this.isAiming() && this.animations?.crouch_aimming)
+      ? { animation: this.animations.crouch_aimming, loop: true }
+      : this._resolve(macroState, subState);
     if (!resolved || this.currentAnimation === resolved.animation) return;
 
     this.currentAnimation?.stop();

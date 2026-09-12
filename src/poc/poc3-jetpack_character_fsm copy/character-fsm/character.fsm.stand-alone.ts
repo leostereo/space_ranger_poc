@@ -1,57 +1,59 @@
 import { BaseFsm, TransitionTable } from "../abstract/base-fsm";
 import { OnGroundFsm, type OnGroundSubState } from "./character.fsm.stand-alone.on-ground";
 
-/**
- * A — A pie. `OnLadder` (roadmap original) queda para más adelante.
- * OnGround ahora es un sub-FSM propio (Idle/Walking/Running) en vez de un estado flat —
- * ver character.fsm.stand-alone.on-ground.ts.
- * Salto: OnGround -> JumpImpulseStart -> OnAir -> OnGround, mismo patrón puente que
- * BoardFsmHovering (JumpImpulseStart -> Jumping) en poc2 — el estado puente nunca se
- * auto-dispara en tick(), sólo sale vía notifyJumpImpulseFrame(), llamado por quien
- * reproduce la animación de salto al llegar al frame de impulso.
- */
-export type StandAloneSubState = "OnGround" | "JumpImpulseStart" | "OnAir";
+export type StandAloneSubState = "OnGround" | "JumpImpulseStart" | "RunningJumpImpulseStart" | "OnAir";
 
 export interface StandAloneFsmDeps {
-  /** Vía raycast en el physics controller activo — ver stand-alone.physics.controller.ts. */
   isGroundDetected: () => boolean;
-  /** Aplica el impulso físico del salto. Se dispara al ENTRAR a OnAir (frame de impulso), no al presionar la tecla. */
   onEnterOnAir: () => void;
-  /** Threading hacia OnGroundFsmDeps, mismo criterio que isGroundDetected/onEnterOnAir. */
   isMoveHeld: () => boolean;
   isRunHeld: () => boolean;
+  getVerticalSpeed: () => number;
+  getHorizontalSpeed: () => number;
+  onEnterLandingRoll: () => void;
+  onExitLandingRoll: () => void;
+  onEnterJumpWindup: () => void;
+  onExitJumpWindup: () => void;
+  onEnterRunningJumpOnAir: () => void; // NUEVO
 }
 
 export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
-  protected transitions: TransitionTable<StandAloneSubState>;
 
+  protected transitions: TransitionTable<StandAloneSubState>;
   readonly onGroundSubFsm: OnGroundFsm;
+  private cameFromRunningJump = false;
 
   constructor(private deps: StandAloneFsmDeps) {
     super();
-    this.state = "OnGround"; // estado inicial: asignado directo, no vía setState
+    this.state = "OnGround";
 
     this.onGroundSubFsm = new OnGroundFsm({
       isMoveHeld: this.deps.isMoveHeld,
       isRunHeld: this.deps.isRunHeld,
+      getVerticalSpeed: this.deps.getVerticalSpeed,
+      getHorizontalSpeed: this.deps.getHorizontalSpeed,
+      onEnterLandingRoll: this.deps.onEnterLandingRoll,
+      onExitLandingRoll: this.deps.onExitLandingRoll,
     });
 
     this.transitions = {
       OnGround: {
-        JumpImpulseStart: true, // vía requestJump()
-        OnAir: () => !this.deps.isGroundDetected(), // NUEVO: caída sin salto (borde sin saltar)
-
+        JumpImpulseStart: true,
+        RunningJumpImpulseStart: true, // NUEVO
+        OnAir: () => !this.deps.isGroundDetected() && !this._isLandingInProgress(),
       },
       JumpImpulseStart: {
-        OnAir: true, // vía notifyJumpImpulseFrame(), manual — nunca automático en tick()
+        OnAir: true,
+      },
+      RunningJumpImpulseStart: { // NUEVO
+        OnAir: true,
       },
       OnAir: {
-        OnGround: () => this.deps.isGroundDetected(), // guard automático, mismo criterio que ground detection en poc2
+        OnGround: () => this.deps.isGroundDetected(),
       },
     };
   }
 
-  /** Le da cuerda al sub-FSM de OnGround mientras ese sea el estado activo. */
   public override tick(): void {
     super.tick();
     if (this.state === "OnGround") {
@@ -59,32 +61,63 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
     }
   }
 
-  /** Único punto de entrada de input — mismo patrón que requestJump() en BoardFsm. */
   requestJump(): void {
-    if (this.state === "OnGround") {
-      this.setState("JumpImpulseStart");
-    }
+    if (this.state !== "OnGround") return;
+
+    const isRunning = this.onGroundSubFsm.getState() === "Running";
+    this.setState(isRunning ? "RunningJumpImpulseStart" : "JumpImpulseStart");
   }
 
-  /** Llamado por quien reproduce la animación de salto al llegar al frame de impulso (ver character.base.ts). */
   notifyJumpImpulseFrame(): void {
     if (this.state === "JumpImpulseStart") {
       this.setState("OnAir");
     }
   }
 
-  /** Para el HUD/CharacterFsm: expone el sub-estado real de OnGround en vez del flat "OnGround". */
-  getActiveSubState(): OnGroundSubState | "JumpImpulseStart" | "OnAir" {
+  /** Llamado por el AnimationEvent del clip "jump_while_running" al llegar al frame de impulso. */
+  notifyRunningJumpImpulseFrame(): void {
+    if (this.state === "RunningJumpImpulseStart") {
+      this.setState("OnAir");
+    }
+  }
+
+  getActiveSubState(): OnGroundSubState | "JumpImpulseStart" | "RunningJumpImpulseStart" | "OnAir" {
     return this.state === "OnGround" ? this.onGroundSubFsm.getState() : this.state;
+  }
+
+  private _isLandingInProgress(): boolean {
+    const state = this.onGroundSubFsm.getState();
+    return state === "LandingSoft" || state === "LandingRoll" || state === "LandingCrash";
   }
 
   protected onEnter(state: StandAloneSubState): void {
     if (state === "OnAir" && this.previousState === "JumpImpulseStart") {
       this.deps.onEnterOnAir();
     }
+    if (state === "OnAir" && this.previousState === "RunningJumpImpulseStart") {
+      this.deps.onEnterRunningJumpOnAir();
+      this.cameFromRunningJump = true; // NUEVO — marca este vuelo específico
+    }
+    if (state === "OnGround" && this.previousState === "OnAir") {
+      if (this.cameFromRunningJump) {
+        // NUEVO: sin decisión de landing — onGroundSubFsm quedó congelado en "Running"
+        // (nunca se tocó mientras estaba en el aire), así que retoma directo ahí, sin
+        // pasar por LandingSoft/Roll/Crash.
+        this.cameFromRunningJump = false;
+      } else {
+        this.onGroundSubFsm.notifyLanding();
+      }
+    }
+    if (state === "JumpImpulseStart") {
+      this.deps.onEnterJumpWindup();
+    }
   }
 
-  protected onExit(_state: StandAloneSubState): void { }
+  protected onExit(state: StandAloneSubState): void {
+    if (state === "JumpImpulseStart") {
+      this.deps.onExitJumpWindup();
+    }
+  }
 
   dispose(): void {
     this.onGroundSubFsm.dispose();

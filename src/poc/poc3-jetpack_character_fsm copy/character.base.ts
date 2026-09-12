@@ -3,13 +3,13 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { Observer } from "@babylonjs/core/Misc/observable";
 import type { Nullable } from "@babylonjs/core/types";
 import { Quaternion } from "@babylonjs/core/Maths/math.vector";
-import { AnimationEvent, FollowCamera, PhysicsShapeType, TransformNode } from "@babylonjs/core";
-import { AssetManager, type ICharacterAnimations } from "@/services/assets-manager";
+import { AnimationEvent, AnimationGroup, FollowCamera, PhysicsShapeType, TransformNode } from "@babylonjs/core";
+import { AssetManager, WeaponBuildResult, type ICharacterAnimations } from "@/services/assets-manager";
 import { Poc } from "../types";
 import { CharacterFsm } from "./character-fsm/character.fsm";
 import { CharacterInput } from "./character.input";
 import { CharacterHud } from "./character.hud";
-import { character_builder, scene_builder } from "./utils/utils";
+import { character_builder, scene_builder, weapon_builder } from "./utils/buildUtils";
 import { buildStandAloneStrategy, type StandAloneStrategyResult } from "./strategies/stand-alone/stand-alone.strategy";
 import { buildJetpackStrategy, type JetpackStrategyResult } from "./strategies/jetpack/jetpack.strategy";
 import type { IVehicleStrategy } from "./strategies/contracts/ivehicle-strategy";
@@ -23,6 +23,14 @@ import { buildHoverBoardStrategy } from "./strategies/hover-board/hover-board.st
 
 const JUMP_IMPULSE_FRAME = 30;
 const EQUIP_BOARD_FRAME = 60; // placeholder — ajustar cuando definan el frame real del clip
+const WEAPON_HOVERBOARD_YAW_COMPENSATION = Math.PI / 8; // cancela characterMesh.rotation.y = -PI/8 en HoverBoard
+const RUNNING_JUMP_IMPULSE_FRAME = 10; // placeholder — ajustar al frame real del clip
+
+const WEAPON_OFFSETS = {
+  jetpack: { x: -0.1, y: 0.16, z: 0 },
+  standAlone: { x: -0.08, y: 0.2, z: 0 },
+  hoverBoard: { x: -0.15, y: -0.05, z: 0 },
+} as const;
 
 export default class CharacterBase implements Poc {
   private scene: Scene;
@@ -49,6 +57,9 @@ export default class CharacterBase implements Poc {
   private activeBoardPhysics: HoverBoardPhysicsController | null = null;
   private _activeBoardInputAdapter: HoverBoardInputAdapter | null = null;
 
+  private weaponRoot: WeaponBuildResult["weaponRoot"] | null = null;
+  private weaponMuzzle: WeaponBuildResult["muzzle"] | null = null;
+
   async build(scene: Scene): Promise<void> {
     this.scene = scene;
     scene_builder(scene);
@@ -62,6 +73,12 @@ export default class CharacterBase implements Poc {
       this.characterMesh.rotationQuaternion = Quaternion.Identity();
     }
 
+    const { weaponRoot, muzzle } = weapon_builder();
+    weaponRoot.parent = this.characterMesh;
+    this.weaponRoot = weaponRoot;
+    this.weaponMuzzle = muzzle;
+    this._applyWeaponOffset(WEAPON_OFFSETS.standAlone); // arranca en StandAlone — ver build() más abajo
+
     this.followCamera = AssetManager.getCamera('follow', false, 'camera') as FollowCamera;
     this.input = new CharacterInput();
 
@@ -72,9 +89,18 @@ export default class CharacterBase implements Poc {
       isGroundDetected: () => this.activeStandAlonePhysics?.isGroundDetected() ?? false,
       onEnterOnAir: () => this.activeStandAlonePhysics?.applyJumpImpulse(),
       isCruiseHeld: () => this.input.current.cruise,
+      isShootHeld: () => this.input.current.shoot,
+      onEnterShooting: () => this.activeJetpackPhysics?.notifyShootingEnter(),
+      onExitShooting: () => this.activeJetpackPhysics?.notifyShootingExit(),
       isMoveHeld: () => this.input.current.forward || this.input.current.backward,
       isRunHeld: () => this.input.current.cruise,
       onEnterHoverBoard: () => this._swapToHoverBoard(),
+      getVerticalSpeed: () => this.activeStandAlonePhysics?.getLastImpactVerticalSpeed() ?? 0,
+      getHorizontalSpeed: () => this.activeStandAlonePhysics?.getLastImpactHorizontalSpeed() ?? 0,
+      onEnterLandingRoll: () => this.activeStandAlonePhysics?.notifyLandingRollStart(),
+      onExitLandingRoll: () => this.activeStandAlonePhysics?.notifyLandingRollEnd(),
+      onEnterJumpWindup: () => this.activeStandAlonePhysics?.notifyJumpWindupStart(),
+      onExitJumpWindup: () => this.activeStandAlonePhysics?.notifyJumpWindupEnd(),
       isBoardGroundDetected: () => this.activeBoardPhysics?.isGroundDetected() ?? false,
       groundLostElapsed: () => this.activeBoardPhysics?.groundLostElapsed() ?? 0,
       coyoteTime: generalConfig.groundCheck.coyoteTime,
@@ -88,12 +114,13 @@ export default class CharacterBase implements Poc {
       isBoostSettled: () => this.activeBoardPhysics?.isBoostSettled() ?? true,
       onEnterDiving: () => { },
       onEnterGliderBoost: () => this.activeBoardPhysics?.onEnterGliderBoost(),
-
-
+      onEnterRunningJumpOnAir: () => this.activeStandAlonePhysics?.applyRunningJumpImpulse(),
     });
 
     this._wireJumpAnimationEvent();
     this._wireEquipBoardAnimationEvent();
+    this._wireLandingAnimationEvents();
+    this._wireRunningJumpAnimationEvent();
 
     const { strategy, physicsController } = await buildStandAloneStrategy(
       this.scene,
@@ -101,7 +128,9 @@ export default class CharacterBase implements Poc {
       this.input,
       this.fsm,
       this.characterAnimations,
+      this.weaponMuzzle,
     );
+
     this.activeStrategy = strategy;
     this.activeStandAlonePhysics = physicsController;
 
@@ -109,6 +138,25 @@ export default class CharacterBase implements Poc {
     this.hud.mount();
 
     this._bindObservables();
+  }
+
+  private _isAimingActive(): boolean {
+    if (this.fsm.getState() === "Jetpack") {
+      return this.fsm.jetpackSubFsm.getState() === "Shooting";
+    }
+    if (this.fsm.getState() === "StandAlone") {
+      const groundState = this.fsm.getActiveSubState();
+      const canAimHere = groundState === "Idle" || groundState === "Walking" || groundState === "Running";
+      return canAimHere && this.input.current.shoot;
+    }
+    if (this.fsm.getState() === "HoverBoard") { // NUEVO — sin restricción de sub-estado
+      return this.input.current.shoot;
+    }
+    return false;
+  }
+
+  private _updateWeaponVisibility(): void {
+    this.weaponRoot?.setEnabled(this._isAimingActive());
   }
 
   private _wireJumpAnimationEvent(): void {
@@ -119,6 +167,17 @@ export default class CharacterBase implements Poc {
       new AnimationEvent(JUMP_IMPULSE_FRAME, () => {
         this.fsm.standAloneSubFsm.notifyJumpImpulseFrame();
         this.fsm.boardSubFsm.hoveringSubFsm.notifyJumpImpulseFrame();
+      }, false),
+    );
+  }
+
+  private _wireRunningJumpAnimationEvent(): void {
+    const runningJumpAnimation = this.characterAnimations?.jump_while_running.targetedAnimations[0]?.animation;
+    if (!runningJumpAnimation) return;
+
+    runningJumpAnimation.addEvent(
+      new AnimationEvent(RUNNING_JUMP_IMPULSE_FRAME, () => {
+        this.fsm.standAloneSubFsm.notifyRunningJumpImpulseFrame();
       }, false),
     );
   }
@@ -135,11 +194,33 @@ export default class CharacterBase implements Poc {
     );
   }
 
+  private _wireLandingAnimationEvents(): void {
+    const wireOnComplete = (group: AnimationGroup | undefined, notify_frame: number) => {
+      const anim = group?.targetedAnimations[0]?.animation;
+      if (!anim) return;
+
+      anim.addEvent(
+        new AnimationEvent(notify_frame, () => {
+          this.fsm.standAloneSubFsm.onGroundSubFsm.notifyLandingAnimationComplete();
+        }, false),
+      );
+    };
+
+    const NORMAL_LAST_FRAME = 60;
+    const CRASH_LAST_FRAME = 96;
+    const ROLL_LAST_FRAME = 90;
+
+    wireOnComplete(this.characterAnimations?.normal_landing, NORMAL_LAST_FRAME);
+    wireOnComplete(this.characterAnimations?.crash_landing, CRASH_LAST_FRAME);
+    wireOnComplete(this.characterAnimations?.roll_landing, ROLL_LAST_FRAME);
+  }
+
   private _bindObservables(): void {
     this.beforePhysicsObserver = this.scene.onBeforePhysicsObservable.add(() => {
       const dt = this.scene.getEngine().getDeltaTime() / 1000;
       this.activeStrategy?.tick(dt);
       this.fsm.tick();
+      this._updateWeaponVisibility();
       if (this.fsm.getState() === "HoverBoard" && this.input.consumeEquipRequest()) {
         this.fsm.requestUnequipBoard();
       }
@@ -149,20 +230,27 @@ export default class CharacterBase implements Poc {
       this.activeJetpackPhysics?.applyVisualRoll();
       this.activeBoardPhysics?.applyVisualRoll();
     });
-
-
   }
 
   private async _swapToJetpack(): Promise<void> {
     this.activeStandAlonePhysics = null;
     this.activeStrategy?.dispose();
 
+    if (!this.weaponMuzzle) {
+      throw new Error("_swapToJetpack: weaponMuzzle no está inicializado — revisar build().");
+    }
+
+    this._applyWeaponOffset(WEAPON_OFFSETS.jetpack); // NUEVO
+
     const { strategy, physicsController } = await buildJetpackStrategy(
+      this.scene,
       this.characterAggregate,
       this.input,
       this.fsm,
       this.characterAnimations,
+      this.weaponMuzzle,
     );
+
     this.activeStrategy = strategy;
     this.activeJetpackPhysics = physicsController;
 
@@ -186,7 +274,8 @@ export default class CharacterBase implements Poc {
       this.characterMesh.setParent(null);
       this.characterMesh.position.copyFrom(spawnPosition);
       this.characterMesh.rotationQuaternion = Quaternion.FromEulerAngles(0, spawnRotationY, 0);
-
+      this.weaponRoot?.rotation.set(0, 0, 0);
+      
       this._activeBoardAggregate.dispose();
       this._activeBoardMesh.dispose();
       this._activeBoardMesh = null;
@@ -198,7 +287,7 @@ export default class CharacterBase implements Poc {
       this.characterAggregate = new PhysicsAggregate(
         this.characterMesh,
         PhysicsShapeType.CAPSULE,
-        { mass: 70 },
+        { mass: 70, restitution: 0 },
         this.scene,
       );
 
@@ -211,14 +300,22 @@ export default class CharacterBase implements Poc {
       }
     }
 
+    if (!this.weaponMuzzle) {
+      throw new Error("_swapToStandAlone: weaponMuzzle no está inicializado — revisar build().");
+    }
+
+    this._applyWeaponOffset(WEAPON_OFFSETS.standAlone); // NUEVO
+
     const { strategy, physicsController } = await buildStandAloneStrategy(
       this.scene,
       this.characterAggregate,
       this.input,
       this.fsm,
       this.characterAnimations,
-      initialGroundDetectedOverride, // NUEVO
+      this.weaponMuzzle, // NUEVO
+      initialGroundDetectedOverride,
     );
+
     this.activeStrategy = strategy;
     this.activeStandAlonePhysics = physicsController;
   }
@@ -261,9 +358,16 @@ export default class CharacterBase implements Poc {
 
     this.characterMesh.position.set(offsetX_Capsule, capsuleYOffset, offsetZ_Capsule);
     this.characterMesh.rotation.set(0, -Math.PI / 8, 0);
+    this.weaponRoot?.rotation.set(0, WEAPON_HOVERBOARD_YAW_COMPENSATION, 0);
 
     this._activeBoardMesh = boardMesh;
     this._activeBoardAggregate = boardAggregate;
+
+    if (!this.weaponMuzzle) {
+      throw new Error("_swapToHoverBoard: weaponMuzzle no está inicializado — revisar build().");
+    }
+
+    this._applyWeaponOffset(WEAPON_OFFSETS.hoverBoard); // NUEVO
 
     const { strategy, physicsController } = await buildHoverBoardStrategy(
       this.scene,
@@ -272,11 +376,17 @@ export default class CharacterBase implements Poc {
       this.input,
       this.fsm,
       this.characterAnimations,
+      this.characterMesh, // NUEVO
+      this.weaponMuzzle,  // NUEVO
     );
 
     this.activeStrategy = strategy;
     this.activeBoardPhysics = physicsController;
     this._activeBoardInputAdapter = new HoverBoardInputAdapter(this.input);
+  }
+
+  private _applyWeaponOffset(offset: { x: number; y: number; z: number }): void {
+    this.weaponRoot?.position.set(offset.x, offset.y, offset.z);
   }
 
   // Helper nuevo — agregalo como método privado de la clase (cerca de _swapToStandAlone/_swapToHoverBoard)
@@ -298,6 +408,6 @@ export default class CharacterBase implements Poc {
     if (this.characterAnimations) {
       Object.values(this.characterAnimations).forEach((ag) => ag.dispose());
     }
-    // this.groundAggregates?.forEach((g) => g.dispose());
+    this.weaponRoot?.dispose();
   }
 }

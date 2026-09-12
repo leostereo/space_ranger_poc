@@ -8,6 +8,9 @@ import type { CharacterInput } from "../../character.input";
 import { StandAlonePhysicsController } from "./stand-alone.physics.controller";
 import { StandAloneInputController } from "./stand-alone.input.controller";
 import { StandAloneAnimationController } from "./stand-alone.animation.controller";
+import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import { ProjectileWeaponController } from "../weapon/projectile-weapon.controller";
 
 export interface StandAloneStrategyResult {
   strategy: IVehicleStrategy;
@@ -19,30 +22,36 @@ export interface StandAloneStrategyResult {
   physicsController: StandAlonePhysicsController;
 }
 
-/**
- * Factory async por convención del repo (mismo criterio que build() en otros POCs).
- * `characterAnimations` viene de character.base.ts (construido una sola vez junto con
- * characterMesh/characterAggregate, ver utils.ts) — esta factory NO carga ni clona nada.
- * `scene` se agrega para el raycast de ground detection (ver stand-alone.physics.controller.ts).
- */
 export async function buildStandAloneStrategy(
   scene: Scene,
   characterAggregate: PhysicsAggregate,
   input: CharacterInput,
   characterFsm: CharacterFsm,
   characterAnimations: ICharacterAnimations | null,
-  initialGroundDetectedOverride?: boolean, // NUEVO
+  weaponMuzzle: TransformNode, // NUEVO — antes del último param opcional
+  initialGroundDetectedOverride?: boolean,
 
 ): Promise<StandAloneStrategyResult> {
-  // Fuente de verdad real en este instante — standAloneSubFsm nunca se destruye ni se
-  // resetea (vive en CharacterFsm, sobrevive a los swaps de strategy), así que su estado
-  // actual es exactamente lo que hay que respetar al reconstruir el physics controller.
-  // Sin esto, StandAlonePhysicsController arrancaba siempre asumiendo "apoyado", lo cual
-  // rompía al volver de Jetpack en pleno vuelo (Ctrl para desequipar estando OnAir).
   const initialGroundDetected = initialGroundDetectedOverride ?? (characterFsm.standAloneSubFsm.getState() !== "OnAir");
   const physics = new StandAlonePhysicsController(scene, characterAggregate, () => input.current, initialGroundDetected);
   const inputController = new StandAloneInputController(input, characterFsm);
-  const animation = new StandAloneAnimationController(characterAnimations, characterFsm.standAloneSubFsm);
+
+  // Único predicado — determina si se dispara, si el arma es visible, y si toca la
+  // animación de apuntado en vez de la normal. Restringido a Idle/Walking/Running: no
+  // durante JumpImpulseStart/OnAir/LandingX/EquippingHoverBoardStart.
+  const isAimingActive = (): boolean => {
+    const groundState = characterFsm.getActiveSubState();
+    const canAimHere = groundState === "Idle" || groundState === "Walking" || groundState === "Running";
+    return canAimHere && input.current.shoot;
+  };
+
+  const animation = new StandAloneAnimationController(characterAnimations, characterFsm.standAloneSubFsm, isAimingActive); // CAMBIADO
+  const weapon = new ProjectileWeaponController( // NUEVO
+    scene,
+    weaponMuzzle,
+    isAimingActive,
+    [characterAggregate.transformNode as AbstractMesh],
+  );
 
   const strategy: IVehicleStrategy = {
     physics,
@@ -52,11 +61,13 @@ export async function buildStandAloneStrategy(
       inputController.tick();
       physics.tick(dt);
       animation.tick();
+      weapon.tick(dt); // NUEVO
     },
     dispose() {
       physics.dispose();
       inputController.dispose();
       animation.dispose();
+      weapon.dispose(); // NUEVO
     },
   };
 
