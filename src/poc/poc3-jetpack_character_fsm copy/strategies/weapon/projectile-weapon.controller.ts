@@ -17,9 +17,13 @@ export interface ProjectileWeaponConfig {
     projectileLength: number;
     poolSize: number;
     emissiveColor: Color3;
-    muzzleFlashDuration: number; // NUEVO
-    muzzleFlashScale: number;    // NUEVO — diámetro máximo del destello
-    muzzleFlashColor: Color3;    // NUEVO
+    muzzleFlashDuration: number;
+    muzzleFlashScale: number;
+    muzzleFlashColor: Color3;
+    impactEffectDuration: number;
+    impactEffectScale: number;
+    impactEffectColor: Color3;
+    impactPoolSize: number;
 }
 
 export const DEFAULT_PROJECTILE_WEAPON_CONFIG: ProjectileWeaponConfig = {
@@ -33,6 +37,10 @@ export const DEFAULT_PROJECTILE_WEAPON_CONFIG: ProjectileWeaponConfig = {
     muzzleFlashDuration: 0.06,
     muzzleFlashScale: 0.18,
     muzzleFlashColor: new Color3(1, 0.95, 0.6),
+    impactEffectDuration: 0.15,
+    impactEffectScale: 0.22,
+    impactEffectColor: new Color3(1, 0.6, 0.15), // naranja/chispa — distinto del rojo del proyectil, se lee como "impacto"
+    impactPoolSize: 6,
 };
 
 const PARK_POSITION = new Vector3(0, -5000, 0);
@@ -44,12 +52,11 @@ interface PoolEntry {
     elapsed: number;
 }
 
-/**
- * Arma de proyectiles kinemáticos reutilizable entre vehículos — no sabe nada de FSMs
- * concretas: recibe `shouldFire` como predicado genérico, así que Jetpack, StandAlone o
- * HoverBoard pueden instanciarla pasando su propia condición de sub-estado, cada uno con
- * su propia config (color, cadencia, etc.) sin duplicar esta clase.
- */
+interface ImpactEntry {
+    mesh: Mesh;
+    elapsed: number; // Infinity = inactivo
+}
+
 export class ProjectileWeaponController implements IWeaponController {
     private pool: PoolEntry[] = [];
     private cooldownElapsed: number;
@@ -57,6 +64,7 @@ export class ProjectileWeaponController implements IWeaponController {
     private _ray = new Ray(Vector3.Zero(), Vector3.Forward(), 1);
     private flashMesh: Mesh;
     private flashElapsed = Infinity; // Infinity = inactivo, evita un flag isActive extra
+    private impactPool: ImpactEntry[] = [];
 
     constructor(
         private scene: Scene,
@@ -68,7 +76,8 @@ export class ProjectileWeaponController implements IWeaponController {
         this.fireInterval = 1 / this.config.fireRate;
         this.cooldownElapsed = this.fireInterval; // arranca listo para disparar de entrada
         this._buildPool();
-        this._buildFlash(); // NUEVO
+        this._buildFlash();
+        this._buildImpactPool();
     }
 
     private _buildPool(): void {
@@ -107,10 +116,52 @@ export class ProjectileWeaponController implements IWeaponController {
         this.flashMesh.setEnabled(false);
     }
 
+    private _buildImpactPool(): void {
+        const material = new StandardMaterial("impactEffectMat", this.scene);
+        material.diffuseColor = Color3.Black();
+        material.emissiveColor = this.config.impactEffectColor;
+        material.specularColor = Color3.Black();
+
+        for (let i = 0; i < this.config.impactPoolSize; i++) {
+            const mesh = MeshBuilder.CreateSphere(`impactEffect_${i}`, { diameter: 1, segments: 6 }, this.scene);
+            mesh.material = material;
+            mesh.isPickable = false; // el propio efecto no debe ser blanco de otros raycasts
+            mesh.scaling.setAll(0);
+            mesh.setEnabled(false);
+            this.impactPool.push({ mesh, elapsed: Infinity });
+        }
+    }
+
+    private _triggerImpact(position: Vector3): void {
+        const free = this.impactPool.find((entry) => entry.elapsed === Infinity);
+        if (!free) return; // pool de impactos agotado — se pierde el efecto visual, no el gameplay
+
+        free.mesh.position.copyFrom(position);
+        free.mesh.scaling.setAll(this.config.impactEffectScale);
+        free.mesh.setEnabled(true);
+        free.elapsed = 0;
+    }
+
+    private _tickImpacts(dt: number): void {
+        for (const entry of this.impactPool) {
+            if (entry.elapsed === Infinity) continue;
+
+            entry.elapsed += dt;
+            const t = Math.min(entry.elapsed / this.config.impactEffectDuration, 1);
+            entry.mesh.scaling.setAll(this.config.impactEffectScale * (1 - t));
+
+            if (t >= 1) {
+                entry.mesh.setEnabled(false);
+                entry.elapsed = Infinity;
+            }
+        }
+    }
+
     tick(dt: number): void {
         this._tickCooldownAndFire(dt);
         this._tickActiveProjectiles(dt);
-        this._tickFlash(dt); // NUEVO
+        this._tickFlash(dt);
+        this._tickImpacts(dt);
     }
 
     private _tickFlash(dt: number): void {
@@ -185,6 +236,7 @@ export class ProjectileWeaponController implements IWeaponController {
             if (hit?.hit) {
                 // TODO: placeholder — acá eventualmente un Observable<HitInfo> propio.
                 console.log(`${entry.mesh.name} impactó contra`, hit.pickedMesh?.name);
+                this._triggerImpact(hit.pickedPoint ?? entry.mesh.position); // NUEVO — fallback por si pickedPoint viene null
                 this._deactivate(entry);
                 continue;
             }
@@ -202,5 +254,6 @@ export class ProjectileWeaponController implements IWeaponController {
     dispose(): void {
         this.pool.forEach((entry) => entry.mesh.dispose());
         this.flashMesh.dispose();
+        this.impactPool.forEach((entry) => entry.mesh.dispose()); // NUEVO
     }
 }
