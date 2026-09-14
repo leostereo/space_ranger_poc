@@ -162,6 +162,21 @@ export class StandAlonePhysicsController implements IPhysicsController {
     );
   }
 
+  /** Suma un boost horizontal extra en la dirección hacia donde mira el personaje,
+   * ENCIMA de la velocidad de carrera que ya trae (no la pisa como applyJumpImpulse). */
+  applyRunningJumpImpulse(): void {
+    const currentVelocity = this.characterAggregate.body.getLinearVelocity();
+    const forward = this.characterAggregate.transformNode.forward;
+
+    this.characterAggregate.body.setLinearVelocity(
+      new Vector3(
+        currentVelocity.x + forward.x * RUNNING_JUMP_FORWARD_BOOST,
+        RUNNING_JUMP_VERTICAL_IMPULSE,
+        currentVelocity.z + forward.z * RUNNING_JUMP_FORWARD_BOOST,
+      ),
+    );
+  }
+
   isGroundDetected(): boolean {
     return this._groundDetected;
   }
