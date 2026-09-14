@@ -21,6 +21,7 @@ const ROLL_MAX_DURATION_SECONDS = 1.2; // safety net si notifyLandingRollEnd() n
 const JUMP_WINDUP_DAMPING_RATE = 8; // más alto = frena más rápido
 const RUNNING_JUMP_VERTICAL_IMPULSE = 4; // más bajo que JUMP_IMPULSE (10) — trayectoria más chata
 const RUNNING_JUMP_FORWARD_BOOST = 8;    // más alto que antes (6) — más alcance para cruzar el hueco
+const WALK_BACKWARD_SPEED = 2; // más lento que WALK_SPEED (4) — retroceder es más cauto que avanzar
 
 export class StandAlonePhysicsController implements IPhysicsController {
   private _groundDetected = true;
@@ -124,19 +125,40 @@ export class StandAlonePhysicsController implements IPhysicsController {
 
   private _applyMove(forward: boolean, backward: boolean, cruise: boolean): void {
     const currentVelocity = this.characterAggregate.body.getLinearVelocity();
+    const verticalVelocity = this._groundDetected ? 0 : currentVelocity.y;
 
     if (!forward && !backward) {
       if (!this._groundDetected) return;
-      this.characterAggregate.body.setLinearVelocity(new Vector3(0, currentVelocity.y, 0));
+      this.characterAggregate.body.setLinearVelocity(new Vector3(0, verticalVelocity, 0));
       return;
     }
 
     const dirSign = (forward ? 1 : 0) - (backward ? 1 : 0);
     const facing = this.characterAggregate.transformNode.forward.scale(dirSign);
-    const speed = cruise ? RUN_SPEED : WALK_SPEED;
+
+    // NUEVO: retroceder siempre va a WALK_BACKWARD_SPEED, sin importar Shift — no existe
+    // "correr hacia atrás". Si ambas se sostienen a la vez, dirSign da 0 (se cancelan),
+    // así que esta rama no importa en ese caso — no hay desplazamiento de todas formas.
+    const isMovingBackwardOnly = backward && !forward;
+    const speed = isMovingBackwardOnly ? WALK_BACKWARD_SPEED : (cruise ? RUN_SPEED : WALK_SPEED);
 
     this.characterAggregate.body.setLinearVelocity(
-      new Vector3(facing.x * speed, currentVelocity.y, facing.z * speed),
+      new Vector3(facing.x * speed, verticalVelocity, facing.z * speed),
+    );
+  }
+
+  /** Suma un boost horizontal extra en la dirección hacia donde mira el personaje,
+   * ENCIMA de la velocidad de carrera que ya trae (no la pisa como applyJumpImpulse). */
+  applyRunningJumpImpulse(): void {
+    const currentVelocity = this.characterAggregate.body.getLinearVelocity();
+    const forward = this.characterAggregate.transformNode.forward;
+
+    this.characterAggregate.body.setLinearVelocity(
+      new Vector3(
+        currentVelocity.x + forward.x * RUNNING_JUMP_FORWARD_BOOST,
+        RUNNING_JUMP_VERTICAL_IMPULSE,
+        currentVelocity.z + forward.z * RUNNING_JUMP_FORWARD_BOOST,
+      ),
     );
   }
 

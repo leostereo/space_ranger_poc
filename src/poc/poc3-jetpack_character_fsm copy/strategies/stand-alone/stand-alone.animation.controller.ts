@@ -73,6 +73,9 @@ export class StandAloneAnimationController implements IAnimationController {
       if (state === "Walking" && this.animations.walking_aimming) {
         return { animation: this.animations.walking_aimming, loop: true };
       }
+      if (state === "WalkingBackwards" && this.animations.walking_backwards_aimming) {
+        return { animation: this.animations.walking_backwards_aimming, loop: true };
+      }
       if (state === "Running" && this.animations.running_aimming) {
         return { animation: this.animations.running_aimming, loop: true };
       }
@@ -83,6 +86,8 @@ export class StandAloneAnimationController implements IAnimationController {
         return { animation: this.animations.standing_idle, loop: true };
       case "Walking":
         return { animation: this.animations.walking_forward, loop: true };
+      case "WalkingBackwards":
+        return { animation: this.animations.walking_backwards, loop: true };
       case "Running":
         return { animation: this.animations.running_normal, loop: true };
       case "EquippingHoverBoardStart":
