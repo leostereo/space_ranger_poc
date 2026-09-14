@@ -24,7 +24,8 @@ export interface CharacterFsmDeps {
   isShootHeld: () => boolean;
   onEnterShooting: () => void;
   onExitShooting: () => void; 
-  isMoveHeld: () => boolean;
+  isStandAloneForwardHeld: () => boolean; // NUEVO — distinto de isForwardHeld (ese es del board)
+  isStandAloneBackwardHeld: () => boolean; // NUEVO
   isRunHeld: () => boolean;
   onEnterHoverBoard: () => void;
   /** Threading hacia OnGroundFsmDeps, vía StandAloneFsmDeps — mismo criterio que isMoveHeld/isRunHeld. */
@@ -64,7 +65,8 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
     this.standAloneSubFsm = new StandAloneFsm({
       isGroundDetected: this.deps.isGroundDetected,
       onEnterOnAir: this.deps.onEnterOnAir,
-      isMoveHeld: this.deps.isMoveHeld,
+      isForwardHeld: this.deps.isStandAloneForwardHeld, // CAMBIADO — mapea al dep sin colisión
+      isBackwardHeld: this.deps.isStandAloneBackwardHeld, // NUEVO
       isRunHeld: this.deps.isRunHeld,
       getVerticalSpeed: this.deps.getVerticalSpeed,
       getHorizontalSpeed: this.deps.getHorizontalSpeed,

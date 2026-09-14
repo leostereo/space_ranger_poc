@@ -6,7 +6,8 @@ export type StandAloneSubState = "OnGround" | "JumpImpulseStart" | "RunningJumpI
 export interface StandAloneFsmDeps {
   isGroundDetected: () => boolean;
   onEnterOnAir: () => void;
-  isMoveHeld: () => boolean;
+  isForwardHeld: () => boolean; // CAMBIADO
+  isBackwardHeld: () => boolean; // NUEVO
   isRunHeld: () => boolean;
   getVerticalSpeed: () => number;
   getHorizontalSpeed: () => number;
@@ -28,7 +29,8 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
     this.state = "OnGround";
 
     this.onGroundSubFsm = new OnGroundFsm({
-      isMoveHeld: this.deps.isMoveHeld,
+      isForwardHeld: this.deps.isForwardHeld, // CAMBIADO
+      isBackwardHeld: this.deps.isBackwardHeld, // NUEVO
       isRunHeld: this.deps.isRunHeld,
       getVerticalSpeed: this.deps.getVerticalSpeed,
       getHorizontalSpeed: this.deps.getHorizontalSpeed,

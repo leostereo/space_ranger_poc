@@ -41,7 +41,7 @@ export async function buildStandAloneStrategy(
   // durante JumpImpulseStart/OnAir/LandingX/EquippingHoverBoardStart.
   const isAimingActive = (): boolean => {
     const groundState = characterFsm.getActiveSubState();
-    const canAimHere = groundState === "Idle" || groundState === "Walking" || groundState === "Running";
+    const canAimHere = groundState === "Idle" || groundState === "Walking" || groundState === 'WalkingBackwards' || groundState === "Running";
     return canAimHere && input.current.shoot;
   };
 

@@ -92,7 +92,8 @@ export default class CharacterBase implements Poc {
       isShootHeld: () => this.input.current.shoot,
       onEnterShooting: () => this.activeJetpackPhysics?.notifyShootingEnter(),
       onExitShooting: () => this.activeJetpackPhysics?.notifyShootingExit(),
-      isMoveHeld: () => this.input.current.forward || this.input.current.backward,
+      isStandAloneForwardHeld: () => this.input.current.forward,
+      isStandAloneBackwardHeld: () => this.input.current.backward,
       isRunHeld: () => this.input.current.cruise,
       onEnterHoverBoard: () => this._swapToHoverBoard(),
       getVerticalSpeed: () => this.activeStandAlonePhysics?.getLastImpactVerticalSpeed() ?? 0,
@@ -146,7 +147,7 @@ export default class CharacterBase implements Poc {
     }
     if (this.fsm.getState() === "StandAlone") {
       const groundState = this.fsm.getActiveSubState();
-      const canAimHere = groundState === "Idle" || groundState === "Walking" || groundState === "Running";
+      const canAimHere = groundState === "Idle" || groundState === "Walking" || groundState === 'WalkingBackwards' || groundState === "Running";
       return canAimHere && this.input.current.shoot;
     }
     if (this.fsm.getState() === "HoverBoard") { // NUEVO — sin restricción de sub-estado

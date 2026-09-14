@@ -71,6 +71,7 @@ export interface ICharacterAnimations {
     crouch_aimming: AnimationGroup,
     idle_aimming: AnimationGroup,
     walking_aimming: AnimationGroup,
+    walking_backwards_aimming: AnimationGroup,
     running_aimming: AnimationGroup,
 
 }
@@ -362,6 +363,7 @@ export class AssetManager {
         const crouch_aimming = find("crouch aim");
         const idle_aimming = find("idle aim");
         const walking_aimming = find("walking aim");
+        const walking_backwards_aimming = find("walking back aim");
         const running_aimming = find("running aim");
 
 
@@ -370,7 +372,8 @@ export class AssetManager {
         if (!standing_idle || !cruising_forward_idle || !cruising_faster_idle || !cruising_maxVel_idle || !jump_while_running || 
             !standing_to_crouch || !crouch_to_standing || !jump || !normal_landing || !crash_landing || !roll_landing || !falling_idle ||
             !flying || !floating || !jump_on_board || !walking_forward || !walking_backwards ||
-            !running_normal || !running_fast || !aiming_jetpack || !crouch_aimming || !idle_aimming || !walking_aimming || !running_aimming) {
+            !running_normal || !running_fast || !aiming_jetpack || !crouch_aimming || !idle_aimming || !walking_backwards_aimming ||
+            !walking_aimming || !running_aimming) {
             console.warn("AssetManager: faltan animaciones de 'character' — revisar nombres de clips en el GLB.");
             return;
         }
@@ -379,7 +382,7 @@ export class AssetManager {
             standing_idle, cruising_forward_idle, cruising_faster_idle, cruising_maxVel_idle,
             standing_to_crouch, crouch_to_standing, jump, normal_landing, crash_landing, roll_landing, floating, flying,
             falling_idle, jump_on_board, walking_forward, walking_backwards,running_fast, running_normal, aiming_jetpack,
-            jump_while_running, crouch_aimming, idle_aimming,walking_aimming,running_aimming
+            jump_while_running, crouch_aimming, idle_aimming, walking_aimming, walking_backwards_aimming, running_aimming
         };
 
         Object.values(mold).forEach((ag) => {
@@ -426,6 +429,7 @@ export class AssetManager {
             crouch_aimming: cloneOne(mold.crouch_aimming),
             idle_aimming: cloneOne(mold.idle_aimming),
             walking_aimming: cloneOne(mold.walking_aimming),
+            walking_backwards_aimming: cloneOne(mold.walking_backwards_aimming),
             running_aimming: cloneOne(mold.running_aimming),
         };
     }
