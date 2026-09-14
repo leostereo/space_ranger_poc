@@ -20,7 +20,7 @@ export class EstadoOnGround implements SubEstado {
 
   // En tu clase EstadoOnGround dentro de character/fsm/sub_states/EstadosAPie.ts
 
-  public actualizar(inputs: InputController, delta: number): void {
+  public actualizar(inputs: InputController, _delta: number): void {
     // REGLA 1: Si presionamos espacio, empezamos a tomar impulso (Salto prioritario)
     // REGLA 1: Si presionamos espacio, empezamos a tomar impulso (Salto prioritario)
     if (inputs.salto) {
@@ -93,7 +93,7 @@ export class EstadoJumpImpulseStart implements SubEstado {
     this._contexto.animController.play("jumpImpulseStart");
   }
 
-  public actualizar(inputs: InputController, delta: number) {
+  public actualizar(_inputs: InputController, delta: number) {
     // Si ya se ejecutó el despegue, no hacemos nada más
     if (this._yaDespego) return;
 
@@ -144,7 +144,7 @@ export class EstadoOnAir implements SubEstado {
     this._caminandoAnterior = false;
   }
 
-  public actualizar(inputs: InputController, delta: number): void {
+  public actualizar(inputs: InputController, _delta: number): void {
     // REGLA 1: Si el Raycast físico detecta el suelo y estamos cerca de la base
     if (this._contexto.estaEnElSuelo && this._contexto.alturaActual < 0.5) {
       this._strategy.cambiarSubEstado(new EstadoOnGround(this._contexto, this._strategy));

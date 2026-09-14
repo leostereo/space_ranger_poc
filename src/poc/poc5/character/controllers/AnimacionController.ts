@@ -7,7 +7,7 @@ export class AnimacionController {
   // Propiedad pública que el subestado escuchará para el despegue físico
   public onFrameClaveDisparado: (() => void) | null = null;
 
-  constructor(mesh: Mesh, animations: any) {
+  constructor(animations: any) {
     this._animations = animations;
     console.log("AnimacionController -> Inicializado con animaciones reales del GLB.");
 

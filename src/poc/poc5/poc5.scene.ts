@@ -11,7 +11,7 @@ import { Poc } from "../types";
 export default class poc5 implements Poc {
 
     // 1. Transformamos la firma del método a 'async' para poder usar await
-    public async build(scene: Scene, canvas: HTMLCanvasElement): Promise<void> {
+    public async build(scene: Scene, _canvas: HTMLCanvasElement): Promise<void> {
         try {
             const light = AssetManager.getLight("main", false, "light");
             light.setEnabled(true);
@@ -29,7 +29,7 @@ export default class poc5 implements Poc {
             const buildResult = character_builder(scene);
 
             const inputs = new InputController(scene);
-            const anims = new AnimacionController(buildResult.characterMesh, buildResult.characterAnimations);
+            const anims = new AnimacionController(buildResult.characterAnimations);
 
             // [ACTUALIZADO] Le inyectamos la escena y el Aggregate real de Havok para congelar las inercias
             const physics = new FisicaController(scene, buildResult.characterAggregate);

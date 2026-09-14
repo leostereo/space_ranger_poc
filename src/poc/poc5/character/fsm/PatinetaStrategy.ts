@@ -17,7 +17,7 @@ export class PatinetaStrategy implements LocomotionStrategy {
     this._contexto.animController.play("skate_ride");
   }
 
-  public actualizar(inputs: InputController, delta: number): void {
+  public actualizar(_inputs: InputController, _delta: number): void {
     console.log("[Patineta Loop] Avanzando sobre ruedas... presione Ctrl no hace nada acá.");
   }
 
