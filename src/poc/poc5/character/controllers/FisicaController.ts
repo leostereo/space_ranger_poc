@@ -44,7 +44,7 @@ export class FisicaController {
    * Procesa la rotación, el desplazamiento y el raycast del suelo.
    */
   // Buscá el método actualizarFisica dentro de FisicaController.ts y dejalo así:
-  public actualizarFisica(inputs: InputController, delta: number): void {
+  public actualizarFisica(inputs: InputController, _delta: number): void {
     this._updateGroundDetection();
 
     // Conectamos el hardware real con tu lógica de producción nativa
