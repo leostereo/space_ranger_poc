@@ -560,8 +560,8 @@ export class AssetManager {
         this.cams['arc'] = camera1
 
         const camera2 = new FollowCamera("mainFollowCamera", new Vector3(0, 5, 10), scene);
-        camera2.radius = 16;          // Distancia horizontal (hacia atrás) en unidades de Babylon
-        camera2.heightOffset = 2.0;  // Altura vertical por encima de la patineta
+        camera2.radius = 10;          // Distancia horizontal (hacia atrás) en unidades de Babylon
+        camera2.heightOffset = 4.0;  // Altura vertical por encima de la patineta
         camera2.rotationOffset = 180;// 180 grados para que mire exactamente desde atrás (0 la miraría de frente)
 
         // 4. Configurar la elasticidad/suavidad del seguimiento
