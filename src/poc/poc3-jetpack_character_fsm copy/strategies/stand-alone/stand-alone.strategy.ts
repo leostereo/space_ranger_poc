@@ -33,17 +33,29 @@ export async function buildStandAloneStrategy(
 
 ): Promise<StandAloneStrategyResult> {
   const initialGroundDetected = initialGroundDetectedOverride ?? (characterFsm.standAloneSubFsm.getState() !== "OnAir");
-  const physics = new StandAlonePhysicsController(scene, characterAggregate, () => input.current, initialGroundDetected);
-  const inputController = new StandAloneInputController(input, characterFsm);
+  const physics = new StandAlonePhysicsController(
+    scene,
+    characterAggregate,
+    () => input.current,
+    initialGroundDetected,
+    () => characterFsm.standAloneSubFsm.getActiveSubState(), // NUEVO
+  ); const inputController = new StandAloneInputController(input, characterFsm);
 
   // Único predicado — determina si se dispara, si el arma es visible, y si toca la
   // animación de apuntado en vez de la normal. Restringido a Idle/Walking/Running: no
   // durante JumpImpulseStart/OnAir/LandingX/EquippingHoverBoardStart.
   const isAimingActive = (): boolean => {
     const groundState = characterFsm.getActiveSubState();
-    const canAimHere = groundState === "Idle" || groundState === "Walking" || groundState === 'WalkingBackwards' || groundState === "Running";
-    return canAimHere && input.current.shoot;
-  };
+  // CAMBIADO — mismo fix que character.base.ts, ver comentario ahí.
+  const canAimHere =
+    groundState === "Idle" ||
+    groundState === "Walking" ||
+    groundState === "WalkingBackwards" ||
+    groundState === "Running" ||
+    groundState === "ShootingStrafeLeft" ||
+    groundState === "ShootingStrafeRight";
+  return canAimHere && input.current.shoot;
+};
 
   const animation = new StandAloneAnimationController(characterAnimations, characterFsm.standAloneSubFsm, isAimingActive); // CAMBIADO
   const weapon = new ProjectileWeaponController( // NUEVO

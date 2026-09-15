@@ -95,6 +95,9 @@ export default class CharacterBase implements Poc {
       isStandAloneForwardHeld: () => this.input.current.forward,
       isStandAloneBackwardHeld: () => this.input.current.backward,
       isRunHeld: () => this.input.current.cruise,
+      isLeftHeld: () => this.input.current.left,
+      isRightHeld: () => this.input.current.right,
+      isAimingHeld: () => this._isAimingActive(),
       onEnterHoverBoard: () => this._swapToHoverBoard(),
       getVerticalSpeed: () => this.activeStandAlonePhysics?.getLastImpactVerticalSpeed() ?? 0,
       getHorizontalSpeed: () => this.activeStandAlonePhysics?.getLastImpactHorizontalSpeed() ?? 0,
@@ -116,6 +119,7 @@ export default class CharacterBase implements Poc {
       onEnterDiving: () => { },
       onEnterGliderBoost: () => this.activeBoardPhysics?.onEnterGliderBoost(),
       onEnterRunningJumpOnAir: () => this.activeStandAlonePhysics?.applyRunningJumpImpulse(),
+      weaponRoot
     });
 
     this._wireJumpAnimationEvent();
@@ -141,20 +145,29 @@ export default class CharacterBase implements Poc {
     this._bindObservables();
   }
 
-  private _isAimingActive(): boolean {
-    if (this.fsm.getState() === "Jetpack") {
-      return this.fsm.jetpackSubFsm.getState() === "Shooting";
-    }
-    if (this.fsm.getState() === "StandAlone") {
-      const groundState = this.fsm.getActiveSubState();
-      const canAimHere = groundState === "Idle" || groundState === "Walking" || groundState === 'WalkingBackwards' || groundState === "Running";
-      return canAimHere && this.input.current.shoot;
-    }
-    if (this.fsm.getState() === "HoverBoard") { // NUEVO — sin restricción de sub-estado
-      return this.input.current.shoot;
-    }
-    return false;
+private _isAimingActive(): boolean {
+  if (this.fsm.getState() === "Jetpack") {
+    return this.fsm.jetpackSubFsm.getState() === "Shooting";
   }
+  if (this.fsm.getState() === "StandAlone") {
+    const groundState = this.fsm.getActiveSubState();
+    // CAMBIADO — sin ShootingStrafeLeft/Right acá, se rompía el ciclo apenas se
+    // entraba a strafe: isAimingHeld() pasaba a false, lo cual disparaba la salida
+    // inmediata de OnGroundFsm de vuelta a Idle (loop Idle<->Strafe cada tick).
+    const canAimHere =
+      groundState === "Idle" ||
+      groundState === "Walking" ||
+      groundState === "WalkingBackwards" ||
+      groundState === "Running" ||
+      groundState === "ShootingStrafeLeft" ||
+      groundState === "ShootingStrafeRight";
+    return canAimHere && this.input.current.shoot;
+  }
+  if (this.fsm.getState() === "HoverBoard") {
+    return this.input.current.shoot;
+  }
+  return false;
+}
 
   private _updateWeaponVisibility(): void {
     this.weaponRoot?.setEnabled(this._isAimingActive());

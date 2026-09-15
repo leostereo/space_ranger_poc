@@ -74,6 +74,9 @@ export interface ICharacterAnimations {
     walking_backwards_aimming: AnimationGroup,
     running_aimming: AnimationGroup,
 
+    strafe_right: AnimationGroup,
+    strafe_left: AnimationGroup,
+
 }
 
 export interface MeshInstanceResult {
@@ -123,7 +126,7 @@ export class AssetManager {
             };
 
             // --- RECURSO 2: Modelo GLB Externo ---
-            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver9.glb");
+            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver10.glb");
             tareaGLB.onSuccess = (task) => {
                 // Buscamos el nodo raíz que crea automáticamente Babylon para los GLB
 
@@ -366,6 +369,9 @@ export class AssetManager {
         const walking_backwards_aimming = find("walking back aim");
         const running_aimming = find("running aim");
 
+        const strafe_right = find("strafe left"); //both are inverted
+        const strafe_left = find("strafe right");
+
 
 
 
@@ -373,7 +379,7 @@ export class AssetManager {
             !standing_to_crouch || !crouch_to_standing || !jump || !normal_landing || !crash_landing || !roll_landing || !falling_idle ||
             !flying || !floating || !jump_on_board || !walking_forward || !walking_backwards ||
             !running_normal || !running_fast || !aiming_jetpack || !crouch_aimming || !idle_aimming || !walking_backwards_aimming ||
-            !walking_aimming || !running_aimming) {
+            !walking_aimming || !running_aimming || !strafe_right || !strafe_left) {
             console.warn("AssetManager: faltan animaciones de 'character' — revisar nombres de clips en el GLB.");
             return;
         }
@@ -382,7 +388,8 @@ export class AssetManager {
             standing_idle, cruising_forward_idle, cruising_faster_idle, cruising_maxVel_idle,
             standing_to_crouch, crouch_to_standing, jump, normal_landing, crash_landing, roll_landing, floating, flying,
             falling_idle, jump_on_board, walking_forward, walking_backwards,running_fast, running_normal, aiming_jetpack,
-            jump_while_running, crouch_aimming, idle_aimming, walking_aimming, walking_backwards_aimming, running_aimming
+            jump_while_running, crouch_aimming, idle_aimming, walking_aimming, walking_backwards_aimming, running_aimming,
+            strafe_right, strafe_left
         };
 
         Object.values(mold).forEach((ag) => {
@@ -431,6 +438,8 @@ export class AssetManager {
             walking_aimming: cloneOne(mold.walking_aimming),
             walking_backwards_aimming: cloneOne(mold.walking_backwards_aimming),
             running_aimming: cloneOne(mold.running_aimming),
+            strafe_right: cloneOne(mold.strafe_right),
+            strafe_left: cloneOne(mold.strafe_left)
         };
     }
 
@@ -551,7 +560,7 @@ export class AssetManager {
         this.cams['arc'] = camera1
 
         const camera2 = new FollowCamera("mainFollowCamera", new Vector3(0, 5, 10), scene);
-        camera2.radius = 6;          // Distancia horizontal (hacia atrás) en unidades de Babylon
+        camera2.radius = 16;          // Distancia horizontal (hacia atrás) en unidades de Babylon
         camera2.heightOffset = 2.0;  // Altura vertical por encima de la patineta
         camera2.rotationOffset = 180;// 180 grados para que mire exactamente desde atrás (0 la miraría de frente)
 
