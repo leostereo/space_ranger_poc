@@ -90,6 +90,10 @@ export class StandAloneAnimationController implements IAnimationController {
         return { animation: this.animations.walking_backwards, loop: true };
       case "Running":
         return { animation: this.animations.running_normal, loop: true };
+      case "ShootingStrafeLeft":
+        return { animation: this.animations.strafe_left ?? this.animations.walking_forward, loop: true };
+      case "ShootingStrafeRight":
+        return { animation: this.animations.strafe_right ?? this.animations.walking_forward, loop: true };
       case "EquippingHoverBoardStart":
         return { animation: this.animations.jump_on_board, loop: false };
       case "JumpImpulseStart":

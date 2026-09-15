@@ -1,143 +1,479 @@
-diff --git a/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts b/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts
-index dd63ae4..e7e9c82 100644
---- a/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts	
-+++ b/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts	
-@@ -17,6 +17,7 @@ export interface CharacterFsmDeps {
-   onEnterEquippingJetpack: () => void;
-   onEnterStandAlone: () => void;
-   isGroundDetected: () => boolean;
-+  isBoardGroundDetected: () => boolean; // ← nuevo, raycast propio del board
-   onEnterOnAir: () => void;
-   /** Threading hacia JetpackFsmDeps, mismo criterio que isGroundDetected/onEnterOnAir hacia StandAloneFsmDeps. */
-   isCruiseHeld: () => boolean;
-@@ -43,6 +44,8 @@ export interface CharacterFsmDeps {
-   isBoostSettled: () => boolean;
-   onEnterDiving: () => void;
-   onEnterGliderBoost: () => void;
+diff --git a/cambios b/cambios
+index 5663fc1..e69de29 100644
+--- a/cambios
++++ b/cambios
+@@ -1,143 +0,0 @@
+-diff --git a/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts b/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts
+-index dd63ae4..e7e9c82 100644
+---- a/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts	
+-+++ b/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts	
+-@@ -17,6 +17,7 @@ export interface CharacterFsmDeps {
+-   onEnterEquippingJetpack: () => void;
+-   onEnterStandAlone: () => void;
+-   isGroundDetected: () => boolean;
+-+  isBoardGroundDetected: () => boolean; // ← nuevo, raycast propio del board
+-   onEnterOnAir: () => void;
+-   /** Threading hacia JetpackFsmDeps, mismo criterio que isGroundDetected/onEnterOnAir hacia StandAloneFsmDeps. */
+-   isCruiseHeld: () => boolean;
+-@@ -43,6 +44,8 @@ export interface CharacterFsmDeps {
+-   isBoostSettled: () => boolean;
+-   onEnterDiving: () => void;
+-   onEnterGliderBoost: () => void;
+-+
+-+
+- }
+- 
+- export class CharacterFsm extends BaseFsm<CharacterMainState> {
+-@@ -68,7 +71,7 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
+-       isCruiseHeld: this.deps.isCruiseHeld,
+-     });
+-     this.boardSubFsm = new BoardFsm({
+--      isGroundDetected: this.deps.isGroundDetected,
+-+      isGroundDetected: this.deps.isBoardGroundDetected,
+-       groundLostElapsed: this.deps.groundLostElapsed,
+-       coyoteTime: this.deps.coyoteTime,
+-       onEnterHovering: this.deps.onEnterHovering,
+-diff --git a/src/poc/poc3-jetpack_character_fsm copy/character.base.ts b/src/poc/poc3-jetpack_character_fsm copy/character.base.ts
+-index 6207a9f..b9e16a2 100644
+---- a/src/poc/poc3-jetpack_character_fsm copy/character.base.ts	
+-+++ b/src/poc/poc3-jetpack_character_fsm copy/character.base.ts	
+-@@ -16,6 +16,9 @@ import type { IVehicleStrategy } from "./strategies/contracts/ivehicle-strategy"
+- import { board_builder } from "./strategies/hover-board/board.builder";
+- import { generalConfig } from "../config.general";
+- import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
+-+import { HoverBoardPhysicsController } from "./strategies/hover-board/hover-board.physics.controller";
+-+import { HoverBoardInputAdapter } from "./strategies/hover-board/hover-board.input.adapter";
+-+import { buildHoverBoardStrategy } from "./strategies/hover-board/hover-board.strategy";
+- 
+- 
+- const JUMP_IMPULSE_FRAME = 30;
+-@@ -43,6 +46,9 @@ export default class CharacterBase implements Poc {
+-   private _activeBoardMesh: Mesh | null = null;
+-   private _activeBoardAggregate: PhysicsAggregate | null = null;
+- 
+-+  private activeBoardPhysics: HoverBoardPhysicsController | null = null;
+-+  private _activeBoardInputAdapter: HoverBoardInputAdapter | null = null;
+-+
+-   async build(scene: Scene): Promise<void> {
+-     this.scene = scene;
+-     this.groundAggregates = scene_builder(scene);
+-@@ -80,6 +86,7 @@ export default class CharacterBase implements Poc {
+-       isBoostSettled: () => true,
+-       onEnterDiving: () => { },
+-       onEnterGliderBoost: () => { },
+-+      isBoardGroundDetected: () => this.activeBoardPhysics?.isGroundDetected() ?? false,
+-     });
+- 
+-     this._wireJumpAnimationEvent();
+-@@ -176,6 +183,9 @@ export default class CharacterBase implements Poc {
+-       this._activeBoardMesh = null;
+-       this._activeBoardAggregate = null;
+- 
+-+      this.activeBoardPhysics = null;
+-+      this._activeBoardInputAdapter = null;
+-+
+-       this.characterAggregate = new PhysicsAggregate(
+-         this.characterMesh,
+-         PhysicsShapeType.CAPSULE,
+-@@ -225,10 +235,18 @@ export default class CharacterBase implements Poc {
+-     this._activeBoardMesh = boardMesh;
+-     this._activeBoardAggregate = boardAggregate;
+- 
+--    // TODO: HoverBoardStrategy real (physics/input/animation portados de BoardController) —
+--    // placeholder por ahora, sólo para confirmar que el board se crea y el parenting queda bien.
+--    this.activeStrategy = null;
+--    console.log("[CharacterFsm] HoverBoard: board creado + parenting aplicado. Falta HoverBoardStrategy real.");
+-+    const { strategy, physicsController } = await buildHoverBoardStrategy(
+-+      this.scene,
+-+      boardMesh,
+-+      boardAggregate,
+-+      this.input,
+-+      this.fsm,
+-+    );
+-+    this.activeStrategy = strategy;
+-+    this.activeBoardPhysics = physicsController;
+-+    this._activeBoardInputAdapter = new HoverBoardInputAdapter(this.input);
+-+
+-+
+-   }
+- 
+-   dispose(): void {
+-diff --git a/src/poc/poc3-jetpack_character_fsm copy/strategies/hover-board/hover-board.input.adapter.ts b/src/poc/poc3-jetpack_character_fsm copy/strategies/hover-board/hover-board.input.adapter.ts
+-index 9fe9f9b..8706c05 100644
+---- a/src/poc/poc3-jetpack_character_fsm copy/strategies/hover-board/hover-board.input.adapter.ts	
+-+++ b/src/poc/poc3-jetpack_character_fsm copy/strategies/hover-board/hover-board.input.adapter.ts	
+-@@ -1,16 +1,19 @@
+-+// src/poc4-.../strategies/hover-board/hover-board.input.adapter.ts
+- import type { CharacterInput } from "../../character.input";
+--import type { BoardInputState } from "./board-fsm/board.input.contract"; // o donde termine viviendo el type
+-+
+-+/** Mismo shape que BoardInputState de POC2 — se redefine acá para no importar
+-+ * board.input.ts entero (esa clase trae sus propios window listeners, que no queremos duplicar). */
+-+export interface BoardInputState {
+-+  forward: boolean;
+-+  turnLeft: boolean;
+-+  turnRight: boolean;
+-+  pitchDown: boolean;
+-+}
+- 
+- /**
+-- * Traduce CharacterInput (WASD/Shift/Space, ya escuchado por un solo listener global)
+-- * a la forma que espera BoardController (BoardInputState), sin duplicar listeners de teclado.
+-- * Mapeo (placeholder, a confirmar con el feel real una vez portado el controller):
+-- *   forward   (Shift en POC2) <- CharacterInput.cruise (Shift)
+-- *   pitchDown (W en POC2)     <- CharacterInput.forward (W)
+-- *   turnLeft  (A)             <- CharacterInput.left (A)
+-- *   turnRight (D)             <- CharacterInput.right (D)
+-- *   jump      (Space)         <- CharacterInput.consumeJumpRequest() (mismo flag que StandAlone/salto)
+-- *   testImpulse (T)           <- no mapeado todavía, siempre false (feature de debug de POC2)
+-+ * Traduce CharacterInput (un solo listener global de teclado) a la forma que espera
+-+ * HoverBoardPhysicsController. Mapeo confirmado (no tocar): Shift=forward del board,
+-+ * W=pitchDown, A/D=turn. Ya funciona bien así.
+-  */
+- export class HoverBoardInputAdapter {
+-   constructor(private characterInput: CharacterInput) {}
+-@@ -24,12 +27,4 @@ export class HoverBoardInputAdapter {
+-       turnRight: right,
+-     };
+-   }
+--
+--  consumeJumpRequest(): boolean {
+--    return this.characterInput.consumeJumpRequest();
+--  }
+--
+--  consumeTestImpulseRequest(): boolean {
+--    return false; // placeholder — sin key mapeada todavía en CharacterInput
+--  }
+- }
+-\ No newline at end of file
+diff --git a/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.stand-alone.on-ground.ts b/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.stand-alone.on-ground.ts
+index 830d670..53af68c 100644
+--- a/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.stand-alone.on-ground.ts	
++++ b/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.stand-alone.on-ground.ts	
+@@ -5,15 +5,20 @@ export type OnGroundSubState =
+   | "Walking"
+   | "WalkingBackwards"
+   | "Running"
++  | "ShootingStrafeLeft"
++  | "ShootingStrafeRight"
+   | "EquippingHoverBoardStart"
+   | "LandingSoft"
+   | "LandingRoll"
+   | "LandingCrash";
+ 
+ export interface OnGroundFsmDeps {
+-  isForwardHeld: () => boolean; // CAMBIADO — antes isMoveHeld (juntaba forward|backward)
+-  isBackwardHeld: () => boolean; // NUEVO
++  isForwardHeld: () => boolean;
++  isBackwardHeld: () => boolean;
+   isRunHeld: () => boolean;
++  isLeftHeld: () => boolean;   // NUEVO
++  isRightHeld: () => boolean;  // NUEVO
++  isAimingHeld: () => boolean; // NUEVO — mismo booleano que ya controla el arma/disparo
+   /** m/s, negativo = cayendo. Leído sólo en notifyLanding(). */
+   getVerticalSpeed: () => number;
+   /** Magnitud XZ, m/s. Leído sólo en notifyLanding(). */
+@@ -35,7 +40,10 @@ export class OnGroundFsm extends BaseFsm<OnGroundSubState> {
+     this.transitions = {
+       Idle: {
+         Walking: () => this.deps.isForwardHeld() && !this.deps.isBackwardHeld(),
+-        WalkingBackwards: () => this.deps.isBackwardHeld() && !this.deps.isForwardHeld(), // NUEVO
++        WalkingBackwards: () => this.deps.isBackwardHeld() && !this.deps.isForwardHeld(),
++        // NUEVO — sólo puede entrar desde Idle: _canStrafe() ya exige !forward && !backward.
++        ShootingStrafeLeft: () => this._canStrafe() && this.deps.isLeftHeld() && !this.deps.isRightHeld(),
++        ShootingStrafeRight: () => this._canStrafe() && this.deps.isRightHeld() && !this.deps.isLeftHeld(),
+         LandingSoft: true,
+         LandingRoll: true,
+         LandingCrash: true,
+@@ -43,12 +51,11 @@ export class OnGroundFsm extends BaseFsm<OnGroundSubState> {
+       Walking: {
+         Idle: () => !this.deps.isForwardHeld(),
+         Running: () => this.deps.isForwardHeld() && this.deps.isRunHeld(),
+-        WalkingBackwards: () => this.deps.isBackwardHeld() && !this.deps.isForwardHeld(), // NUEVO
++        WalkingBackwards: () => this.deps.isBackwardHeld() && !this.deps.isForwardHeld(),
+         LandingSoft: true,
+         LandingRoll: true,
+         LandingCrash: true,
+       },
+-      // NUEVO — mismo criterio que Walking, pero sin Running: no hay "correr hacia atrás".
+       WalkingBackwards: {
+         Idle: () => !this.deps.isBackwardHeld(),
+         Walking: () => this.deps.isForwardHeld() && !this.deps.isBackwardHeld(),
+@@ -59,7 +66,7 @@ export class OnGroundFsm extends BaseFsm<OnGroundSubState> {
+       Running: {
+         Idle: () => !this.deps.isForwardHeld(),
+         Walking: () => this.deps.isForwardHeld() && !this.deps.isRunHeld(),
+-        WalkingBackwards: () => this.deps.isBackwardHeld() && !this.deps.isForwardHeld(), // NUEVO
++        WalkingBackwards: () => this.deps.isBackwardHeld() && !this.deps.isForwardHeld(),
+         EquippingHoverBoardStart: true,
+         LandingSoft: true,
+         LandingRoll: true,
+@@ -68,11 +75,24 @@ export class OnGroundFsm extends BaseFsm<OnGroundSubState> {
+       EquippingHoverBoardStart: {
+         Idle: true,
+       },
+-      // NUEVO: WalkingBackwards también como posible origen de landing — igual motivo que
+-      // Idle/Walking/Running (onGroundSubFsm puede quedar "congelado" ahí mientras estaba OnAir).
+       LandingSoft: { Idle: true },
+       LandingRoll: { Idle: true },
+       LandingCrash: { Idle: true },
 +
-+
- }
- 
- export class CharacterFsm extends BaseFsm<CharacterMainState> {
-@@ -68,7 +71,7 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
-       isCruiseHeld: this.deps.isCruiseHeld,
-     });
-     this.boardSubFsm = new BoardFsm({
--      isGroundDetected: this.deps.isGroundDetected,
-+      isGroundDetected: this.deps.isBoardGroundDetected,
-       groundLostElapsed: this.deps.groundLostElapsed,
-       coyoteTime: this.deps.coyoteTime,
-       onEnterHovering: this.deps.onEnterHovering,
-diff --git a/src/poc/poc3-jetpack_character_fsm copy/character.base.ts b/src/poc/poc3-jetpack_character_fsm copy/character.base.ts
-index 6207a9f..b9e16a2 100644
---- a/src/poc/poc3-jetpack_character_fsm copy/character.base.ts	
-+++ b/src/poc/poc3-jetpack_character_fsm copy/character.base.ts	
-@@ -16,6 +16,9 @@ import type { IVehicleStrategy } from "./strategies/contracts/ivehicle-strategy"
- import { board_builder } from "./strategies/hover-board/board.builder";
- import { generalConfig } from "../config.general";
- import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
-+import { HoverBoardPhysicsController } from "./strategies/hover-board/hover-board.physics.controller";
-+import { HoverBoardInputAdapter } from "./strategies/hover-board/hover-board.input.adapter";
-+import { buildHoverBoardStrategy } from "./strategies/hover-board/hover-board.strategy";
- 
- 
- const JUMP_IMPULSE_FRAME = 30;
-@@ -43,6 +46,9 @@ export default class CharacterBase implements Poc {
-   private _activeBoardMesh: Mesh | null = null;
-   private _activeBoardAggregate: PhysicsAggregate | null = null;
- 
-+  private activeBoardPhysics: HoverBoardPhysicsController | null = null;
-+  private _activeBoardInputAdapter: HoverBoardInputAdapter | null = null;
-+
-   async build(scene: Scene): Promise<void> {
-     this.scene = scene;
-     this.groundAggregates = scene_builder(scene);
-@@ -80,6 +86,7 @@ export default class CharacterBase implements Poc {
-       isBoostSettled: () => true,
-       onEnterDiving: () => { },
-       onEnterGliderBoost: () => { },
-+      isBoardGroundDetected: () => this.activeBoardPhysics?.isGroundDetected() ?? false,
-     });
- 
-     this._wireJumpAnimationEvent();
-@@ -176,6 +183,9 @@ export default class CharacterBase implements Poc {
-       this._activeBoardMesh = null;
-       this._activeBoardAggregate = null;
- 
-+      this.activeBoardPhysics = null;
-+      this._activeBoardInputAdapter = null;
-+
-       this.characterAggregate = new PhysicsAggregate(
-         this.characterMesh,
-         PhysicsShapeType.CAPSULE,
-@@ -225,10 +235,18 @@ export default class CharacterBase implements Poc {
-     this._activeBoardMesh = boardMesh;
-     this._activeBoardAggregate = boardAggregate;
- 
--    // TODO: HoverBoardStrategy real (physics/input/animation portados de BoardController) —
--    // placeholder por ahora, sólo para confirmar que el board se crea y el parenting queda bien.
--    this.activeStrategy = null;
--    console.log("[CharacterFsm] HoverBoard: board creado + parenting aplicado. Falta HoverBoardStrategy real.");
-+    const { strategy, physicsController } = await buildHoverBoardStrategy(
-+      this.scene,
-+      boardMesh,
-+      boardAggregate,
-+      this.input,
-+      this.fsm,
-+    );
-+    this.activeStrategy = strategy;
-+    this.activeBoardPhysics = physicsController;
-+    this._activeBoardInputAdapter = new HoverBoardInputAdapter(this.input);
-+
-+
-   }
- 
-   dispose(): void {
-diff --git a/src/poc/poc3-jetpack_character_fsm copy/strategies/hover-board/hover-board.input.adapter.ts b/src/poc/poc3-jetpack_character_fsm copy/strategies/hover-board/hover-board.input.adapter.ts
-index 9fe9f9b..8706c05 100644
---- a/src/poc/poc3-jetpack_character_fsm copy/strategies/hover-board/hover-board.input.adapter.ts	
-+++ b/src/poc/poc3-jetpack_character_fsm copy/strategies/hover-board/hover-board.input.adapter.ts	
-@@ -1,16 +1,19 @@
-+// src/poc4-.../strategies/hover-board/hover-board.input.adapter.ts
- import type { CharacterInput } from "../../character.input";
--import type { BoardInputState } from "./board-fsm/board.input.contract"; // o donde termine viviendo el type
-+
-+/** Mismo shape que BoardInputState de POC2 — se redefine acá para no importar
-+ * board.input.ts entero (esa clase trae sus propios window listeners, que no queremos duplicar). */
-+export interface BoardInputState {
-+  forward: boolean;
-+  turnLeft: boolean;
-+  turnRight: boolean;
-+  pitchDown: boolean;
-+}
- 
- /**
-- * Traduce CharacterInput (WASD/Shift/Space, ya escuchado por un solo listener global)
-- * a la forma que espera BoardController (BoardInputState), sin duplicar listeners de teclado.
-- * Mapeo (placeholder, a confirmar con el feel real una vez portado el controller):
-- *   forward   (Shift en POC2) <- CharacterInput.cruise (Shift)
-- *   pitchDown (W en POC2)     <- CharacterInput.forward (W)
-- *   turnLeft  (A)             <- CharacterInput.left (A)
-- *   turnRight (D)             <- CharacterInput.right (D)
-- *   jump      (Space)         <- CharacterInput.consumeJumpRequest() (mismo flag que StandAlone/salto)
-- *   testImpulse (T)           <- no mapeado todavía, siempre false (feature de debug de POC2)
-+ * Traduce CharacterInput (un solo listener global de teclado) a la forma que espera
-+ * HoverBoardPhysicsController. Mapeo confirmado (no tocar): Shift=forward del board,
-+ * W=pitchDown, A/D=turn. Ya funciona bien así.
-  */
- export class HoverBoardInputAdapter {
-   constructor(private characterInput: CharacterInput) {}
-@@ -24,12 +27,4 @@ export class HoverBoardInputAdapter {
-       turnRight: right,
++      ShootingStrafeLeft: {
++        Idle: () => !this.deps.isAimingHeld() || !this.deps.isLeftHeld() || this.deps.isForwardHeld() || this.deps.isBackwardHeld(),
++        ShootingStrafeRight: () => this._canStrafe() && this.deps.isRightHeld() && !this.deps.isLeftHeld(),
++        LandingSoft: true,
++        LandingRoll: true,
++        LandingCrash: true,
++      },
++      ShootingStrafeRight: {
++        Idle: () => !this.deps.isAimingHeld() || !this.deps.isRightHeld() || this.deps.isForwardHeld() || this.deps.isBackwardHeld(),
++        ShootingStrafeLeft: () => this._canStrafe() && this.deps.isLeftHeld() && !this.deps.isRightHeld(),
++        LandingSoft: true,
++        LandingRoll: true,
++        LandingCrash: true,
++      },
      };
    }
+ 
+@@ -112,7 +132,7 @@ export class OnGroundFsm extends BaseFsm<OnGroundSubState> {
+     const isFastVerticalFall = verticalSpeed <= LANDING_CRASH_VERTICAL_THRESHOLD;
+     const ratio = horizontalSpeed / Math.max(Math.abs(verticalSpeed), 0.001);
+     const isFastHorizontal = ratio > LANDING_ROLL_RATIO_THRESHOLD;
 -
--  consumeJumpRequest(): boolean {
--    return this.characterInput.consumeJumpRequest();
--  }
--
--  consumeTestImpulseRequest(): boolean {
--    return false; // placeholder — sin key mapeada todavía en CharacterInput
--  }
++    console.log(verticalSpeed)
+     if (isFastVerticalFall) {
+       this.setState("LandingCrash");
+     } else if (isFastHorizontal) {
+@@ -137,6 +157,10 @@ export class OnGroundFsm extends BaseFsm<OnGroundSubState> {
+     }
+   }
+ 
++  private _canStrafe(): boolean {
++    return this.deps.isAimingHeld() && !this.deps.isForwardHeld() && !this.deps.isBackwardHeld();
++  }
++
+   protected onEnter(_state: OnGroundSubState): void { }
+   protected onExit(_state: OnGroundSubState): void { }
+   dispose(): void { }
+diff --git a/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.stand-alone.ts b/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.stand-alone.ts
+index 8496a51..6f027b1 100644
+--- a/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.stand-alone.ts	
++++ b/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.stand-alone.ts	
+@@ -6,8 +6,8 @@ export type StandAloneSubState = "OnGround" | "JumpImpulseStart" | "RunningJumpI
+ export interface StandAloneFsmDeps {
+   isGroundDetected: () => boolean;
+   onEnterOnAir: () => void;
+-  isForwardHeld: () => boolean; // CAMBIADO
+-  isBackwardHeld: () => boolean; // NUEVO
++  isForwardHeld: () => boolean;
++  isBackwardHeld: () => boolean;
+   isRunHeld: () => boolean;
+   getVerticalSpeed: () => number;
+   getHorizontalSpeed: () => number;
+@@ -15,7 +15,10 @@ export interface StandAloneFsmDeps {
+   onExitLandingRoll: () => void;
+   onEnterJumpWindup: () => void;
+   onExitJumpWindup: () => void;
+-  onEnterRunningJumpOnAir: () => void; // NUEVO
++  onEnterRunningJumpOnAir: () => void;
++  isLeftHeld: () => boolean;
++  isRightHeld: () => boolean;
++  isAimingHeld: () => boolean;
  }
-\ No newline at end of file
+ 
+ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
+@@ -30,8 +33,11 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
+ 
+     this.onGroundSubFsm = new OnGroundFsm({
+       isForwardHeld: this.deps.isForwardHeld, // CAMBIADO
+-      isBackwardHeld: this.deps.isBackwardHeld, // NUEVO
++      isBackwardHeld: this.deps.isBackwardHeld,
+       isRunHeld: this.deps.isRunHeld,
++      isLeftHeld: this.deps.isLeftHeld,    
++      isRightHeld: this.deps.isRightHeld,  
++      isAimingHeld: this.deps.isAimingHeld,
+       getVerticalSpeed: this.deps.getVerticalSpeed,
+       getHorizontalSpeed: this.deps.getHorizontalSpeed,
+       onEnterLandingRoll: this.deps.onEnterLandingRoll,
+@@ -41,7 +47,7 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
+     this.transitions = {
+       OnGround: {
+         JumpImpulseStart: true,
+-        RunningJumpImpulseStart: true, // NUEVO
++        RunningJumpImpulseStart: true,
+         OnAir: () => !this.deps.isGroundDetected() && !this._isLandingInProgress(),
+       },
+       JumpImpulseStart: {
+diff --git a/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts b/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts
+index d990014..5ee9b88 100644
+--- a/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts	
++++ b/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts	
+@@ -19,14 +19,17 @@ export interface CharacterFsmDeps {
+   isGroundDetected: () => boolean;
+   isBoardGroundDetected: () => boolean;
+   onEnterOnAir: () => void;
+-  onEnterRunningJumpOnAir: () => void; // NUEVO
++  onEnterRunningJumpOnAir: () => void; 
+   isCruiseHeld: () => boolean;
+   isShootHeld: () => boolean;
+   onEnterShooting: () => void;
+   onExitShooting: () => void; 
+-  isStandAloneForwardHeld: () => boolean; // NUEVO — distinto de isForwardHeld (ese es del board)
+-  isStandAloneBackwardHeld: () => boolean; // NUEVO
++  isStandAloneForwardHeld: () => boolean;
++  isStandAloneBackwardHeld: () => boolean; 
+   isRunHeld: () => boolean;
++  isLeftHeld: () => boolean;
++  isRightHeld: () => boolean;
++  isAimingHeld: () => boolean; 
+   onEnterHoverBoard: () => void;
+   /** Threading hacia OnGroundFsmDeps, vía StandAloneFsmDeps — mismo criterio que isMoveHeld/isRunHeld. */
+   getVerticalSpeed: () => number;
+@@ -65,9 +68,12 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
+     this.standAloneSubFsm = new StandAloneFsm({
+       isGroundDetected: this.deps.isGroundDetected,
+       onEnterOnAir: this.deps.onEnterOnAir,
+-      isForwardHeld: this.deps.isStandAloneForwardHeld, // CAMBIADO — mapea al dep sin colisión
+-      isBackwardHeld: this.deps.isStandAloneBackwardHeld, // NUEVO
++      isForwardHeld: this.deps.isStandAloneForwardHeld, 
++      isBackwardHeld: this.deps.isStandAloneBackwardHeld, 
+       isRunHeld: this.deps.isRunHeld,
++      isLeftHeld: this.deps.isLeftHeld,     
++      isRightHeld: this.deps.isRightHeld,   
++      isAimingHeld: this.deps.isAimingHeld, 
+       getVerticalSpeed: this.deps.getVerticalSpeed,
+       getHorizontalSpeed: this.deps.getHorizontalSpeed,
+       onEnterLandingRoll: this.deps.onEnterLandingRoll,
+diff --git a/src/poc/poc3-jetpack_character_fsm copy/character.base.ts b/src/poc/poc3-jetpack_character_fsm copy/character.base.ts
+index 395e4bc..4329c24 100644
+--- a/src/poc/poc3-jetpack_character_fsm copy/character.base.ts	
++++ b/src/poc/poc3-jetpack_character_fsm copy/character.base.ts	
+@@ -95,6 +95,9 @@ export default class CharacterBase implements Poc {
+       isStandAloneForwardHeld: () => this.input.current.forward,
+       isStandAloneBackwardHeld: () => this.input.current.backward,
+       isRunHeld: () => this.input.current.cruise,
++      isLeftHeld: () => this.input.current.left,
++      isRightHeld: () => this.input.current.right,
++      isAimingHeld: () => this._isAimingActive(),
+       onEnterHoverBoard: () => this._swapToHoverBoard(),
+       getVerticalSpeed: () => this.activeStandAlonePhysics?.getLastImpactVerticalSpeed() ?? 0,
+       getHorizontalSpeed: () => this.activeStandAlonePhysics?.getLastImpactHorizontalSpeed() ?? 0,
+diff --git a/src/poc/poc3-jetpack_character_fsm copy/strategies/stand-alone/stand-alone.physics.controller.ts b/src/poc/poc3-jetpack_character_fsm copy/strategies/stand-alone/stand-alone.physics.controller.ts
+index 678bafa..50eadb5 100644
+--- a/src/poc/poc3-jetpack_character_fsm copy/strategies/stand-alone/stand-alone.physics.controller.ts	
++++ b/src/poc/poc3-jetpack_character_fsm copy/strategies/stand-alone/stand-alone.physics.controller.ts	
+@@ -7,13 +7,14 @@ import { generalConfig } from "@/poc/config.general";
+ import type { IPhysicsController } from "../contracts/iphysics-controller";
+ import type { CharacterInputState } from "../../character.input";
+ import { Color3, RayHelper } from "@babylonjs/core";
++import { OnGroundSubState } from "../../character-fsm/character.fsm.stand-alone.on-ground";
+ 
+ const WALK_SPEED = 4;
+ const RUN_SPEED = 7;
+ const TURN_SPEED = Math.PI;
+ const GROUND_FRICTION = 0.8;
+ const GROUND_RESTITUTION = 0;
+-const GROUND_RAY_MARGIN = 0.5;
++const GROUND_RAY_MARGIN = 0.15;
+ const UPWARD_VELOCITY_THRESHOLD = 0.5;
+ const JUMP_IMPULSE = 10;
+ const ROLL_INITIAL_SPEED = 8; // m/s, ajustar a gusto
+@@ -22,6 +23,7 @@ const JUMP_WINDUP_DAMPING_RATE = 8; // más alto = frena más rápido
+ const RUNNING_JUMP_VERTICAL_IMPULSE = 4; // más bajo que JUMP_IMPULSE (10) — trayectoria más chata
+ const RUNNING_JUMP_FORWARD_BOOST = 8;    // más alto que antes (6) — más alcance para cruzar el hueco
+ const WALK_BACKWARD_SPEED = 2; // más lento que WALK_SPEED (4) — retroceder es más cauto que avanzar
++const STRAFE_SPEED = 2.2; // más lento que WALK_SPEED (4) — strafe táctico
+ 
+ export class StandAlonePhysicsController implements IPhysicsController {
+   private _groundDetected = true;
+@@ -38,6 +40,7 @@ export class StandAlonePhysicsController implements IPhysicsController {
+     private characterAggregate: PhysicsAggregate,
+     private getInput: () => CharacterInputState,
+     initialGroundDetected: boolean,
++    private getSubState: () => OnGroundSubState | "JumpImpulseStart" | "RunningJumpImpulseStart" | "OnAir", // NUEVO
+   ) {
+     this._groundDetected = initialGroundDetected;
+     this._setupFallAndLanding();
+@@ -79,8 +82,19 @@ export class StandAlonePhysicsController implements IPhysicsController {
+       return;
+     }
+ 
+-    const { forward, backward, left, right, cruise } = this.getInput();
++    // if (this._movementLocked) {
++    //   this.characterAggregate.body.setLinearVelocity(Vector3.Zero());
++    //   return;
++    // }
++
++    // NUEVO — strafe: traslada sin rotar, en vez de _applyTurn + _applyMove normales.
++    const subState = this.getSubState();
++    if (subState === "ShootingStrafeLeft" || subState === "ShootingStrafeRight") {
++      this._applyStrafe(subState === "ShootingStrafeLeft" ? -1 : 1);
++      return;
++    }
+ 
++    const { forward, backward, left, right, cruise } = this.getInput();
+     this._applyTurn(left, right);
+     this._applyMove(forward, backward, cruise);
+   }
+@@ -147,6 +161,19 @@ export class StandAlonePhysicsController implements IPhysicsController {
+     );
+   }
+ 
++  /** Traslada lateralmente sin tocar la rotación — dirSign: -1 = izquierda, 1 = derecha.
++ * Usa el `right` del transform, no un giro, así el personaje sigue mirando al frente
++ * mientras se desplaza de costado (a diferencia de _applyTurn, que rota el modelo). */
++  private _applyStrafe(dirSign: -1 | 1): void {
++    const currentVelocity = this.characterAggregate.body.getLinearVelocity();
++    const verticalVelocity = this._groundDetected ? 0 : currentVelocity.y;
++    const right = this.characterAggregate.transformNode.right.scale(dirSign);
++
++    this.characterAggregate.body.setLinearVelocity(
++      new Vector3(right.x * STRAFE_SPEED, verticalVelocity, right.z * STRAFE_SPEED),
++    );
++  }
++
+   /** Suma un boost horizontal extra en la dirección hacia donde mira el personaje,
+    * ENCIMA de la velocidad de carrera que ya trae (no la pisa como applyJumpImpulse). */
+   applyRunningJumpImpulse(): void {
+@@ -212,7 +239,7 @@ export class StandAlonePhysicsController implements IPhysicsController {
+     //console.log(hit?.distance, hit?.pickedMesh?.name, hit?.hit, verticalVelocity, isMovingUpward)
+ 
+     this._groundDetected = !!(hit && hit.hit) && !isMovingUpward;
+-
++    console.log(this._groundDetected);
+   }
+ 
+   getLastImpactVerticalSpeed(): number {
+diff --git a/src/poc/poc3-jetpack_character_fsm copy/strategies/stand-alone/stand-alone.strategy.ts b/src/poc/poc3-jetpack_character_fsm copy/strategies/stand-alone/stand-alone.strategy.ts
+index 61fbadc..0a25555 100644
+--- a/src/poc/poc3-jetpack_character_fsm copy/strategies/stand-alone/stand-alone.strategy.ts	
++++ b/src/poc/poc3-jetpack_character_fsm copy/strategies/stand-alone/stand-alone.strategy.ts	
+@@ -33,8 +33,13 @@ export async function buildStandAloneStrategy(
+ 
+ ): Promise<StandAloneStrategyResult> {
+   const initialGroundDetected = initialGroundDetectedOverride ?? (characterFsm.standAloneSubFsm.getState() !== "OnAir");
+-  const physics = new StandAlonePhysicsController(scene, characterAggregate, () => input.current, initialGroundDetected);
+-  const inputController = new StandAloneInputController(input, characterFsm);
++  const physics = new StandAlonePhysicsController(
++    scene,
++    characterAggregate,
++    () => input.current,
++    initialGroundDetected,
++    () => characterFsm.standAloneSubFsm.getActiveSubState(), // NUEVO
++  ); const inputController = new StandAloneInputController(input, characterFsm);
+ 
+   // Único predicado — determina si se dispara, si el arma es visible, y si toca la
+   // animación de apuntado en vez de la normal. Restringido a Idle/Walking/Running: no
+diff --git a/src/services/assets-manager.ts b/src/services/assets-manager.ts
+index 7d7c0ab..698705b 100644
+--- a/src/services/assets-manager.ts
++++ b/src/services/assets-manager.ts
+@@ -551,7 +551,7 @@ export class AssetManager {
+         this.cams['arc'] = camera1
+ 
+         const camera2 = new FollowCamera("mainFollowCamera", new Vector3(0, 5, 10), scene);
+-        camera2.radius = 6;          // Distancia horizontal (hacia atrás) en unidades de Babylon
++        camera2.radius = 16;          // Distancia horizontal (hacia atrás) en unidades de Babylon
+         camera2.heightOffset = 2.0;  // Altura vertical por encima de la patineta
+         camera2.rotationOffset = 180;// 180 grados para que mire exactamente desde atrás (0 la miraría de frente)
+ 

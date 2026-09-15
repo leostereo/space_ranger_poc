@@ -1,3 +1,4 @@
+import { TransformNode } from "@babylonjs/core";
 import { BaseFsm, TransitionTable } from "../abstract/base-fsm";
 import { OnGroundFsm, type OnGroundSubState } from "./character.fsm.stand-alone.on-ground";
 
@@ -6,8 +7,8 @@ export type StandAloneSubState = "OnGround" | "JumpImpulseStart" | "RunningJumpI
 export interface StandAloneFsmDeps {
   isGroundDetected: () => boolean;
   onEnterOnAir: () => void;
-  isForwardHeld: () => boolean; // CAMBIADO
-  isBackwardHeld: () => boolean; // NUEVO
+  isForwardHeld: () => boolean;
+  isBackwardHeld: () => boolean;
   isRunHeld: () => boolean;
   getVerticalSpeed: () => number;
   getHorizontalSpeed: () => number;
@@ -15,7 +16,11 @@ export interface StandAloneFsmDeps {
   onExitLandingRoll: () => void;
   onEnterJumpWindup: () => void;
   onExitJumpWindup: () => void;
-  onEnterRunningJumpOnAir: () => void; // NUEVO
+  onEnterRunningJumpOnAir: () => void;
+  isLeftHeld: () => boolean;
+  isRightHeld: () => boolean;
+  isAimingHeld: () => boolean;
+  weaponRoot: TransformNode;
 }
 
 export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
@@ -30,18 +35,22 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
 
     this.onGroundSubFsm = new OnGroundFsm({
       isForwardHeld: this.deps.isForwardHeld, // CAMBIADO
-      isBackwardHeld: this.deps.isBackwardHeld, // NUEVO
+      isBackwardHeld: this.deps.isBackwardHeld,
       isRunHeld: this.deps.isRunHeld,
+      isLeftHeld: this.deps.isLeftHeld,
+      isRightHeld: this.deps.isRightHeld,
+      isAimingHeld: this.deps.isAimingHeld,
       getVerticalSpeed: this.deps.getVerticalSpeed,
       getHorizontalSpeed: this.deps.getHorizontalSpeed,
       onEnterLandingRoll: this.deps.onEnterLandingRoll,
       onExitLandingRoll: this.deps.onExitLandingRoll,
+      weaponRoot: this.deps.weaponRoot
     });
 
     this.transitions = {
       OnGround: {
         JumpImpulseStart: true,
-        RunningJumpImpulseStart: true, // NUEVO
+        RunningJumpImpulseStart: true,
         OnAir: () => !this.deps.isGroundDetected() && !this._isLandingInProgress(),
       },
       JumpImpulseStart: {

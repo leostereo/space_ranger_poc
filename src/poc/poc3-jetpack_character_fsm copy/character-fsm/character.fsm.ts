@@ -5,6 +5,7 @@ import { BoardFsm } from "./board-fsm/board.fsm";
 import { OnGroundSubState } from "./character.fsm.stand-alone.on-ground";
 import type { HoveringSubState } from "./board-fsm/board.fsm.hovering";
 import type { FallingSubState } from "./board-fsm/board.fsm.falling";
+import { TransformNode } from "@babylonjs/core";
 
 export type CharacterMainState =
   | "StandAlone"
@@ -19,14 +20,17 @@ export interface CharacterFsmDeps {
   isGroundDetected: () => boolean;
   isBoardGroundDetected: () => boolean;
   onEnterOnAir: () => void;
-  onEnterRunningJumpOnAir: () => void; // NUEVO
+  onEnterRunningJumpOnAir: () => void; 
   isCruiseHeld: () => boolean;
   isShootHeld: () => boolean;
   onEnterShooting: () => void;
   onExitShooting: () => void; 
-  isStandAloneForwardHeld: () => boolean; // NUEVO — distinto de isForwardHeld (ese es del board)
-  isStandAloneBackwardHeld: () => boolean; // NUEVO
+  isStandAloneForwardHeld: () => boolean;
+  isStandAloneBackwardHeld: () => boolean; 
   isRunHeld: () => boolean;
+  isLeftHeld: () => boolean;
+  isRightHeld: () => boolean;
+  isAimingHeld: () => boolean; 
   onEnterHoverBoard: () => void;
   /** Threading hacia OnGroundFsmDeps, vía StandAloneFsmDeps — mismo criterio que isMoveHeld/isRunHeld. */
   getVerticalSpeed: () => number;
@@ -47,6 +51,7 @@ export interface CharacterFsmDeps {
   isBoostSettled: () => boolean;
   onEnterDiving: () => void;
   onEnterGliderBoost: () => void;
+  weaponRoot:TransformNode;
 }
 
 export class CharacterFsm extends BaseFsm<CharacterMainState> {
@@ -65,9 +70,12 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
     this.standAloneSubFsm = new StandAloneFsm({
       isGroundDetected: this.deps.isGroundDetected,
       onEnterOnAir: this.deps.onEnterOnAir,
-      isForwardHeld: this.deps.isStandAloneForwardHeld, // CAMBIADO — mapea al dep sin colisión
-      isBackwardHeld: this.deps.isStandAloneBackwardHeld, // NUEVO
+      isForwardHeld: this.deps.isStandAloneForwardHeld, 
+      isBackwardHeld: this.deps.isStandAloneBackwardHeld, 
       isRunHeld: this.deps.isRunHeld,
+      isLeftHeld: this.deps.isLeftHeld,     
+      isRightHeld: this.deps.isRightHeld,   
+      isAimingHeld: this.deps.isAimingHeld, 
       getVerticalSpeed: this.deps.getVerticalSpeed,
       getHorizontalSpeed: this.deps.getHorizontalSpeed,
       onEnterLandingRoll: this.deps.onEnterLandingRoll,
@@ -75,6 +83,7 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
       onEnterJumpWindup: this.deps.onEnterJumpWindup,
       onExitJumpWindup: this.deps.onExitJumpWindup,
       onEnterRunningJumpOnAir: this.deps.onEnterRunningJumpOnAir,
+      weaponRoot: this.deps.weaponRoot
     });
 
     this.jetpackSubFsm = new JetpackFsm({

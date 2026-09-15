@@ -7,13 +7,14 @@ import { generalConfig } from "@/poc/config.general";
 import type { IPhysicsController } from "../contracts/iphysics-controller";
 import type { CharacterInputState } from "../../character.input";
 import { Color3, RayHelper } from "@babylonjs/core";
+import { OnGroundSubState } from "../../character-fsm/character.fsm.stand-alone.on-ground";
 
 const WALK_SPEED = 4;
 const RUN_SPEED = 7;
 const TURN_SPEED = Math.PI;
 const GROUND_FRICTION = 0.8;
 const GROUND_RESTITUTION = 0;
-const GROUND_RAY_MARGIN = 0.5;
+const GROUND_RAY_MARGIN = 0.15;
 const UPWARD_VELOCITY_THRESHOLD = 0.5;
 const JUMP_IMPULSE = 10;
 const ROLL_INITIAL_SPEED = 8; // m/s, ajustar a gusto
@@ -22,6 +23,7 @@ const JUMP_WINDUP_DAMPING_RATE = 8; // más alto = frena más rápido
 const RUNNING_JUMP_VERTICAL_IMPULSE = 4; // más bajo que JUMP_IMPULSE (10) — trayectoria más chata
 const RUNNING_JUMP_FORWARD_BOOST = 8;    // más alto que antes (6) — más alcance para cruzar el hueco
 const WALK_BACKWARD_SPEED = 2; // más lento que WALK_SPEED (4) — retroceder es más cauto que avanzar
+const STRAFE_SPEED = 2.2; // más lento que WALK_SPEED (4) — strafe táctico
 
 export class StandAlonePhysicsController implements IPhysicsController {
   private _groundDetected = true;
@@ -38,6 +40,7 @@ export class StandAlonePhysicsController implements IPhysicsController {
     private characterAggregate: PhysicsAggregate,
     private getInput: () => CharacterInputState,
     initialGroundDetected: boolean,
+    private getSubState: () => OnGroundSubState | "JumpImpulseStart" | "RunningJumpImpulseStart" | "OnAir", // NUEVO
   ) {
     this._groundDetected = initialGroundDetected;
     this._setupFallAndLanding();
@@ -79,8 +82,19 @@ export class StandAlonePhysicsController implements IPhysicsController {
       return;
     }
 
-    const { forward, backward, left, right, cruise } = this.getInput();
+    // if (this._movementLocked) {
+    //   this.characterAggregate.body.setLinearVelocity(Vector3.Zero());
+    //   return;
+    // }
 
+    // NUEVO — strafe: traslada sin rotar, en vez de _applyTurn + _applyMove normales.
+    const subState = this.getSubState();
+    if (subState === "ShootingStrafeLeft" || subState === "ShootingStrafeRight") {
+      this._applyStrafe(subState === "ShootingStrafeLeft" ? -1 : 1);
+      return;
+    }
+
+    const { forward, backward, left, right, cruise } = this.getInput();
     this._applyTurn(left, right);
     this._applyMove(forward, backward, cruise);
   }
@@ -147,6 +161,20 @@ export class StandAlonePhysicsController implements IPhysicsController {
     );
   }
 
+  /** Traslada lateralmente sin tocar la rotación — dirSign: -1 = izquierda, 1 = derecha.
+ * Usa el `right` del transform, no un giro, así el personaje sigue mirando al frente
+ * mientras se desplaza de costado (a diferencia de _applyTurn, que rota el modelo). */
+  private _applyStrafe(dirSign: -1 | 1): void {
+    const currentVelocity = this.characterAggregate.body.getLinearVelocity();
+    const verticalVelocity = this._groundDetected ? 0 : currentVelocity.y;
+    const right = this.characterAggregate.transformNode.right.scale(dirSign);
+
+    this.characterAggregate.body.setAngularVelocity(Vector3.Zero()); // NUEVO — sin esto, el giro residual de _applyTurn() sigue girando indefinidamente
+    this.characterAggregate.body.setLinearVelocity(
+      new Vector3(right.x * STRAFE_SPEED, verticalVelocity, right.z * STRAFE_SPEED),
+    );
+  }
+
   /** Suma un boost horizontal extra en la dirección hacia donde mira el personaje,
    * ENCIMA de la velocidad de carrera que ya trae (no la pisa como applyJumpImpulse). */
   applyRunningJumpImpulse(): void {
@@ -210,9 +238,7 @@ export class StandAlonePhysicsController implements IPhysicsController {
     const isMovingUpward = verticalVelocity > UPWARD_VELOCITY_THRESHOLD;
 
     //console.log(hit?.distance, hit?.pickedMesh?.name, hit?.hit, verticalVelocity, isMovingUpward)
-
     this._groundDetected = !!(hit && hit.hit) && !isMovingUpward;
-
   }
 
   getLastImpactVerticalSpeed(): number {
