@@ -46,6 +46,7 @@ export type TexturetKey = "flare";
  */
 export interface ICharacterAnimations {
     standing_idle: AnimationGroup;
+    cruising_idle: AnimationGroup;
     cruising_forward_idle: AnimationGroup;
     cruising_faster_idle: AnimationGroup;
     cruising_maxVel_idle: AnimationGroup;
@@ -126,7 +127,7 @@ export class AssetManager {
             };
 
             // --- RECURSO 2: Modelo GLB Externo ---
-            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver10.glb");
+            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver11.glb");
             tareaGLB.onSuccess = (task) => {
                 // Buscamos el nodo raíz que crea automáticamente Babylon para los GLB
 
@@ -341,6 +342,7 @@ export class AssetManager {
         const find = (name: string): AnimationGroup | undefined => groups.find((g) => g.name === name);
 
         const standing_idle = find("standing idle");
+        const cruising_idle = find("skateboarding");
         const cruising_forward_idle = find("skate_idle");
         const cruising_faster_idle = find("ninja crouch idle mirror");
         const cruising_maxVel_idle = find("skate crouching idle");
@@ -375,7 +377,7 @@ export class AssetManager {
 
 
 
-        if (!standing_idle || !cruising_forward_idle || !cruising_faster_idle || !cruising_maxVel_idle || !jump_while_running || 
+        if (!standing_idle || !cruising_idle || !cruising_forward_idle || !cruising_faster_idle || !cruising_maxVel_idle || !jump_while_running || 
             !standing_to_crouch || !crouch_to_standing || !jump || !normal_landing || !crash_landing || !roll_landing || !falling_idle ||
             !flying || !floating || !jump_on_board || !walking_forward || !walking_backwards ||
             !running_normal || !running_fast || !aiming_jetpack || !crouch_aimming || !idle_aimming || !walking_backwards_aimming ||
@@ -385,7 +387,7 @@ export class AssetManager {
         }
 
         const mold: ICharacterAnimations = {
-            standing_idle, cruising_forward_idle, cruising_faster_idle, cruising_maxVel_idle,
+            standing_idle, cruising_idle, cruising_forward_idle, cruising_faster_idle, cruising_maxVel_idle,
             standing_to_crouch, crouch_to_standing, jump, normal_landing, crash_landing, roll_landing, floating, flying,
             falling_idle, jump_on_board, walking_forward, walking_backwards,running_fast, running_normal, aiming_jetpack,
             jump_while_running, crouch_aimming, idle_aimming, walking_aimming, walking_backwards_aimming, running_aimming,
@@ -414,6 +416,7 @@ export class AssetManager {
         const mold = this.characterAnimationsMold;
         return {
             standing_idle: cloneOne(mold.standing_idle),
+            cruising_idle: cloneOne(mold.cruising_idle),
             cruising_forward_idle: cloneOne(mold.cruising_forward_idle),
             cruising_faster_idle: cloneOne(mold.cruising_faster_idle),
             cruising_maxVel_idle: cloneOne(mold.cruising_maxVel_idle),
