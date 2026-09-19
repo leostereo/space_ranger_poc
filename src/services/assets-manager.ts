@@ -24,7 +24,7 @@
 // Vale la pena migrarlo a `getMesh('character', ...).animations` cuando se retome poc2,
 // para no tener la lógica de nombres de clips duplicada en dos lugares.
 
-import { Texture, Material, AbstractMesh, AnimationGroup, Scene, AssetsManager, StandardMaterial, MeshBuilder, Color3, Tools, PhysicsAggregate, PhysicsShapeType, Mesh, ArcRotateCamera, Vector3, FollowCamera, HemisphericLight, Axis, Space, Quaternion, TransformNode } from "@babylonjs/core";
+import { Texture, Material, AbstractMesh, AnimationGroup, Scene, AssetsManager, StandardMaterial, MeshBuilder, Color3, Tools, PhysicsAggregate, PhysicsShapeType, Mesh, ArcRotateCamera, Vector3, FollowCamera, HemisphericLight, Axis, Space, Quaternion, TransformNode, Skeleton } from "@babylonjs/core";
 import { GridMaterial } from "@babylonjs/materials/grid/gridMaterial";
 import { generalConfig } from "@/poc/config.general";
 import "@babylonjs/loaders/glTF"; // Obligatorio en Babylon para leer archivos .glb
@@ -107,6 +107,8 @@ export class AssetManager {
     private static cams: Record<string, ArcRotateCamera | FollowCamera> = {};
     private static lights: Record<string, HemisphericLight> = {};
     private static weaponResult: WeaponBuildResult | null = null;
+    private static skeletons: Record<MeshAssetKey, Skeleton> = {} as Record<MeshAssetKey, Skeleton>;
+
 
     // Almacén para las animaciones originales de los GLB (crudo, por nombre de clip tal
     // cual viene del archivo — sigue existiendo para getAnimations(), sin cambios).
@@ -144,6 +146,16 @@ export class AssetManager {
                     // Desactivamos el nodo raíz (apaga al personaje entero y sus hijos)
                     root.setEnabled(false);
                     this.meshes["character"] = root;
+
+                    if (task.loadedSkeletons && task.loadedSkeletons.length > 0) {
+                        this.skeletons["character"] = task.loadedSkeletons[0];
+                    } else {
+                        // Nota: En algunos GLB modernos de Babylon, los huesos se importan como TransformNodes 
+                        // en lugar de un objeto Skeleton tradicional. Si el array viene vacío, se busca en los nodos:
+                        const totalSkeleton = root.getChildren((node) => node.getClassName() === "Bone", false);
+                        console.log("Huesos encontrados como nodos:", totalSkeleton);
+                    }
+
 
                     // Guardamos las animaciones que traía este GLB específico
                     this.animationGroups["character"] = task.loadedAnimationGroups;
@@ -493,6 +505,10 @@ export class AssetManager {
         // 3. Lo activamos para que sea visible y retorne al código
         clon.setEnabled(true);
         return { mesh: clon, animations };
+    }
+
+    public static getSkeleton(key: MeshAssetKey): Skeleton | undefined {
+        return this.skeletons[key];
     }
 
     public static getTexture(key: TexturetKey): Texture {

@@ -2,7 +2,7 @@
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { ICharacterAnimations } from "@/services/assets-manager";
 import type { IAnimationController } from "../contracts/ianimation-controller";
-import type { JetpackFsm, JetpackSubState } from "../../character-fsm/character.fsm.jetpack";
+import type { JetpackFsm, JetpackSubState } from "../../character-fsm/jetpack-fsm/character.fsm.jetpack";
 
 /** Mismo patrón que StandAloneAnimationController — ver comentario ahí para el porqué. */
 export class JetpackAnimationController implements IAnimationController {

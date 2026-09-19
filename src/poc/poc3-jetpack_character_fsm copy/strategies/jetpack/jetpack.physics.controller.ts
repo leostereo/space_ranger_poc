@@ -6,7 +6,7 @@ import { Scalar } from "@babylonjs/core/Maths/math.scalar";
 import { Tools } from "@babylonjs/core/Misc/tools";
 import type { IPhysicsController } from "../contracts/iphysics-controller";
 import type { CharacterInputState } from "../../character.input";
-import type { JetpackSubState } from "../../character-fsm/character.fsm.jetpack";
+import type { JetpackSubState } from "../../character-fsm/jetpack-fsm/character.fsm.jetpack";
 
 const CHARACTER_MASS = 70;
 const GRAVITY = 9.81;

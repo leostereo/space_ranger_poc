@@ -179,6 +179,8 @@ const addMapAggregate = (scene: Scene) => {
 };
 
 export function weapon_builder(): WeaponBuildResult {
+  const skeleton = AssetManager.getSkeleton('character')
+  console.log(skeleton)
   const result = AssetManager.getWeapon();
   if (!result) {
     throw new Error("weapon_builder: no se pudo obtener 'player_weapon' del AssetManager.");

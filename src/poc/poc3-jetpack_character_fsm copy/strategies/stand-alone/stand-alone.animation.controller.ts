@@ -2,9 +2,9 @@
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { ICharacterAnimations } from "@/services/assets-manager";
 import type { IAnimationController } from "../contracts/ianimation-controller";
-import type { StandAloneFsm } from "../../character-fsm/character.fsm.stand-alone";
-import type { OnGroundSubState } from "../../character-fsm/character.fsm.stand-alone.on-ground";
-import { OnGroundCrouchedSubState } from "../../character-fsm/character.fsm.stand-alone.on-ground-crouched";
+import type { StandAloneFsm } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone";
+import type { OnGroundSubState } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone.on-ground";
+import { OnGroundCrouchedSubState } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone.on-ground-crouched";
 
 /** Combina el estado flat de StandAloneFsm con el sub-estado real de OnGroundFsm cuando aplica —
  * mismo valor que devuelve StandAloneFsm.getActiveSubState(). */
@@ -34,7 +34,7 @@ export class StandAloneAnimationController implements IAnimationController {
   }
 
   tick(): void {
-    //this._render(this.standAloneFsm.getActiveSubState());
+    this._render(this.standAloneFsm.getActiveSubState());
   }
 
   dispose(): void {

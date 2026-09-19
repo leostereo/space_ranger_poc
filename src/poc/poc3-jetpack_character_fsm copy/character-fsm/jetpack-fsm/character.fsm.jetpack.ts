@@ -1,5 +1,5 @@
 // src/poc3-jetpack_character_fsm/character-fsm/character.fsm.jetpack.ts
-import { BaseFsm, TransitionTable } from "../abstract/base-fsm";
+import { BaseFsm, TransitionTable } from "../../abstract/base-fsm";
 
 export type JetpackSubState = "On" | "Cruising" | "Shooting";
 
@@ -34,12 +34,12 @@ export class JetpackFsm extends BaseFsm<JetpackSubState> {
     this.state = "On";
   }
 
-protected onEnter(state: JetpackSubState): void {
-  if (state === "Shooting") this.deps.onEnterShooting();
-}
+  protected onEnter(state: JetpackSubState): void {
+    if (state === "Shooting") this.deps.onEnterShooting();
+  }
 
-protected onExit(state: JetpackSubState): void {
-  if (state === "Shooting") this.deps.onExitShooting();
-}
-  dispose(): void {}
+  protected onExit(state: JetpackSubState): void {
+    if (state === "Shooting") this.deps.onExitShooting();
+  }
+  dispose(): void { }
 }
