@@ -1,5 +1,5 @@
 import { TransformNode } from "@babylonjs/core";
-import { BaseFsm, TransitionTable } from "../../abstract/base-fsm";
+import { BaseFsm, TransitionTable } from "../abstract/base-fsm";
 
 export type OnGroundSubState =
   | "Idle"
@@ -182,6 +182,6 @@ export class OnGroundFsm extends BaseFsm<OnGroundSubState> {
       this._applyWeaponOffset(WEAPON_OFFSETS.strafe_right)
     }
   }
-  protected onExit(_state: OnGroundSubState): void { }
+  protected onExit(_state: OnGroundSubState): void {}
   dispose(): void { }
 }

@@ -1,12 +1,12 @@
 import { BaseFsm, TransitionTable } from "../abstract/base-fsm";
-import { StandAloneFsm, type StandAloneSubState } from "./standAlone-fsm/character.fsm.stand-alone";
-import { JetpackFsm, type JetpackSubState } from "./jetpack-fsm/character.fsm.jetpack";
+import { StandAloneFsm, type StandAloneSubState } from "./character.fsm.stand-alone";
+import { JetpackFsm, type JetpackSubState } from "./character.fsm.jetpack";
 import { BoardFsm } from "./board-fsm/board.fsm";
-import { OnGroundSubState } from "./standAlone-fsm/character.fsm.stand-alone.on-ground";
+import { OnGroundSubState } from "./character.fsm.stand-alone.on-ground";
 import type { HoveringSubState } from "./board-fsm/board.fsm.hovering";
 import type { FallingSubState } from "./board-fsm/board.fsm.falling";
 import { TransformNode } from "@babylonjs/core";
-import { OnGroundCrouchedSubState } from "./standAlone-fsm/character.fsm.stand-alone.on-ground-crouched";
+import { OnGroundCrouchedSubState } from "./character.fsm.stand-alone.on-ground-crouched";
 
 export type CharacterMainState =
   | "StandAlone"

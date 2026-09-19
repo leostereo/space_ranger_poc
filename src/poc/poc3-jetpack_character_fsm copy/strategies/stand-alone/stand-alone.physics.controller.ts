@@ -7,8 +7,8 @@ import { generalConfig } from "@/poc/config.general";
 import type { IPhysicsController } from "../contracts/iphysics-controller";
 import type { CharacterInputState } from "../../character.input";
 import { Color3, PhysicsShapeCapsule, RayHelper } from "@babylonjs/core";
-import { OnGroundSubState } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone.on-ground";
-import { OnGroundCrouchedSubState } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone.on-ground-crouched"; // NUEVO
+import { OnGroundSubState } from "../../character-fsm/character.fsm.stand-alone.on-ground";
+import { OnGroundCrouchedSubState } from "../../character-fsm/character.fsm.stand-alone.on-ground-crouched"; // NUEVO
 
 const WALK_SPEED = 4;
 const RUN_SPEED = 7;

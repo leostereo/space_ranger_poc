@@ -1,5 +1,5 @@
 import { TransformNode } from "@babylonjs/core";
-import { BaseFsm, TransitionTable } from "../../abstract/base-fsm";
+import { BaseFsm, TransitionTable } from "../abstract/base-fsm";
 import { OnGroundFsm, type OnGroundSubState } from "./character.fsm.stand-alone.on-ground";
 import { OnGroundCrouchedFsm, type OnGroundCrouchedSubState } from "./character.fsm.stand-alone.on-ground-crouched";
 
@@ -51,7 +51,7 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
       onExitLandingRoll: this.deps.onExitLandingRoll,
       weaponRoot: this.deps.weaponRoot
     });
-
+    
     this.onGroundCrouchedSubFsm = new OnGroundCrouchedFsm({ // NUEVO
       isForwardHeld: this.deps.isForwardHeld,
       isBackwardHeld: this.deps.isBackwardHeld,
@@ -78,7 +78,7 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
     super.tick();
     if (this.state === "OnGround") {
       this.onGroundSubFsm.tick();
-    } else if (this.state === "Crouch") {
+    } else if (this.state === "Crouch") { 
       this.onGroundCrouchedSubFsm.tick();
     }
   }
