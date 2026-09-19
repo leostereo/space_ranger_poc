@@ -98,6 +98,7 @@ export default class CharacterBase implements Poc {
       isLeftHeld: () => this.input.current.left,
       isRightHeld: () => this.input.current.right,
       isAimingHeld: () => this._isAimingActive(),
+      isCrouchHeld: () => this.input.current.crouch,
       onEnterHoverBoard: () => this._swapToHoverBoard(),
       getVerticalSpeed: () => this.activeStandAlonePhysics?.getLastImpactVerticalSpeed() ?? 0,
       getHorizontalSpeed: () => this.activeStandAlonePhysics?.getLastImpactHorizontalSpeed() ?? 0,
@@ -119,7 +120,9 @@ export default class CharacterBase implements Poc {
       onEnterDiving: () => { },
       onEnterGliderBoost: () => this.activeBoardPhysics?.onEnterGliderBoost(),
       onEnterRunningJumpOnAir: () => this.activeStandAlonePhysics?.applyRunningJumpImpulse(),
-      weaponRoot
+      weaponRoot,
+      onEnterCrouch: () => this.activeStandAlonePhysics?.notifyCrouchEnter(), // NUEVO
+      onExitCrouch: () => this.activeStandAlonePhysics?.notifyCrouchExit(),  // NUEVO
     });
 
     this._wireJumpAnimationEvent();
@@ -151,16 +154,16 @@ private _isAimingActive(): boolean {
   }
   if (this.fsm.getState() === "StandAlone") {
     const groundState = this.fsm.getActiveSubState();
-    // CAMBIADO — sin ShootingStrafeLeft/Right acá, se rompía el ciclo apenas se
-    // entraba a strafe: isAimingHeld() pasaba a false, lo cual disparaba la salida
-    // inmediata de OnGroundFsm de vuelta a Idle (loop Idle<->Strafe cada tick).
     const canAimHere =
       groundState === "Idle" ||
       groundState === "Walking" ||
       groundState === "WalkingBackwards" ||
       groundState === "Running" ||
       groundState === "ShootingStrafeLeft" ||
-      groundState === "ShootingStrafeRight";
+      groundState === "ShootingStrafeRight" ||
+      groundState === "CrouchIdle" ||            // NUEVO
+      groundState === "CrouchWalking" ||          // NUEVO
+      groundState === "CrouchWalkingBackwards";   // NUEVO
     return canAimHere && this.input.current.shoot;
   }
   if (this.fsm.getState() === "HoverBoard") {

@@ -38,7 +38,8 @@ export class CharacterHud {
 
     this.fsm.onStateChange(() => this._renderState());
     this.fsm.standAloneSubFsm.onStateChange(() => this._renderState());
-    this.fsm.standAloneSubFsm.onGroundSubFsm.onStateChange(() => this._renderState()); // ← nuevo
+    this.fsm.standAloneSubFsm.onGroundSubFsm.onStateChange(() => this._renderState());
+    this.fsm.standAloneSubFsm.onGroundCrouchedSubFsm.onStateChange(() => this._renderState()); // NUEVO
     this.fsm.jetpackSubFsm.onStateChange(() => this._renderState());
 
     this.fsm.boardSubFsm.onStateChange(() => this._renderState());

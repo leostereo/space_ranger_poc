@@ -6,6 +6,7 @@ import { OnGroundSubState } from "./character.fsm.stand-alone.on-ground";
 import type { HoveringSubState } from "./board-fsm/board.fsm.hovering";
 import type { FallingSubState } from "./board-fsm/board.fsm.falling";
 import { TransformNode } from "@babylonjs/core";
+import { OnGroundCrouchedSubState } from "./character.fsm.stand-alone.on-ground-crouched";
 
 export type CharacterMainState =
   | "StandAlone"
@@ -30,7 +31,8 @@ export interface CharacterFsmDeps {
   isRunHeld: () => boolean;
   isLeftHeld: () => boolean;
   isRightHeld: () => boolean;
-  isAimingHeld: () => boolean; 
+  isAimingHeld: () => boolean;
+  isCrouchHeld: () => boolean; // NUEVO
   onEnterHoverBoard: () => void;
   /** Threading hacia OnGroundFsmDeps, vía StandAloneFsmDeps — mismo criterio que isMoveHeld/isRunHeld. */
   getVerticalSpeed: () => number;
@@ -52,6 +54,8 @@ export interface CharacterFsmDeps {
   onEnterDiving: () => void;
   onEnterGliderBoost: () => void;
   weaponRoot:TransformNode;
+  onEnterCrouch: () => void; // NUEVO
+  onExitCrouch: () => void;  // NUEVO
 }
 
 export class CharacterFsm extends BaseFsm<CharacterMainState> {
@@ -75,7 +79,8 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
       isRunHeld: this.deps.isRunHeld,
       isLeftHeld: this.deps.isLeftHeld,     
       isRightHeld: this.deps.isRightHeld,   
-      isAimingHeld: this.deps.isAimingHeld, 
+      isAimingHeld: this.deps.isAimingHeld,
+      isCrouchHeld: this.deps.isCrouchHeld, // NUEVO
       getVerticalSpeed: this.deps.getVerticalSpeed,
       getHorizontalSpeed: this.deps.getHorizontalSpeed,
       onEnterLandingRoll: this.deps.onEnterLandingRoll,
@@ -83,7 +88,9 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
       onEnterJumpWindup: this.deps.onEnterJumpWindup,
       onExitJumpWindup: this.deps.onExitJumpWindup,
       onEnterRunningJumpOnAir: this.deps.onEnterRunningJumpOnAir,
-      weaponRoot: this.deps.weaponRoot
+      weaponRoot: this.deps.weaponRoot,
+      onEnterCrouch: this.deps.onEnterCrouch, // NUEVO
+      onExitCrouch: this.deps.onExitCrouch,   // NUEVO
     });
 
     this.jetpackSubFsm = new JetpackFsm({
@@ -181,7 +188,7 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
     }
   }
 
-  getActiveSubState(): StandAloneSubState | OnGroundSubState | JetpackSubState | HoveringSubState | FallingSubState | "Loading" {
+  getActiveSubState(): StandAloneSubState | OnGroundSubState | OnGroundCrouchedSubState | JetpackSubState | HoveringSubState | FallingSubState | "Loading" {
     if (this.state === "StandAlone") return this.standAloneSubFsm.getActiveSubState();
     if (this.state === "Jetpack") return this.jetpackSubFsm.getState();
     if (this.state === "HoverBoard") return this.boardSubFsm.getActiveSubState();
@@ -192,9 +199,12 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
    * ["HoverBoard","Falling","Dropping"], ["Jetpack","Cruising"]. */
   getStatePath(): string[] {
     if (this.state === "StandAlone") {
-      const mid = this.standAloneSubFsm.getState(); // "OnGround" | "JumpImpulseStart" | "OnAir"
+      const mid = this.standAloneSubFsm.getState(); // ahora puede ser "Crouch" también
       if (mid === "OnGround") {
         return [this.state, mid, this.standAloneSubFsm.onGroundSubFsm.getState()];
+      }
+      if (mid === "Crouch") { // NUEVO
+        return [this.state, mid, this.standAloneSubFsm.onGroundCrouchedSubFsm.getState()];
       }
       return [this.state, mid];
     }
