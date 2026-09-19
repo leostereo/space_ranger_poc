@@ -1,5 +1,5 @@
 // src/poc3-jetpack_character_fsm/character-fsm/character.fsm.jetpack.ts
-import { BaseFsm, TransitionTable } from "../abstract/base-fsm";
+import { BaseFsm, TransitionTable } from "../../abstract/base-fsm";
 
 export type JetpackSubState = "On" | "Cruising" | "Shooting";
 

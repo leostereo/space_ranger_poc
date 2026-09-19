@@ -1,5 +1,5 @@
 import { TransformNode } from "@babylonjs/core";
-import { BaseFsm, TransitionTable } from "../abstract/base-fsm";
+import { BaseFsm, TransitionTable } from "../../abstract/base-fsm";
 
 export type OnGroundCrouchedSubState = "CrouchIdle" | "CrouchWalking" | "CrouchWalkingBackwards";
 
