@@ -6,9 +6,7 @@ import type { StandAloneFsm } from "../../character-fsm/standAlone-fsm/character
 import type { OnGroundSubState } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone.on-ground";
 import { OnGroundCrouchedSubState } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone.on-ground-crouched";
 
-/** Combina el estado flat de StandAloneFsm con el sub-estado real de OnGroundFsm cuando aplica —
- * mismo valor que devuelve StandAloneFsm.getActiveSubState(). */
-type ResolvedStandAloneState = OnGroundSubState | OnGroundCrouchedSubState | "JumpImpulseStart" | "OnAir" | "RunningJumpImpulseStart";
+type ResolvedStandAloneState = OnGroundSubState | OnGroundCrouchedSubState | "JumpImpulseStart" | "OnAir" | "RunningJumpImpulseStart" | "CrouchRollStart";
 
 export class StandAloneAnimationController implements IAnimationController {
   private currentAnimation: AnimationGroup | null = null;
@@ -126,6 +124,8 @@ export class StandAloneAnimationController implements IAnimationController {
         return { animation: this.animations.crouch_walk, loop: true };
       case "CrouchWalkingBackwards": 
         return { animation: this.animations.crouch_walkbackwards, loop: true };
+      case "CrouchRollStart": // NUEVO
+        return { animation: this.animations.running_roll, loop: false, waitForCompletion: true };
       default:
         return null;
     }

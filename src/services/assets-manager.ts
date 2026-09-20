@@ -85,6 +85,8 @@ export interface ICharacterAnimations {
     crouch_walkbackwards_aim: AnimationGroup
     crouch_idle_aim :AnimationGroup
 
+    running_roll: AnimationGroup
+
 }
 
 export interface MeshInstanceResult {
@@ -400,6 +402,8 @@ export class AssetManager {
         const crouch_walkbackwards_aim = find("crouched walk aim backwards");
         const crouch_idle_aim = find("crouch aim");
 
+        const running_roll = find("roll to run");
+
 
 
 
@@ -408,7 +412,7 @@ export class AssetManager {
             !flying || !floating || !jump_on_board || !walking_forward || !walking_backwards ||
             !running_normal || !running_fast || !aiming_jetpack || !crouch_aimming || !idle_aimming || !walking_backwards_aimming ||
             !walking_aimming || !running_aimming || !strafe_right || !strafe_left || !crouch_walk || !crouch_walkbackwards ||
-            !crouch_walk_aim || !crouch_walkbackwards_aim || !crouch_idle_aim) {
+            !crouch_walk_aim || !crouch_walkbackwards_aim || !crouch_idle_aim || !running_roll) {
             console.warn("AssetManager: faltan animaciones de 'character' — revisar nombres de clips en el GLB.");
             return;
         }
@@ -418,7 +422,8 @@ export class AssetManager {
             standing_to_crouch, crouch_to_standing, jump, normal_landing, crash_landing, roll_landing, floating, flying,
             falling_idle, jump_on_board, walking_forward, walking_backwards,running_fast, running_normal, aiming_jetpack,
             jump_while_running, crouch_aimming, idle_aimming, walking_aimming, walking_backwards_aimming, running_aimming,
-            strafe_right, strafe_left, crouch_walk, crouch_walkbackwards,  crouch_walk_aim, crouch_walkbackwards_aim,crouch_idle_aim
+            strafe_right, strafe_left, crouch_walk, crouch_walkbackwards, crouch_walk_aim, crouch_walkbackwards_aim,
+            crouch_idle_aim, running_roll
         };
 
         Object.values(mold).forEach((ag) => {
@@ -475,7 +480,9 @@ export class AssetManager {
             
             crouch_idle_aim: cloneOne(mold.crouch_idle_aim),
             crouch_walk_aim: cloneOne(mold.crouch_walk_aim),
-            crouch_walkbackwards_aim: cloneOne(mold.crouch_walkbackwards_aim)
+            crouch_walkbackwards_aim: cloneOne(mold.crouch_walkbackwards_aim),
+            
+            running_roll: cloneOne(mold.running_roll)
         };
     }
 

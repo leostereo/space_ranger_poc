@@ -27,6 +27,7 @@ export class CharacterInput {
    */
   private equipRequested = false;
   private jumpRequested = false;
+  private crouchRollRequested = false;
 
   constructor() {
     window.addEventListener("keydown", this._onKeyDown);
@@ -49,6 +50,12 @@ export class CharacterInput {
     return true;
   }
 
+  consumeCrouchRollRequest(): boolean {
+    if (!this.crouchRollRequested) return false;
+    this.crouchRollRequested = false;
+    return true;
+  }
+
   dispose(): void {
     window.removeEventListener("keydown", this._onKeyDown);
     window.removeEventListener("keyup", this._onKeyUp);
@@ -68,8 +75,9 @@ export class CharacterInput {
       case "Comma": // CAMBIADO — antes "Slash", ahora "," dispara
         this.state.shoot = true;
         break;
-      case "Period": // "." sigue siendo crouch, sin cambios
+      case "Period":
         this.state.crouch = true;
+        this.crouchRollRequested = true; // NUEVO — edge trigger, consumido una sola vez
         break;
     }
   };

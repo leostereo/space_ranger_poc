@@ -24,6 +24,7 @@ const JUMP_IMPULSE_FRAME = 30;
 const EQUIP_BOARD_FRAME = 60; // placeholder — ajustar cuando definan el frame real del clip
 const WEAPON_HOVERBOARD_YAW_COMPENSATION = Math.PI / 8; // cancela characterMesh.rotation.y = -PI/8 en HoverBoard
 const RUNNING_JUMP_IMPULSE_FRAME = 10; // placeholder — ajustar al frame real del clip
+const CROUCH_ROLL_COMPLETE_FRAME = 85; // placeholder — ajustar al frame real del clip running_roll
 
 const WEAPON_OFFSETS = {
   jetpack: { x: -0.1, y: 0.16, z: 0 },
@@ -125,12 +126,15 @@ export default class CharacterBase implements Poc {
       weaponRoot,
       onEnterCrouch: () => this.activeStandAlonePhysics?.notifyCrouchEnter(), // NUEVO
       onExitCrouch: () => this.activeStandAlonePhysics?.notifyCrouchExit(),  // NUEVO
+      onEnterCrouchRoll: () => this.activeStandAlonePhysics?.notifyCrouchRollStart(), // NUEVO
+      onExitCrouchRoll: () => this.activeStandAlonePhysics?.notifyCrouchRollEnd(),
     });
 
     this._wireJumpAnimationEvent();
     this._wireEquipBoardAnimationEvent();
     this._wireLandingAnimationEvents();
     this._wireRunningJumpAnimationEvent();
+    this._wireCrouchRollAnimationEvent();
 
     const { strategy, physicsController } = await buildStandAloneStrategy(
       this.scene,
@@ -175,7 +179,9 @@ private _isAimingActive(): boolean {
 }
 
   private _updateWeaponVisibility(): void {
-    this.weaponRoot?.setEnabled(this._isAimingActive());
+    setTimeout(()=>{
+      this.weaponRoot?.setEnabled(this._isAimingActive());
+    },3000)
   }
 
   private _wireJumpAnimationEvent(): void {
@@ -197,6 +203,17 @@ private _isAimingActive(): boolean {
     runningJumpAnimation.addEvent(
       new AnimationEvent(RUNNING_JUMP_IMPULSE_FRAME, () => {
         this.fsm.standAloneSubFsm.notifyRunningJumpImpulseFrame();
+      }, false),
+    );
+  }
+
+  private _wireCrouchRollAnimationEvent(): void { // NUEVO
+    const crouchRollAnimation = this.characterAnimations?.running_roll.targetedAnimations[0]?.animation;
+    if (!crouchRollAnimation) return;
+
+    crouchRollAnimation.addEvent(
+      new AnimationEvent(CROUCH_ROLL_COMPLETE_FRAME, () => {
+        this.fsm.standAloneSubFsm.notifyCrouchRollComplete();
       }, false),
     );
   }

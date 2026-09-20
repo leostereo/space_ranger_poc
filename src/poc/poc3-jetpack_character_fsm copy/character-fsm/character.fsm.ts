@@ -54,8 +54,10 @@ export interface CharacterFsmDeps {
   onEnterDiving: () => void;
   onEnterGliderBoost: () => void;
   weaponRoot:TransformNode;
-  onEnterCrouch: () => void; // NUEVO
-  onExitCrouch: () => void;  // NUEVO
+  onEnterCrouch: () => void;
+  onExitCrouch: () => void;
+  onEnterCrouchRoll: () => void; // NUEVO
+  onExitCrouchRoll: () => void;  // NUEVO
 }
 
 export class CharacterFsm extends BaseFsm<CharacterMainState> {
@@ -89,8 +91,10 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
       onExitJumpWindup: this.deps.onExitJumpWindup,
       onEnterRunningJumpOnAir: this.deps.onEnterRunningJumpOnAir,
       weaponRoot: this.deps.weaponRoot,
-      onEnterCrouch: this.deps.onEnterCrouch, // NUEVO
-      onExitCrouch: this.deps.onExitCrouch,   // NUEVO
+      onEnterCrouch: this.deps.onEnterCrouch,
+      onExitCrouch: this.deps.onExitCrouch,
+      onEnterCrouchRoll: this.deps.onEnterCrouchRoll, // NUEVO
+      onExitCrouchRoll: this.deps.onExitCrouchRoll,   // NUEVO
     });
 
     this.jetpackSubFsm = new JetpackFsm({

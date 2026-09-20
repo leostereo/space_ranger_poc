@@ -20,6 +20,8 @@ const UPWARD_VELOCITY_THRESHOLD = 0.5;
 const JUMP_IMPULSE = 10;
 const ROLL_INITIAL_SPEED = 8; // m/s, ajustar a gusto
 const ROLL_MAX_DURATION_SECONDS = 1.2; // safety net si notifyLandingRollEnd() nunca llega
+const CROUCH_ROLL_SPEED = 10; // NUEVO — ajustar a gusto
+const CROUCH_ROLL_DURATION_SECONDS = 2.83;
 const JUMP_WINDUP_DAMPING_RATE = 8; // más alto = frena más rápido
 const RUNNING_JUMP_VERTICAL_IMPULSE = 4; // más bajo que JUMP_IMPULSE (10) — trayectoria más chata
 const RUNNING_JUMP_FORWARD_BOOST = 8;    // más alto que antes (6) — más alcance para cruzar el hueco
@@ -38,6 +40,8 @@ export class StandAlonePhysicsController implements IPhysicsController {
   private _isRolling = false;
   private _rollElapsed = 0;
   private _rollDirection = Vector3.Zero();
+  private _rollSpeed = ROLL_INITIAL_SPEED;
+  private _rollDuration = ROLL_MAX_DURATION_SECONDS;
   private _lastImpactVerticalSpeed = 0;
   private _lastImpactHorizontalSpeed = 0;
   private _isWindingUpJump = false;
@@ -122,8 +126,8 @@ export class StandAlonePhysicsController implements IPhysicsController {
   /** Decae ROLL_INITIAL_SPEED -> 0 mientras dure el roll, en la dirección capturada al entrar. */
   private _tickRoll(dt: number): void {
     this._rollElapsed += dt;
-    const t = Math.min(this._rollElapsed / ROLL_MAX_DURATION_SECONDS, 1);
-    const currentSpeed = Scalar.Lerp(ROLL_INITIAL_SPEED, 0, t);
+    const t = Math.min(this._rollElapsed / this._rollDuration, 1); // CAMBIADO
+    const currentSpeed = Scalar.Lerp(this._rollSpeed, 0, t); // CAMBIADO
     const currentVelocity = this.characterAggregate.body.getLinearVelocity();
 
     this.characterAggregate.body.setLinearVelocity(
@@ -217,12 +221,27 @@ export class StandAlonePhysicsController implements IPhysicsController {
       ? horizontal.normalize()
       : this.characterAggregate.transformNode.forward.clone();
 
+    this._rollSpeed = ROLL_INITIAL_SPEED; // NUEVO
+    this._rollDuration = ROLL_MAX_DURATION_SECONDS; // NUEVO
     this._isRolling = true;
     this._rollElapsed = 0;
   }
 
   /** Llamado cuando el AnimationEvent de landing-roll llega al frame final. */
   notifyLandingRollEnd(): void {
+    this._isRolling = false;
+  }
+
+    notifyCrouchRollStart(): void { // NUEVO
+    this._rollDirection = this.characterAggregate.transformNode.forward.clone();
+    this._rollSpeed = CROUCH_ROLL_SPEED;
+    this._rollDuration = CROUCH_ROLL_DURATION_SECONDS;
+    this._isRolling = true;
+    this._rollElapsed = 0;
+  }
+
+  /** Llamado al salir de CrouchRollStart (por notifyCrouchRollComplete() vía animación). */
+  notifyCrouchRollEnd(): void { // NUEVO
     this._isRolling = false;
   }
 

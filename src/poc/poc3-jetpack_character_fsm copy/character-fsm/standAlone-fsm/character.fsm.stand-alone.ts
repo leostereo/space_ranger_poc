@@ -3,7 +3,7 @@ import { BaseFsm, TransitionTable } from "../../abstract/base-fsm";
 import { OnGroundFsm, type OnGroundSubState } from "./character.fsm.stand-alone.on-ground";
 import { OnGroundCrouchedFsm, type OnGroundCrouchedSubState } from "./character.fsm.stand-alone.on-ground-crouched";
 
-export type StandAloneSubState = "OnGround" | "JumpImpulseStart" | "RunningJumpImpulseStart" | "OnAir" | "Crouch";
+export type StandAloneSubState = "OnGround" | "JumpImpulseStart" | "RunningJumpImpulseStart" | "OnAir" | "Crouch" | "CrouchRollStart"; // CAMBIADO
 
 export interface StandAloneFsmDeps {
   isGroundDetected: () => boolean;
@@ -25,6 +25,8 @@ export interface StandAloneFsmDeps {
   weaponRoot: TransformNode;
   onEnterCrouch: () => void; // NUEVO
   onExitCrouch: () => void;  // NUEVO
+  onEnterCrouchRoll: () => void; // NUEVO
+  onExitCrouchRoll: () => void;  // NUEVO
 }
 
 const WEAPON_OFFSETS = {
@@ -68,13 +70,17 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
         JumpImpulseStart: true,
         RunningJumpImpulseStart: true,
         OnAir: () => !this.deps.isGroundDetected() && !this._isLandingInProgress(),
-        Crouch: () => this.deps.isCrouchHeld() && this._isCrouchableGroundState(), // NUEVO
+        Crouch: () => this.deps.isCrouchHeld() && this._isCrouchableGroundState(),
+        CrouchRollStart: true,
       },
       JumpImpulseStart: { OnAir: true },
       RunningJumpImpulseStart: { OnAir: true },
       OnAir: { OnGround: () => this.deps.isGroundDetected() },
-      Crouch: { // NUEVO
+      Crouch: {
         OnGround: () => !this.deps.isCrouchHeld(),
+      },
+      CrouchRollStart: {
+        OnGround: true,
       },
     };
   }
@@ -93,7 +99,7 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
     return s === "Idle" || s === "Walking" || s === "WalkingBackwards";
   }
 
-  getActiveSubState(): OnGroundSubState | OnGroundCrouchedSubState | "JumpImpulseStart" | "RunningJumpImpulseStart" | "OnAir" { // CAMBIADO — sin "Crouch"
+  getActiveSubState(): OnGroundSubState | OnGroundCrouchedSubState | "JumpImpulseStart" | "RunningJumpImpulseStart" | "OnAir" | 'CrouchRollStart' { // CAMBIADO — sin "Crouch"
     if (this.state === "OnGround") return this.onGroundSubFsm.getState();
     if (this.state === "Crouch") return this.onGroundCrouchedSubFsm.getState();
     return this.state;
@@ -104,6 +110,19 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
 
     const isRunning = this.onGroundSubFsm.getState() === "Running";
     this.setState(isRunning ? "RunningJumpImpulseStart" : "JumpImpulseStart");
+  }
+
+  requestCrouchRoll(): void { // NUEVO
+    if (this.state !== "OnGround") return;
+    if (this.onGroundSubFsm.getState() !== "Running") return;
+    this.setState("CrouchRollStart");
+  }
+
+  /** Llamado por el AnimationEvent del clip "running_roll" al llegar al frame final. */
+  notifyCrouchRollComplete(): void { // NUEVO
+    if (this.state === "CrouchRollStart") {
+      this.setState("OnGround");
+    }
   }
 
   notifyJumpImpulseFrame(): void {
@@ -147,8 +166,11 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
     }
     if (state === "Crouch") {
       this.onGroundCrouchedSubFsm.resetToIdle();
-      this.deps.onEnterCrouch(); // NUEVO
+      this.deps.onEnterCrouch();
       this._applyWeaponOffset(WEAPON_OFFSETS.crouchIdle);
+    }
+    if (state === "CrouchRollStart") { // NUEVO
+      this.deps.onEnterCrouchRoll();
     }
   }
 
@@ -156,9 +178,12 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
     if (state === "JumpImpulseStart") {
       this.deps.onExitJumpWindup();
     }
-    if (state === "Crouch") { // NUEVO
+    if (state === "Crouch") {
       this._applyWeaponOffset(WEAPON_OFFSETS.standAlone);
       this.deps.onExitCrouch();
+    }
+    if (state === "CrouchRollStart") { // NUEVO
+      this.deps.onExitCrouchRoll();
     }
   }
 

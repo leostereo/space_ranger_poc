@@ -146,9 +146,9 @@ export function characterAndEquipment_builder(scene: Scene): CharacterAndEquipme
     scene,
   );
 
-  // const camera = AssetManager.getCamera('follow', false, 'main_camera')
-  // camera.lockedTarget = character;
-  // scene.activeCamera = camera;
+  const camera = AssetManager.getCamera('follow', false, 'main_camera')
+  camera.lockedTarget = character;
+  scene.activeCamera = camera;
 
   // Weapon: parenteado simple a la cápsula, con offsets manuales por estado (ver WEAPON_OFFSETS
   // en character.base.ts / OnGroundFsm / OnGroundCrouchedFsm). Se intentó attachToBone acá pero
