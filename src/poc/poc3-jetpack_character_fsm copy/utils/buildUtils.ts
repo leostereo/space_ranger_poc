@@ -32,7 +32,6 @@ export function scene_builder(scene: Scene) {
   //return [groundAggregate];
 }
 
-
 const platformsData = [
   { name: "ground-inicio", depth: 400, heightOffset: 0.0, zStart: 0 },
   { name: "ground-media", depth: 40, heightOffset: -100, zStart: 300 },
@@ -107,8 +106,8 @@ export interface CharacterAndEquipmentBuildResult extends CharacterBuildResult {
 }
 
 export function characterAndEquipment_builder(scene: Scene): CharacterAndEquipmentBuildResult {
-  const capsuleResult = AssetManager.getMesh("character-capsule", "character-capsule");
-  const characterResult = AssetManager.getMesh("character", "character");
+  const capsuleResult = AssetManager.getMesh("character-capsule", "character-capsule"); // sin cambios — sigue sin clonar, single-player
+  const characterResult = AssetManager.getMesh("character", "character", { cloneAnimations: true }); // CAMBIADO — antes clonaba solo por ser "character"; ahora hay que pedirlo explícito
 
   if (!capsuleResult || !characterResult) {
     throw new Error("AssetManager: 'character' o 'character-capsule' no disponibles (¿faltó awaitear cargarTodo()?).");

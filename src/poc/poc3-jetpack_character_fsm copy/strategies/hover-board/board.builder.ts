@@ -18,19 +18,12 @@ export function board_builder(
   spawnPosition: Vector3,
   spawnRotationY: number = 0,
 ): BoardBuildResult {
-  const boardResult = AssetManager.getMesh("board", "skateboard");
-  const boardTemplate = boardResult?.mesh as Mesh; // CAMBIADO — ya no se usa directo
+  const boardResult = AssetManager.getMesh("board", "skateboard", { cloneMesh: true }); // CAMBIADO — antes clon local en este archivo
+  const boardMesh = boardResult?.mesh as Mesh;
 
-  if (!boardTemplate) {
+  if (!boardMesh) {
     throw new Error("board_builder: AssetManager no tiene 'board'/'skateboard' (¿faltó cargarTodo()?).");
   }
-
-  // NUEVO — clon descartable por cada equip, ya que AssetManager.getMesh("board", ...)
-  // devuelve la misma instancia singleton en cada llamada (a diferencia de "character",
-  // que sí clona internamente). Sin esto, dispose() en _swapToStandAlone() destruye la
-  // geometría real y el segundo equip falla con "0 vértices" en PhysicsAggregate.
-  const boardMesh = boardTemplate.clone("skateboard_clone", null) as Mesh;
-  boardMesh.setEnabled(true);
 
   boardMesh.position.copyFrom(spawnPosition);
   boardMesh.rotationQuaternion = Quaternion.FromEulerAngles(0, spawnRotationY, 0);

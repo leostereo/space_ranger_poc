@@ -495,45 +495,35 @@ export class AssetManager {
      * el resto de las claves (sin animaciones), `animations` es null.
      */
 
-    public static getMesh(clave: MeshAssetKey, nombreInstancia: string): MeshInstanceResult | null {
+    public static getMesh(
+        clave: MeshAssetKey,
+        nombreInstancia: string,
+        options: { cloneMesh?: boolean; cloneAnimations?: boolean } = {}, // NUEVO
+    ): MeshInstanceResult | null {
+        const { cloneMesh = false, cloneAnimations = false } = options; // NUEVO — ambos default false, comportamiento explícito por llamada
+
         const molde = this.meshes[clave];
         if (!molde) {
             console.error(`El asset "${clave}" no existe en el AssetManager.`);
             return null;
         }
 
-        // 1. Ya no clonamos, usamos el molde original directamente
-        const original = molde;
-
-        // 2. Si es 'character', pasamos el original. 
-        // Nota: Revisa si '_cloneCharacterAnimations' necesita adaptarse al original.
-        const animations = clave === "character" ? this._cloneCharacterAnimations(original, nombreInstancia) : null;
-
-        // 3. Nos aseguramos de que esté activo y visible
-        original.setEnabled(true);
-
-        return { mesh: original, animations };
+        // NUEVO — clon real si se pide, sino la referencia directa (comportamiento previo)
+        const resultMesh = cloneMesh ? (molde.clone(nombreInstancia, null) as Mesh) : molde;
+        if (!resultMesh) {
+            console.error(`getMesh: clone() de "${clave}" devolvió null (nombreInstancia="${nombreInstancia}").`);
+            return null;
     }
 
+        // CAMBIADO — antes se clonaban SIEMPRE para 'character'; ahora es explícito por llamada,
+        // igual criterio que cloneMesh. Sobre qué mesh remapear los huesos: el clon si cloneMesh,
+        // sino el original (sigue siendo válido para animar una única instancia compartida).
+        const animations = clave === "character" && cloneAnimations
+            ? this._cloneCharacterAnimations(resultMesh, nombreInstancia)
+            : null;
 
-    public static getClonedMesh(clave: MeshAssetKey, nombreInstancia: string): MeshInstanceResult | null {
-        const molde = this.meshes[clave];
-        if (!molde) {
-            console.error(`El asset "${clave}" no existe en el AssetManager.`);
-            return null;
-        }
-
-        // 1. Clonamos el mesh base (sea de código o el __root__ del GLB)
-        const clon = molde.clone(nombreInstancia, null);
-        if (!clon) return null;
-
-        // 2. Si es 'character' y el molde de animaciones está listo, clonamos el
-        //    diccionario semántico completo usando ESTE clon para el remapeo de huesos.
-        const animations = clave === "character" ? this._cloneCharacterAnimations(clon, nombreInstancia) : null;
-
-        // 3. Lo activamos para que sea visible y retorne al código
-        clon.setEnabled(true);
-        return { mesh: clon, animations };
+        resultMesh.setEnabled(true);
+        return { mesh: resultMesh, animations };
     }
 
     public static getSkeleton(key: MeshAssetKey): Skeleton | undefined {
