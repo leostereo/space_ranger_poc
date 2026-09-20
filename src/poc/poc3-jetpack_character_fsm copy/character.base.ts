@@ -9,7 +9,6 @@ import { Poc } from "../types";
 import { CharacterFsm } from "./character-fsm/character.fsm";
 import { CharacterInput } from "./character.input";
 import { CharacterHud } from "./character.hud";
-import { character_builder, scene_builder, weapon_builder } from "./utils/buildUtils";
 import { buildStandAloneStrategy, type StandAloneStrategyResult } from "./strategies/stand-alone/stand-alone.strategy";
 import { buildJetpackStrategy, type JetpackStrategyResult } from "./strategies/jetpack/jetpack.strategy";
 import type { IVehicleStrategy } from "./strategies/contracts/ivehicle-strategy";
@@ -19,7 +18,7 @@ import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { HoverBoardPhysicsController } from "./strategies/hover-board/hover-board.physics.controller";
 import { HoverBoardInputAdapter } from "./strategies/hover-board/hover-board.input.adapter";
 import { buildHoverBoardStrategy } from "./strategies/hover-board/hover-board.strategy";
-
+import { characterAndEquipment_builder, scene_builder } from "./utils/buildUtils";
 
 const JUMP_IMPULSE_FRAME = 30;
 const EQUIP_BOARD_FRAME = 60; // placeholder — ajustar cuando definan el frame real del clip
@@ -64,16 +63,19 @@ export default class CharacterBase implements Poc {
     this.scene = scene;
     scene_builder(scene);
 
-    const { characterMesh, characterAggregate, characterAnimations } = character_builder(scene);
+    const { characterMesh, characterAggregate, characterAnimations, weaponRoot, muzzle } = characterAndEquipment_builder(scene); // CAMBIADO
     this.characterMesh = characterMesh;
     this.characterAggregate = characterAggregate;
     this.characterAnimations = characterAnimations;
+    this.weaponRoot = weaponRoot;
+    this.weaponMuzzle = muzzle;
+    weaponRoot.parent = this.characterMesh;
+    this._applyWeaponOffset(WEAPON_OFFSETS.standAlone);
 
     if (!this.characterMesh.rotationQuaternion) {
       this.characterMesh.rotationQuaternion = Quaternion.Identity();
     }
 
-    const { weaponRoot, muzzle } = weapon_builder();
     weaponRoot.parent = this.characterMesh;
     this.weaponRoot = weaponRoot;
     this.weaponMuzzle = muzzle;

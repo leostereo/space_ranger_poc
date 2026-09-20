@@ -487,7 +487,29 @@ export class AssetManager {
      * (ver _prepareCharacterAnimations), clonado y remapeado contra esta instancia. Para
      * el resto de las claves (sin animaciones), `animations` es null.
      */
+
     public static getMesh(clave: MeshAssetKey, nombreInstancia: string): MeshInstanceResult | null {
+        const molde = this.meshes[clave];
+        if (!molde) {
+            console.error(`El asset "${clave}" no existe en el AssetManager.`);
+            return null;
+        }
+
+        // 1. Ya no clonamos, usamos el molde original directamente
+        const original = molde;
+
+        // 2. Si es 'character', pasamos el original. 
+        // Nota: Revisa si '_cloneCharacterAnimations' necesita adaptarse al original.
+        const animations = clave === "character" ? this._cloneCharacterAnimations(original, nombreInstancia) : null;
+
+        // 3. Nos aseguramos de que esté activo y visible
+        original.setEnabled(true);
+
+        return { mesh: original, animations };
+    }
+
+
+    public static getClonedMesh(clave: MeshAssetKey, nombreInstancia: string): MeshInstanceResult | null {
         const molde = this.meshes[clave];
         if (!molde) {
             console.error(`El asset "${clave}" no existe en el AssetManager.`);

@@ -140,7 +140,7 @@ export class OnGroundFsm extends BaseFsm<OnGroundSubState> {
     const isFastVerticalFall = verticalSpeed <= LANDING_CRASH_VERTICAL_THRESHOLD;
     const ratio = horizontalSpeed / Math.max(Math.abs(verticalSpeed), 0.001);
     const isFastHorizontal = ratio > LANDING_ROLL_RATIO_THRESHOLD;
-    console.log(verticalSpeed)
+
     if (isFastVerticalFall) {
       this.setState("LandingCrash");
     } else if (isFastHorizontal) {
@@ -175,7 +175,6 @@ export class OnGroundFsm extends BaseFsm<OnGroundSubState> {
   protected onEnter(_state: OnGroundSubState): void {
     this._applyWeaponOffset(WEAPON_OFFSETS.standAlone)
     if (this.state === 'ShootingStrafeLeft') {
-      console.log('enter left')
       this._applyWeaponOffset(WEAPON_OFFSETS.strafe_left)
     }
     if (this.state === 'ShootingStrafeRight') {

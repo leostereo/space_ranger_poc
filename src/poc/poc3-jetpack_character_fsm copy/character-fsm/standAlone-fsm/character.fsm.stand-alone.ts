@@ -27,6 +27,11 @@ export interface StandAloneFsmDeps {
   onExitCrouch: () => void;  // NUEVO
 }
 
+const WEAPON_OFFSETS = {
+  standAlone: { x: -0.08, y: 0.2, z: 0 },
+  crouchIdle: { x: -0.08, y: -0.06, z: 0 },
+} as const;
+
 export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
 
   protected transitions: TransitionTable<StandAloneSubState>;
@@ -143,6 +148,7 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
     if (state === "Crouch") {
       this.onGroundCrouchedSubFsm.resetToIdle();
       this.deps.onEnterCrouch(); // NUEVO
+      this._applyWeaponOffset(WEAPON_OFFSETS.crouchIdle);
     }
   }
 
@@ -151,8 +157,13 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
       this.deps.onExitJumpWindup();
     }
     if (state === "Crouch") { // NUEVO
+      this._applyWeaponOffset(WEAPON_OFFSETS.standAlone);
       this.deps.onExitCrouch();
     }
+  }
+
+  private _applyWeaponOffset(offset: { x: number; y: number; z: number }): void {
+    this.deps.weaponRoot?.position.set(offset.x, offset.y, offset.z);
   }
 
   dispose(): void {

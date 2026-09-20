@@ -10,9 +10,9 @@ export interface OnGroundCrouchedFsmDeps {
 }
 
 const WEAPON_OFFSETS = {
-  crouchIdle: { x: -0.08, y: 0.1, z: 0 },           // NUEVO — ajustá según pruebes
-  crouchWalking: { x: -0.08, y: 0.1, z: 1 },          // NUEVO
-  crouchWalkingBackwards: { x: -0.08, y: 0.1, z: -1 }, // NUEVO
+  crouchIdle: { x: -0.08, y: -0.06, z: 0 },
+  crouchWalking: { x: -0.08, y: 0, z: 0 },
+  crouchWalkingBackwards: { x: -0.08, y: 0, z: 0 },
 } as const;
 
 export class OnGroundCrouchedFsm extends BaseFsm<OnGroundCrouchedSubState> {
@@ -21,7 +21,6 @@ export class OnGroundCrouchedFsm extends BaseFsm<OnGroundCrouchedSubState> {
   constructor(private deps: OnGroundCrouchedFsmDeps) {
     super();
     this.state = "CrouchIdle";
-
     this.transitions = {
       CrouchIdle: {
         CrouchWalking: () => this.deps.isForwardHeld() && !this.deps.isBackwardHeld(),
