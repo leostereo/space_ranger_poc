@@ -11,20 +11,12 @@ import { Scalar } from "@babylonjs/core/Maths/math.scalar";
 import type { BoardFsm } from "../../character-fsm/board-fsm/board.fsm";
 import { generalConfig } from "@/poc/config.general";
 import { BoardInputState } from "@/poc/poc1-floating_board/board-input";
+import { HoverBoardThruster } from "./hover-board.thruster"; // NUEVO
 
-/**
- * Portado de BoardController (POC2). Diferencias con el original:
- * - No crea ni tickea su propio BoardFsm — lo recibe por constructor (referencia a
- *   characterFsm.boardSubFsm, que ya existe y ya se tickea desde CharacterFsm.tick()).
- *   Sólo LEE su estado para decidir qué fuerzas aplicar, mismo criterio que POC2 pero
- *   sin ser dueño de la FSM.
- * - No consume jump/testImpulse del input — eso vive en HoverBoardInputController.
- * - tick(dt) recibe dt por parámetro en vez de calcularlo con getDeltaTime() (mismo
- *   patrón que StandAlonePhysicsController).
- * - Thruster: TODO, pendiente portar board.thruster.ts.
- */
+
 export class HoverBoardPhysicsController {
   readonly fsm: BoardFsm;
+  private thruster: HoverBoardThruster; // NUEVO
 
   private elapsedTime = 0;
   private groundLostTimer = 0;
@@ -65,6 +57,8 @@ export class HoverBoardPhysicsController {
       this.boardMesh.rotationQuaternion = Quaternion.Identity();
     }
     this.fsm = boardFsm;
+    this.thruster = new HoverBoardThruster(this.scene, this.boardMesh); // NUEVO
+
   }
 
   /** Llamar desde el strategy.tick(dt), antes de que CharacterFsm.tick() corra la transición del boardSubFsm. */
@@ -106,6 +100,7 @@ export class HoverBoardPhysicsController {
     this._updateForwardForce();
     this._applyLateralFriction();
     this._updatePitch(dt);
+    this.thruster.update(this.getInput().forward, this._currentForwardSpeed); // NUEVO
   }
 
   /** Llamar en scene.onAfterPhysicsObservable. Roll y pitch son 100% visuales. */
@@ -352,7 +347,6 @@ export class HoverBoardPhysicsController {
   }
 
   dispose(): void {
-    // No dispone boardMesh/boardAggregate — dueño: character.base.ts (mismo criterio
-    // que StandAlonePhysicsController no dispone characterAggregate).
+    this.thruster.dispose(); // NUEVO
   }
 }

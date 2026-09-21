@@ -60,16 +60,28 @@ export default class CharacterBase implements Poc {
   private weaponRoot: WeaponBuildResult["weaponRoot"] | null = null;
   private weaponMuzzle: WeaponBuildResult["muzzle"] | null = null;
 
+  private thrusterGroup: TransformNode | null = null; // NUEVO
+  private thrusterLeft: Mesh | null = null;
+  private thrusterRight: Mesh | null = null;
+  private thrusterLeftNozzle: TransformNode | null = null; // NUEVO
+  private thrusterRightNozzle: TransformNode | null = null; // NUEVO
+
   async build(scene: Scene): Promise<void> {
     this.scene = scene;
     scene_builder(scene);
 
-    const { characterMesh, characterAggregate, characterAnimations, weaponRoot, muzzle } = characterAndEquipment_builder(scene); // CAMBIADO
+    const { characterMesh, characterAggregate, characterAnimations, weaponRoot, muzzle,
+      thrusterGroup, thrusterLeft, thrusterRight, thrusterLeftNozzle, thrusterRightNozzle } = characterAndEquipment_builder(scene); // CAMBIADO
     this.characterMesh = characterMesh;
     this.characterAggregate = characterAggregate;
     this.characterAnimations = characterAnimations;
     this.weaponRoot = weaponRoot;
     this.weaponMuzzle = muzzle;
+    this.thrusterGroup = thrusterGroup; // NUEVO
+    this.thrusterLeft = thrusterLeft; // NUEVO
+    this.thrusterRight = thrusterRight; // NUEVO
+    this.thrusterLeftNozzle = thrusterLeftNozzle; // NUEVO
+    this.thrusterRightNozzle = thrusterRightNozzle; // NUEVO
     weaponRoot.parent = this.characterMesh;
     this._applyWeaponOffset(WEAPON_OFFSETS.standAlone);
 
@@ -154,34 +166,34 @@ export default class CharacterBase implements Poc {
     this._bindObservables();
   }
 
-private _isAimingActive(): boolean {
-  if (this.fsm.getState() === "Jetpack") {
-    return this.fsm.jetpackSubFsm.getState() === "Shooting";
+  private _isAimingActive(): boolean {
+    if (this.fsm.getState() === "Jetpack") {
+      return this.fsm.jetpackSubFsm.getState() === "Shooting";
+    }
+    if (this.fsm.getState() === "StandAlone") {
+      const groundState = this.fsm.getActiveSubState();
+      const canAimHere =
+        groundState === "Idle" ||
+        groundState === "Walking" ||
+        groundState === "WalkingBackwards" ||
+        groundState === "Running" ||
+        groundState === "ShootingStrafeLeft" ||
+        groundState === "ShootingStrafeRight" ||
+        groundState === "CrouchIdle" ||            // NUEVO
+        groundState === "CrouchWalking" ||          // NUEVO
+        groundState === "CrouchWalkingBackwards";   // NUEVO
+      return canAimHere && this.input.current.shoot;
+    }
+    if (this.fsm.getState() === "HoverBoard") {
+      return this.input.current.shoot;
+    }
+    return false;
   }
-  if (this.fsm.getState() === "StandAlone") {
-    const groundState = this.fsm.getActiveSubState();
-    const canAimHere =
-      groundState === "Idle" ||
-      groundState === "Walking" ||
-      groundState === "WalkingBackwards" ||
-      groundState === "Running" ||
-      groundState === "ShootingStrafeLeft" ||
-      groundState === "ShootingStrafeRight" ||
-      groundState === "CrouchIdle" ||            // NUEVO
-      groundState === "CrouchWalking" ||          // NUEVO
-      groundState === "CrouchWalkingBackwards";   // NUEVO
-    return canAimHere && this.input.current.shoot;
-  }
-  if (this.fsm.getState() === "HoverBoard") {
-    return this.input.current.shoot;
-  }
-  return false;
-}
 
   private _updateWeaponVisibility(): void {
-    setTimeout(()=>{
+    setTimeout(() => {
       this.weaponRoot?.setEnabled(this._isAimingActive());
-    },3000)
+    }, 3000)
   }
 
   private _wireJumpAnimationEvent(): void {
@@ -276,7 +288,13 @@ private _isAimingActive(): boolean {
       throw new Error("_swapToJetpack: weaponMuzzle no está inicializado — revisar build().");
     }
 
+    if (!this.thrusterGroup || !this.thrusterLeft || !this.thrusterRight || !this.thrusterLeftNozzle || !this.thrusterRightNozzle) {
+      throw new Error("_swapToJetpack: thrusters no inicializados — revisar build().");
+    }
+
     this._applyWeaponOffset(WEAPON_OFFSETS.jetpack); // NUEVO
+    this._setThrustersEnabled(true); // NUEVO
+
 
     const { strategy, physicsController } = await buildJetpackStrategy(
       this.scene,
@@ -285,6 +303,9 @@ private _isAimingActive(): boolean {
       this.fsm,
       this.characterAnimations,
       this.weaponMuzzle,
+      this.thrusterGroup,
+      this.thrusterLeftNozzle, // CAMBIADO — antes thrusterLeft (mesh), ahora el nozzle
+      this.thrusterRightNozzle, // CAMBIADO
     );
 
     this.activeStrategy = strategy;
@@ -311,7 +332,7 @@ private _isAimingActive(): boolean {
       this.characterMesh.position.copyFrom(spawnPosition);
       this.characterMesh.rotationQuaternion = Quaternion.FromEulerAngles(0, spawnRotationY, 0);
       this.weaponRoot?.rotation.set(0, 0, 0);
-      
+
       this._activeBoardAggregate.dispose();
       this._activeBoardMesh.dispose();
       this._activeBoardMesh = null;
@@ -340,7 +361,8 @@ private _isAimingActive(): boolean {
       throw new Error("_swapToStandAlone: weaponMuzzle no está inicializado — revisar build().");
     }
 
-    this._applyWeaponOffset(WEAPON_OFFSETS.standAlone); // NUEVO
+    this._applyWeaponOffset(WEAPON_OFFSETS.standAlone);
+    this._setThrustersEnabled(false); // NUEVO
 
     const { strategy, physicsController } = await buildStandAloneStrategy(
       this.scene,
@@ -423,6 +445,10 @@ private _isAimingActive(): boolean {
 
   private _applyWeaponOffset(offset: { x: number; y: number; z: number }): void {
     this.weaponRoot?.position.set(offset.x, offset.y, offset.z);
+  }
+
+  private _setThrustersEnabled(enabled: boolean): void {
+    this.thrusterGroup?.setEnabled(enabled); // CAMBIADO — un solo toggle, cascada automática
   }
 
   // Helper nuevo — agregalo como método privado de la clase (cerca de _swapToStandAlone/_swapToHoverBoard)

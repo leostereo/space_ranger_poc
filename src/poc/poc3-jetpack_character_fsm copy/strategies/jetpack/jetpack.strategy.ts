@@ -7,7 +7,7 @@ import type { CharacterInput } from "../../character.input";
 import { JetpackPhysicsController } from "./jetpack.physics.controller";
 import { JetpackInputController } from "./jetpack.input.controller";
 import { JetpackAnimationController } from "./jetpack.animation.controller";
-import { AbstractMesh, Scene, TransformNode } from "@babylonjs/core";
+import { AbstractMesh, Mesh, Scene, TransformNode } from "@babylonjs/core";
 import { ProjectileWeaponController } from "../weapon/projectile-weapon.controller";
 
 export interface JetpackStrategyResult {
@@ -22,11 +22,18 @@ export async function buildJetpackStrategy(
   characterFsm: CharacterFsm,
   characterAnimations: ICharacterAnimations | null,
   weaponMuzzle: TransformNode,
+  thrusterGroup: TransformNode,
+  thrusterLeftNozzle: TransformNode, // CAMBIADO
+  thrusterRightNozzle: TransformNode, // CAMBIADO
 ): Promise<JetpackStrategyResult> {
   const physics = new JetpackPhysicsController(
+    scene,
     characterAggregate,
     () => input.current,
     () => characterFsm.jetpackSubFsm.getState(),
+    thrusterGroup,
+    thrusterLeftNozzle, // CAMBIADO
+    thrusterRightNozzle, // CAMBIADO
   );
   const inputController = new JetpackInputController(input, characterFsm);
   const animation = new JetpackAnimationController(characterAnimations, characterFsm.jetpackSubFsm);

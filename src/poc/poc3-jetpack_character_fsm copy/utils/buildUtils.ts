@@ -2,7 +2,7 @@
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType } from "@babylonjs/core/Physics/v2/IPhysicsEnginePlugin";
-import { Axis, Quaternion, Space } from "@babylonjs/core";
+import { Axis, Quaternion, Space, TransformNode } from "@babylonjs/core";
 import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { generalConfig } from "@/poc/config.general";
@@ -103,6 +103,11 @@ export interface CharacterBuildResult {
 export interface CharacterAndEquipmentBuildResult extends CharacterBuildResult {
   weaponRoot: WeaponBuildResult["weaponRoot"];
   muzzle: WeaponBuildResult["muzzle"];
+  thrusterGroup: TransformNode;
+  thrusterLeft: Mesh;
+  thrusterRight: Mesh;
+  thrusterLeftNozzle: TransformNode; // NUEVO
+  thrusterRightNozzle: TransformNode; // NUEVO
 }
 
 export function characterAndEquipment_builder(scene: Scene): CharacterAndEquipmentBuildResult {
@@ -159,11 +164,26 @@ export function characterAndEquipment_builder(scene: Scene): CharacterAndEquipme
   }
   const { weaponRoot, muzzle } = weaponResult;
 
+  // NUEVO — thrusters, parentados a la cápsula, offset hombros/espalda (ajustar a ojo)
+  const thrusterResult = AssetManager.getThrusters();
+  if (!thrusterResult) {
+    throw new Error("characterAndEquipment_builder: no se pudo obtener thrusters del AssetManager.");
+  }
+  const { thrusterGroup, thrusterLeft, thrusterRight, thrusterLeftNozzle, thrusterRightNozzle } = thrusterResult; // CAMBIADO
+  thrusterGroup.parent = capsule;
+  thrusterGroup.position.set(0,0.3,0.06);
+
   return {
     characterMesh: capsule,
     characterAggregate,
     characterAnimations: characterResult.animations,
     weaponRoot,
     muzzle,
+    thrusterGroup,
+    thrusterLeft,
+    thrusterRight,
+    thrusterLeftNozzle, // NUEVO
+    thrusterRightNozzle, // NUEVO
   };
 }
+

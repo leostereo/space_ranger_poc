@@ -81,9 +81,9 @@ export interface ICharacterAnimations {
     crouch_walk: AnimationGroup,
     crouch_walkbackwards: AnimationGroup,
 
-    crouch_walk_aim :AnimationGroup
+    crouch_walk_aim: AnimationGroup
     crouch_walkbackwards_aim: AnimationGroup
-    crouch_idle_aim :AnimationGroup
+    crouch_idle_aim: AnimationGroup
 
     running_roll: AnimationGroup
 
@@ -100,6 +100,14 @@ export interface WeaponBuildResult {
     muzzle: TransformNode;
 }
 
+export interface ThrusterBuildResult {
+    thrusterGroup: TransformNode;
+    thrusterLeft: Mesh;
+    thrusterRight: Mesh;
+    thrusterLeftNozzle: TransformNode; // NUEVO
+    thrusterRightNozzle: TransformNode; // NUEVO
+}
+
 export class AssetManager {
     // Diccionarios en memoria (privados para que nadie los modifique por fuera)
     private static textures: Record<string, Texture> = {};
@@ -110,7 +118,7 @@ export class AssetManager {
     private static lights: Record<string, HemisphericLight> = {};
     private static weaponResult: WeaponBuildResult | null = null;
     private static skeletons: Record<MeshAssetKey, Skeleton> = {} as Record<MeshAssetKey, Skeleton>;
-
+    private static thrusterResult: ThrusterBuildResult | null = null; // NUEVO
 
     // Almacén para las animaciones originales de los GLB (crudo, por nombre de clip tal
     // cual viene del archivo — sigue existiendo para getAnimations(), sin cambios).
@@ -303,7 +311,74 @@ export class AssetManager {
         this._buildBoard(scene);
         this._prepareCharacterAnimations();
         this._buildWeapons(scene);
+        this._buildThrusters(scene); // NUEVO
 
+    }
+
+    private static _buildThrusters(scene: Scene): void {
+        const bodyLength = 0.12;
+        const bodyDiameter = 0.06;
+        const coneLength = 0.05; // CAMBIADO — antes tipLength
+        const coneBaseDiameter = 0.09; // CAMBIADO — antes tipDiameter, ahora es la base ancha del cono
+
+        const thrusterGroup = new TransformNode("thrusterGroup", scene);
+
+        const buildOne = (name: string): { root: Mesh; nozzle: TransformNode } => {
+            const root = MeshBuilder.CreateBox(`${name}Root`, { size: 0.0001 }, scene);
+            root.isVisible = false;
+            root.isPickable = false;
+            root.parent = thrusterGroup;
+
+            const body = MeshBuilder.CreateCylinder(
+                `${name}Body`,
+                { diameter: bodyDiameter, height: bodyLength, tessellation: 16 },
+                scene,
+            );
+            body.parent = root;
+            body.rotation.x = Math.PI / 2;
+            body.position.z = bodyLength / 2;
+            body.isPickable = false;
+
+            // CAMBIADO — cono en vez de cilindro para la punta: diameterTop en 0 da la forma
+            // cónica real (base ancha pegada al body, vértice hacia afuera = salida del chorro).
+            const cone = MeshBuilder.CreateCylinder(
+                `${name}Cone`,
+                { diameterTop: 0, diameterBottom: coneBaseDiameter, height: coneLength, tessellation: 16 },
+                scene,
+            );
+            cone.parent = root;
+            cone.rotation.x = -Math.PI / 2;
+            cone.position.z = bodyLength + coneLength / 2;
+            cone.isPickable = false;
+
+            const mat = new StandardMaterial(`${name}Mat`, scene);
+            mat.diffuseColor = new Color3(0.25, 0.25, 0.3);
+            mat.specularColor = new Color3(0.1, 0.1, 0.1);
+            body.material = mat;
+            cone.material = mat; // CAMBIADO — antes tip.material
+
+            const nozzle = new TransformNode(`${name}Nozzle`, scene);
+            nozzle.parent = root;
+            nozzle.position.set(0, 0, bodyLength + coneLength); // CAMBIADO — punta del cono, no del tip cilíndrico
+
+            return { root, nozzle };
+        };
+
+        const left = buildOne("thrusterLeft");
+        const right = buildOne("thrusterRight");
+
+        left.root.position.set(-0.08, 0, 0);
+        right.root.position.set(0.08, 0, 0);
+
+        thrusterGroup.setEnabled(false);
+
+        this.thrusterResult = {
+            thrusterGroup,
+            thrusterLeft: left.root,
+            thrusterRight: right.root,
+            thrusterLeftNozzle: left.nozzle,
+            thrusterRightNozzle: right.nozzle,
+        };
     }
 
     private static _buildWeapons(scene: Scene): void {
@@ -378,7 +453,7 @@ export class AssetManager {
         const falling_idle = find("falling idle");
         const flying = find("flying");
         const floating = find("floating");
-        
+
         const jump_on_board = find("jump on board");
         const walking_forward = find("walking forward");
         const walking_backwards = find("walking backwards");
@@ -407,7 +482,7 @@ export class AssetManager {
 
 
 
-        if (!standing_idle || !cruising_idle || !cruising_forward_idle || !cruising_faster_idle || !cruising_maxVel_idle || !jump_while_running || 
+        if (!standing_idle || !cruising_idle || !cruising_forward_idle || !cruising_faster_idle || !cruising_maxVel_idle || !jump_while_running ||
             !standing_to_crouch || !crouch_to_standing || !jump || !normal_landing || !crash_landing || !roll_landing || !falling_idle ||
             !flying || !floating || !jump_on_board || !walking_forward || !walking_backwards ||
             !running_normal || !running_fast || !aiming_jetpack || !crouch_aimming || !idle_aimming || !walking_backwards_aimming ||
@@ -420,7 +495,7 @@ export class AssetManager {
         const mold: ICharacterAnimations = {
             standing_idle, cruising_idle, cruising_forward_idle, cruising_faster_idle, cruising_maxVel_idle,
             standing_to_crouch, crouch_to_standing, jump, normal_landing, crash_landing, roll_landing, floating, flying,
-            falling_idle, jump_on_board, walking_forward, walking_backwards,running_fast, running_normal, aiming_jetpack,
+            falling_idle, jump_on_board, walking_forward, walking_backwards, running_fast, running_normal, aiming_jetpack,
             jump_while_running, crouch_aimming, idle_aimming, walking_aimming, walking_backwards_aimming, running_aimming,
             strafe_right, strafe_left, crouch_walk, crouch_walkbackwards, crouch_walk_aim, crouch_walkbackwards_aim,
             crouch_idle_aim, running_roll
@@ -477,11 +552,11 @@ export class AssetManager {
             strafe_left: cloneOne(mold.strafe_left),
             crouch_walk: cloneOne(mold.crouch_walk),
             crouch_walkbackwards: cloneOne(mold.crouch_walkbackwards),
-            
+
             crouch_idle_aim: cloneOne(mold.crouch_idle_aim),
             crouch_walk_aim: cloneOne(mold.crouch_walk_aim),
             crouch_walkbackwards_aim: cloneOne(mold.crouch_walkbackwards_aim),
-            
+
             running_roll: cloneOne(mold.running_roll)
         };
     }
@@ -513,7 +588,7 @@ export class AssetManager {
         if (!resultMesh) {
             console.error(`getMesh: clone() de "${clave}" devolvió null (nombreInstancia="${nombreInstancia}").`);
             return null;
-    }
+        }
 
         // CAMBIADO — antes se clonaban SIEMPRE para 'character'; ahora es explícito por llamada,
         // igual criterio que cloneMesh. Sobre qué mesh remapear los huesos: el clon si cloneMesh,
@@ -584,6 +659,14 @@ export class AssetManager {
             return null;
         }
         return this.weaponResult;
+    }
+
+    public static getThrusters(): ThrusterBuildResult | null {
+        if (!this.thrusterResult) {
+            console.error(`Los assets de thrusters no fueron construidos — revisar _buildThrusters().`);
+            return null;
+        }
+        return this.thrusterResult;
     }
 
     //privates

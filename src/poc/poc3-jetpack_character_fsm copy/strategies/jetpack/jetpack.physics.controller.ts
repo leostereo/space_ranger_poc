@@ -7,6 +7,10 @@ import { Tools } from "@babylonjs/core/Misc/tools";
 import type { IPhysicsController } from "../contracts/iphysics-controller";
 import type { CharacterInputState } from "../../character.input";
 import type { JetpackSubState } from "../../character-fsm/jetpack-fsm/character.fsm.jetpack";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh"; // NUEVO
+import { JetpackThruster } from "./jetpack.thruster"; // NUEVO
+import { Mesh, TransformNode, type Scene } from "@babylonjs/core";
+
 
 const CHARACTER_MASS = 70;
 const GRAVITY = 9.81;
@@ -40,10 +44,15 @@ const ON_HORIZONTAL_BRAKE_FACTOR = 4; // mismo criterio que brakingDragFactor/CR
 const SHOOTING_MAX_PITCH_ANGLE = Tools.ToRadians(45);
 const SHOOTING_PITCH_RATE = Tools.ToRadians(90); // rad/s — velocidad de ajuste mientras se sostiene W/S
 
+const THRUSTER_TRANSFORM_ON = { rotation: new Vector3(Tools.ToRadians(90), Tools.ToRadians(-60), 0) };
+const THRUSTER_TRANSFORM_SHOOTING = { rotation: new Vector3(Tools.ToRadians(90), Tools.ToRadians(-50), 0) };
+const THRUSTER_TRANSFORM_CRUISING = { rotation: new Vector3(Tools.ToRadians(180), 0, 0) };
+
 export class JetpackPhysicsController implements IPhysicsController {
   private fuel = MAX_FUEL;
   private hoverTargetHeight: number;
   private elapsedTime = 0;
+  private thruster: JetpackThruster; // NUEVO
 
   // Visual (roll/pitch) — aplicado en applyVisualRoll(), llamado desde
   // onAfterPhysicsObservable en character.base.ts, nunca en tick().
@@ -60,11 +69,16 @@ export class JetpackPhysicsController implements IPhysicsController {
   private wasCruisePitching = false;
 
   constructor(
+    private scene: Scene,
     private characterAggregate: PhysicsAggregate,
     private getInput: () => CharacterInputState,
     private getSubState: () => JetpackSubState,
+    private thrusterGroup: TransformNode,
+    thrusterLeftNozzle: TransformNode, // CAMBIADO
+    thrusterRightNozzle: TransformNode, // CAMBIADO
   ) {
     this.hoverTargetHeight = this.characterAggregate.transformNode.getAbsolutePosition().y;
+    this.thruster = new JetpackThruster(this.scene, this.characterAggregate.transformNode as AbstractMesh, thrusterLeftNozzle, thrusterRightNozzle); // CAMBIADO
   }
 
   tick(dt: number): void {
@@ -82,6 +96,9 @@ export class JetpackPhysicsController implements IPhysicsController {
     this._applyGravityCompensation();
 
     const subState = this.getSubState();
+
+    this._applyThrusterRotation(subState); // NUEVO
+
 
     if (subState === "Cruising") {
       this._updateCruisePitch(dt); // lerp del ángulo ANTES de decidir si hay fuerza que aplicar
@@ -114,6 +131,10 @@ export class JetpackPhysicsController implements IPhysicsController {
       this._decayVisuals(dt, subState); // CAMBIADO — antes _decayCruiseVisuals(dt), ver abajo
       this._applyOnHorizontalBrake();
     }
+
+    const verticalVelocity = this.characterAggregate.body.getLinearVelocity().y; // NUEVO
+    this.thruster.update(up && this.fuel > 0, verticalVelocity); // NUEVO
+
   }
 
   private _updateShootingPitch(dt: number): void {
@@ -145,6 +166,13 @@ export class JetpackPhysicsController implements IPhysicsController {
       new Vector3(0, CHARACTER_MASS * GRAVITY, 0),
       this.characterAggregate.transformNode.getAbsolutePosition(),
     );
+  }
+
+  private _applyThrusterRotation(subState: JetpackSubState): void {
+    let transform = THRUSTER_TRANSFORM_ON;
+    if (subState === "Shooting") transform = THRUSTER_TRANSFORM_SHOOTING;
+    if (subState === "Cruising") transform = THRUSTER_TRANSFORM_CRUISING; // NUEVO
+    this.thrusterGroup.rotation.set(transform.rotation.x, transform.rotation.y, transform.rotation.z);
   }
 
   private _decayVisuals(dt: number, subState: JetpackSubState): void {
@@ -335,6 +363,6 @@ export class JetpackPhysicsController implements IPhysicsController {
   }
 
   dispose(): void {
-    // No posee characterAggregate (compartida, dueño: character.base.ts) — nada que liberar acá todavía.
+    this.thruster.dispose(); // NUEVO
   }
 }
