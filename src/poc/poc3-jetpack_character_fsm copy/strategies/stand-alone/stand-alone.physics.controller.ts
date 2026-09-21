@@ -51,7 +51,7 @@ export class StandAlonePhysicsController implements IPhysicsController {
     private characterAggregate: PhysicsAggregate,
     private getInput: () => CharacterInputState,
     initialGroundDetected: boolean,
-    private getSubState: () => OnGroundSubState | OnGroundCrouchedSubState | "JumpImpulseStart" | "RunningJumpImpulseStart" | "OnAir", 
+    private getSubState: () => OnGroundSubState | OnGroundCrouchedSubState | "JumpImpulseStart" | "RunningJumpImpulseStart" | "OnAir" | "CrouchRollStart", 
   ) {
     this._groundDetected = initialGroundDetected;
     this._setupFallAndLanding();
