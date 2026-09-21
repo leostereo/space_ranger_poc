@@ -1,0 +1,381 @@
+diff --git a/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.stand-alone.ts b/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.stand-alone.ts
+index 67f43cb..275a13d 100644
+--- a/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.stand-alone.ts	
++++ b/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.stand-alone.ts	
+@@ -1,8 +1,9 @@
+ import { TransformNode } from "@babylonjs/core";
+ import { BaseFsm, TransitionTable } from "../abstract/base-fsm";
+ import { OnGroundFsm, type OnGroundSubState } from "./character.fsm.stand-alone.on-ground";
++import { OnGroundCrouchedFsm, type OnGroundCrouchedSubState } from "./character.fsm.stand-alone.on-ground-crouched";
+ 
+-export type StandAloneSubState = "OnGround" | "JumpImpulseStart" | "RunningJumpImpulseStart" | "OnAir";
++export type StandAloneSubState = "OnGround" | "JumpImpulseStart" | "RunningJumpImpulseStart" | "OnAir" | "Crouch";
+ 
+ export interface StandAloneFsmDeps {
+   isGroundDetected: () => boolean;
+@@ -20,13 +21,17 @@ export interface StandAloneFsmDeps {
+   isLeftHeld: () => boolean;
+   isRightHeld: () => boolean;
+   isAimingHeld: () => boolean;
++  isCrouchHeld: () => boolean;
+   weaponRoot: TransformNode;
++  onEnterCrouch: () => void; // NUEVO
++  onExitCrouch: () => void;  // NUEVO
+ }
+ 
+ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
+ 
+   protected transitions: TransitionTable<StandAloneSubState>;
+   readonly onGroundSubFsm: OnGroundFsm;
++  readonly onGroundCrouchedSubFsm: OnGroundCrouchedFsm;
+   private cameFromRunningJump = false;
+ 
+   constructor(private deps: StandAloneFsmDeps) {
+@@ -47,20 +52,23 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
+       weaponRoot: this.deps.weaponRoot
+     });
+ 
++    this.onGroundCrouchedSubFsm = new OnGroundCrouchedFsm({ // NUEVO
++      isForwardHeld: this.deps.isForwardHeld,
++      isBackwardHeld: this.deps.isBackwardHeld,
++    });
++
+     this.transitions = {
+       OnGround: {
+         JumpImpulseStart: true,
+         RunningJumpImpulseStart: true,
+         OnAir: () => !this.deps.isGroundDetected() && !this._isLandingInProgress(),
++        Crouch: () => this.deps.isCrouchHeld() && this._isCrouchableGroundState(), // NUEVO
+       },
+-      JumpImpulseStart: {
+-        OnAir: true,
+-      },
+-      RunningJumpImpulseStart: { // NUEVO
+-        OnAir: true,
+-      },
+-      OnAir: {
+-        OnGround: () => this.deps.isGroundDetected(),
++      JumpImpulseStart: { OnAir: true },
++      RunningJumpImpulseStart: { OnAir: true },
++      OnAir: { OnGround: () => this.deps.isGroundDetected() },
++      Crouch: { // NUEVO
++        OnGround: () => !this.deps.isCrouchHeld(),
+       },
+     };
+   }
+@@ -69,9 +77,22 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
+     super.tick();
+     if (this.state === "OnGround") {
+       this.onGroundSubFsm.tick();
++    } else if (this.state === "Crouch") { // NUEVO
++      this.onGroundCrouchedSubFsm.tick();
+     }
+   }
+ 
++  private _isCrouchableGroundState(): boolean { // NUEVO
++    const s = this.onGroundSubFsm.getState();
++    return s === "Idle" || s === "Walking" || s === "WalkingBackwards";
++  }
++
++  getActiveSubState(): OnGroundSubState | OnGroundCrouchedSubState | "JumpImpulseStart" | "RunningJumpImpulseStart" | "OnAir" { // CAMBIADO — sin "Crouch"
++    if (this.state === "OnGround") return this.onGroundSubFsm.getState();
++    if (this.state === "Crouch") return this.onGroundCrouchedSubFsm.getState();
++    return this.state;
++  }
++
+   requestJump(): void {
+     if (this.state !== "OnGround") return;
+ 
+@@ -92,10 +113,6 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
+     }
+   }
+ 
+-  getActiveSubState(): OnGroundSubState | "JumpImpulseStart" | "RunningJumpImpulseStart" | "OnAir" {
+-    return this.state === "OnGround" ? this.onGroundSubFsm.getState() : this.state;
+-  }
+-
+   private _isLandingInProgress(): boolean {
+     const state = this.onGroundSubFsm.getState();
+     return state === "LandingSoft" || state === "LandingRoll" || state === "LandingCrash";
+@@ -122,15 +139,23 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
+     if (state === "JumpImpulseStart") {
+       this.deps.onEnterJumpWindup();
+     }
++    if (state === "Crouch") {
++      this.onGroundCrouchedSubFsm.resetToIdle();
++      this.deps.onEnterCrouch(); // NUEVO
++    }
+   }
+ 
+   protected onExit(state: StandAloneSubState): void {
+     if (state === "JumpImpulseStart") {
+       this.deps.onExitJumpWindup();
+     }
++    if (state === "Crouch") { // NUEVO
++      this.deps.onExitCrouch();
++    }
+   }
+ 
+   dispose(): void {
+     this.onGroundSubFsm.dispose();
++    this.onGroundCrouchedSubFsm.dispose(); // NUEVO
+   }
+ }
+\ No newline at end of file
+diff --git a/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts b/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts
+index 29d4188..072d3ab 100644
+--- a/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts	
++++ b/src/poc/poc3-jetpack_character_fsm copy/character-fsm/character.fsm.ts	
+@@ -6,6 +6,7 @@ import { OnGroundSubState } from "./character.fsm.stand-alone.on-ground";
+ import type { HoveringSubState } from "./board-fsm/board.fsm.hovering";
+ import type { FallingSubState } from "./board-fsm/board.fsm.falling";
+ import { TransformNode } from "@babylonjs/core";
++import { OnGroundCrouchedSubState } from "./character.fsm.stand-alone.on-ground-crouched";
+ 
+ export type CharacterMainState =
+   | "StandAlone"
+@@ -30,7 +31,8 @@ export interface CharacterFsmDeps {
+   isRunHeld: () => boolean;
+   isLeftHeld: () => boolean;
+   isRightHeld: () => boolean;
+-  isAimingHeld: () => boolean; 
++  isAimingHeld: () => boolean;
++  isCrouchHeld: () => boolean; // NUEVO
+   onEnterHoverBoard: () => void;
+   /** Threading hacia OnGroundFsmDeps, vía StandAloneFsmDeps — mismo criterio que isMoveHeld/isRunHeld. */
+   getVerticalSpeed: () => number;
+@@ -52,6 +54,8 @@ export interface CharacterFsmDeps {
+   onEnterDiving: () => void;
+   onEnterGliderBoost: () => void;
+   weaponRoot:TransformNode;
++  onEnterCrouch: () => void; // NUEVO
++  onExitCrouch: () => void;  // NUEVO
+ }
+ 
+ export class CharacterFsm extends BaseFsm<CharacterMainState> {
+@@ -75,7 +79,8 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
+       isRunHeld: this.deps.isRunHeld,
+       isLeftHeld: this.deps.isLeftHeld,     
+       isRightHeld: this.deps.isRightHeld,   
+-      isAimingHeld: this.deps.isAimingHeld, 
++      isAimingHeld: this.deps.isAimingHeld,
++      isCrouchHeld: this.deps.isCrouchHeld, // NUEVO
+       getVerticalSpeed: this.deps.getVerticalSpeed,
+       getHorizontalSpeed: this.deps.getHorizontalSpeed,
+       onEnterLandingRoll: this.deps.onEnterLandingRoll,
+@@ -83,7 +88,9 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
+       onEnterJumpWindup: this.deps.onEnterJumpWindup,
+       onExitJumpWindup: this.deps.onExitJumpWindup,
+       onEnterRunningJumpOnAir: this.deps.onEnterRunningJumpOnAir,
+-      weaponRoot: this.deps.weaponRoot
++      weaponRoot: this.deps.weaponRoot,
++      onEnterCrouch: this.deps.onEnterCrouch, // NUEVO
++      onExitCrouch: this.deps.onExitCrouch,   // NUEVO
+     });
+ 
+     this.jetpackSubFsm = new JetpackFsm({
+@@ -181,7 +188,7 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
+     }
+   }
+ 
+-  getActiveSubState(): StandAloneSubState | OnGroundSubState | JetpackSubState | HoveringSubState | FallingSubState | "Loading" {
++  getActiveSubState(): StandAloneSubState | OnGroundSubState | OnGroundCrouchedSubState | JetpackSubState | HoveringSubState | FallingSubState | "Loading" {
+     if (this.state === "StandAlone") return this.standAloneSubFsm.getActiveSubState();
+     if (this.state === "Jetpack") return this.jetpackSubFsm.getState();
+     if (this.state === "HoverBoard") return this.boardSubFsm.getActiveSubState();
+@@ -192,10 +199,13 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
+    * ["HoverBoard","Falling","Dropping"], ["Jetpack","Cruising"]. */
+   getStatePath(): string[] {
+     if (this.state === "StandAlone") {
+-      const mid = this.standAloneSubFsm.getState(); // "OnGround" | "JumpImpulseStart" | "OnAir"
++      const mid = this.standAloneSubFsm.getState(); // ahora puede ser "Crouch" también
+       if (mid === "OnGround") {
+         return [this.state, mid, this.standAloneSubFsm.onGroundSubFsm.getState()];
+       }
++      if (mid === "Crouch") { // NUEVO
++        return [this.state, mid, this.standAloneSubFsm.onGroundCrouchedSubFsm.getState()];
++      }
+       return [this.state, mid];
+     }
+ 
+diff --git a/src/poc/poc3-jetpack_character_fsm copy/character.base.ts b/src/poc/poc3-jetpack_character_fsm copy/character.base.ts
+index e71adf8..bbe9691 100644
+--- a/src/poc/poc3-jetpack_character_fsm copy/character.base.ts	
++++ b/src/poc/poc3-jetpack_character_fsm copy/character.base.ts	
+@@ -98,6 +98,7 @@ export default class CharacterBase implements Poc {
+       isLeftHeld: () => this.input.current.left,
+       isRightHeld: () => this.input.current.right,
+       isAimingHeld: () => this._isAimingActive(),
++      isCrouchHeld: () => this.input.current.crouch,
+       onEnterHoverBoard: () => this._swapToHoverBoard(),
+       getVerticalSpeed: () => this.activeStandAlonePhysics?.getLastImpactVerticalSpeed() ?? 0,
+       getHorizontalSpeed: () => this.activeStandAlonePhysics?.getLastImpactHorizontalSpeed() ?? 0,
+@@ -119,7 +120,9 @@ export default class CharacterBase implements Poc {
+       onEnterDiving: () => { },
+       onEnterGliderBoost: () => this.activeBoardPhysics?.onEnterGliderBoost(),
+       onEnterRunningJumpOnAir: () => this.activeStandAlonePhysics?.applyRunningJumpImpulse(),
+-      weaponRoot
++      weaponRoot,
++      onEnterCrouch: () => this.activeStandAlonePhysics?.notifyCrouchEnter(), // NUEVO
++      onExitCrouch: () => this.activeStandAlonePhysics?.notifyCrouchExit(),  // NUEVO
+     });
+ 
+     this._wireJumpAnimationEvent();
+diff --git a/src/poc/poc3-jetpack_character_fsm copy/character.input.ts b/src/poc/poc3-jetpack_character_fsm copy/character.input.ts
+index 01e84fd..fc6f193 100644
+--- a/src/poc/poc3-jetpack_character_fsm copy/character.input.ts	
++++ b/src/poc/poc3-jetpack_character_fsm copy/character.input.ts	
+@@ -6,6 +6,7 @@ export interface CharacterInputState {
+   up: boolean;       // Space (empuje del jetpack mientras está equipado)
+   cruise: boolean;   // Shift — mantenido en Jetpack/On dispara Cruising, al soltar vuelve a On
+   shoot: boolean;     // "/" — mantenido en Jetpack/On dispara Shooting, Shift tiene prioridad
++  crouch: boolean;   // "." — mantenido en OnGround (Idle/Walking/WalkingBackwards) dispara Crouch
+ }
+ 
+ export class CharacterInput {
+@@ -17,6 +18,7 @@ export class CharacterInput {
+     up: false,
+     cruise: false,
+     shoot: false,
++    crouch: false,
+   };
+ 
+   /**
+@@ -66,9 +68,8 @@ export class CharacterInput {
+       case "Slash": // NUEVO — tecla "/"
+         this.state.shoot = true;
+         break;
+-      case "ControlLeft":
+-      case "ControlRight":
+-        this.equipRequested = true;
++      case "Period": // NUEVO — tecla "."
++        this.state.crouch = true;
+         break;
+     }
+   };
+@@ -87,6 +88,13 @@ export class CharacterInput {
+       case "Slash": // NUEVO
+         this.state.shoot = false;
+         break;
++      case "Period": // NUEVO
++        this.state.crouch = false;
++        break;
++      case "ControlLeft":
++      case "ControlRight":
++        this.equipRequested = true;
++        break
+     }
+   };
+ }
+diff --git a/src/poc/poc3-jetpack_character_fsm copy/strategies/stand-alone/stand-alone.animation.controller.ts b/src/poc/poc3-jetpack_character_fsm copy/strategies/stand-alone/stand-alone.animation.controller.ts
+index 73e409d..1e48311 100644
+--- a/src/poc/poc3-jetpack_character_fsm copy/strategies/stand-alone/stand-alone.animation.controller.ts	
++++ b/src/poc/poc3-jetpack_character_fsm copy/strategies/stand-alone/stand-alone.animation.controller.ts	
+@@ -4,10 +4,11 @@ import type { ICharacterAnimations } from "@/services/assets-manager";
+ import type { IAnimationController } from "../contracts/ianimation-controller";
+ import type { StandAloneFsm } from "../../character-fsm/character.fsm.stand-alone";
+ import type { OnGroundSubState } from "../../character-fsm/character.fsm.stand-alone.on-ground";
++import { OnGroundCrouchedSubState } from "../../character-fsm/character.fsm.stand-alone.on-ground-crouched";
+ 
+ /** Combina el estado flat de StandAloneFsm con el sub-estado real de OnGroundFsm cuando aplica —
+  * mismo valor que devuelve StandAloneFsm.getActiveSubState(). */
+-type ResolvedStandAloneState = OnGroundSubState | "JumpImpulseStart" | "OnAir" | "RunningJumpImpulseStart";
++type ResolvedStandAloneState = OnGroundSubState | OnGroundCrouchedSubState | "JumpImpulseStart" | "OnAir" | "RunningJumpImpulseStart";
+ 
+ export class StandAloneAnimationController implements IAnimationController {
+   private currentAnimation: AnimationGroup | null = null;
+@@ -20,6 +21,7 @@ export class StandAloneAnimationController implements IAnimationController {
+   ) {
+     this.standAloneFsm.onStateChange(() => this._render(this.standAloneFsm.getActiveSubState()));
+     this.standAloneFsm.onGroundSubFsm.onStateChange(() => this._render(this.standAloneFsm.getActiveSubState()));
++    this.standAloneFsm.onGroundCrouchedSubFsm.onStateChange(() => this._render(this.standAloneFsm.getActiveSubState())); // NUEVO
+     this._render(this.standAloneFsm.getActiveSubState());
+ 
+     if (this.animations) {
+@@ -32,7 +34,7 @@ export class StandAloneAnimationController implements IAnimationController {
+   }
+ 
+   tick(): void {
+-    this._render(this.standAloneFsm.getActiveSubState());
++    //this._render(this.standAloneFsm.getActiveSubState());
+   }
+ 
+   dispose(): void {
+@@ -108,6 +110,12 @@ export class StandAloneAnimationController implements IAnimationController {
+         return { animation: this.animations.roll_landing, loop: false };
+       case "LandingCrash":
+         return { animation: this.animations.crash_landing, loop: false };
++      case "CrouchIdle": // NUEVO — placeholder, reutiliza standing_idle hasta tener clip propio
++        return { animation: this.animations.running_normal, loop: true };
++      case "CrouchWalking": // NUEVO — placeholder, reutiliza walking_forward
++        return { animation: this.animations.walking_forward, loop: true };
++      case "CrouchWalkingBackwards": // NUEVO — placeholder, reutiliza walking_backwards
++        return { animation: this.animations.walking_backwards, loop: true };
+       default:
+         return null;
+     }
+diff --git a/src/poc/poc3-jetpack_character_fsm copy/strategies/stand-alone/stand-alone.physics.controller.ts b/src/poc/poc3-jetpack_character_fsm copy/strategies/stand-alone/stand-alone.physics.controller.ts
+index 8701d10..a9fd02f 100644
+--- a/src/poc/poc3-jetpack_character_fsm copy/strategies/stand-alone/stand-alone.physics.controller.ts	
++++ b/src/poc/poc3-jetpack_character_fsm copy/strategies/stand-alone/stand-alone.physics.controller.ts	
+@@ -6,7 +6,7 @@ import { Ray } from "@babylonjs/core/Culling/ray";
+ import { generalConfig } from "@/poc/config.general";
+ import type { IPhysicsController } from "../contracts/iphysics-controller";
+ import type { CharacterInputState } from "../../character.input";
+-import { Color3, RayHelper } from "@babylonjs/core";
++import { Color3, PhysicsShapeCapsule, RayHelper } from "@babylonjs/core";
+ import { OnGroundSubState } from "../../character-fsm/character.fsm.stand-alone.on-ground";
+ 
+ const WALK_SPEED = 4;
+@@ -24,9 +24,14 @@ const RUNNING_JUMP_VERTICAL_IMPULSE = 4; // más bajo que JUMP_IMPULSE (10) —
+ const RUNNING_JUMP_FORWARD_BOOST = 8;    // más alto que antes (6) — más alcance para cruzar el hueco
+ const WALK_BACKWARD_SPEED = 2; // más lento que WALK_SPEED (4) — retroceder es más cauto que avanzar
+ const STRAFE_SPEED = 2.2; // más lento que WALK_SPEED (4) — strafe táctico
++const CAPSULE_RADIUS = generalConfig.playerConfig.capsuleRadius;
++const CAPSULE_BOTTOM = generalConfig.playerConfig.capsuleBottomPoint;
++const CAPSULE_STANDING_TOP = generalConfig.playerConfig.capsuleStandingTopPoint;
++const CAPSULE_CROUCH_TOP = generalConfig.playerConfig.capsuleCrouchTopPoint;
+ 
+ export class StandAlonePhysicsController implements IPhysicsController {
+   private _groundDetected = true;
++  private _isCrouched = false; // NUEVO
+   private _ray = new Ray(Vector3.Zero(), Vector3.Down(), 5);
+   private _isRolling = false;
+   private _rollElapsed = 0;
+@@ -220,8 +225,9 @@ export class StandAlonePhysicsController implements IPhysicsController {
+   }
+ 
+   private _updateGroundDetection(): void {
+-    const capsuleHeight = generalConfig.playerConfig.height;
+-    const rayLength = capsuleHeight / 2 + GROUND_RAY_MARGIN;
++    const topY = this._isCrouched ? CAPSULE_CROUCH_TOP : CAPSULE_STANDING_TOP; // CAMBIADO
++    const halfHeight = (topY - CAPSULE_BOTTOM) / 2; // CAMBIADO
++    const rayLength = halfHeight + GROUND_RAY_MARGIN; // CAMBIADO — antes: generalConfig.playerConfig.height / 2 + GROUND_RAY_MARGIN
+ 
+     const origin = this.characterAggregate.transformNode.getAbsolutePosition();
+     this._ray.origin.set(origin.x, origin.y, origin.z);
+@@ -241,6 +247,24 @@ export class StandAlonePhysicsController implements IPhysicsController {
+     this._groundDetected = !!(hit && hit.hit) && !isMovingUpward;
+   }
+ 
++  /** Llamado al entrar a Crouch (StandAloneFsm.onEnter). */
++  notifyCrouchEnter(): void { // NUEVO
++    this._isCrouched = true;
++    this._applyCapsuleShape(CAPSULE_CROUCH_TOP);
++  }
++
++  /** Llamado al salir de Crouch (StandAloneFsm.onExit). */
++  notifyCrouchExit(): void { // NUEVO
++    this._isCrouched = false;
++    this._applyCapsuleShape(CAPSULE_STANDING_TOP);
++  }
++
++  private _applyCapsuleShape(topY: number): void { // NUEVO
++    const pointA = new Vector3(0, CAPSULE_BOTTOM, 0);
++    const pointB = new Vector3(0, topY, 0);
++    this.characterAggregate.shape = new PhysicsShapeCapsule(pointA, pointB, CAPSULE_RADIUS, this.scene);
++  }
++
+   getLastImpactVerticalSpeed(): number {
+     return this._lastImpactVerticalSpeed;
+   }

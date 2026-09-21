@@ -19,6 +19,9 @@ export class StandAloneInputController implements IInputController {
     if (this.input.consumeJumpRequest()) {
       this.characterFsm.standAloneSubFsm.requestJump();
     }
+    if (this.input.consumeCrouchRollRequest()) { // NUEVO
+      this.characterFsm.standAloneSubFsm.requestCrouchRoll();
+    }
   }
 
   dispose(): void {}

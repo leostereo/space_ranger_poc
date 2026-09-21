@@ -2,7 +2,7 @@
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType } from "@babylonjs/core/Physics/v2/IPhysicsEnginePlugin";
-import { Axis, Space } from "@babylonjs/core";
+import { Axis, Quaternion, Space, TransformNode } from "@babylonjs/core";
 import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { generalConfig } from "@/poc/config.general";
@@ -30,90 +30,6 @@ export function scene_builder(scene: Scene) {
   addMapAggregate(scene);
 
   //return [groundAggregate];
-}
-
-export interface CharacterBuildResult {
-  characterMesh: Mesh;
-  characterAggregate: PhysicsAggregate;
-  /**
-   * Diccionario semántico ya preparado por AssetManager (blending activado, todo parado).
-   * Construido UNA sola vez acá, igual que characterMesh/characterAggregate — se pasa por
-   * referencia a la strategy activa (StandAlone o Jetpack), nunca se dispone al swapear
-   * strategy, sólo cuando character.base.ts se dispone del todo. Puede ser null si
-   * AssetManager no pudo armar el molde (ver warning en consola).
-   */
-  characterAnimations: ICharacterAnimations | null;
-}
-
-/**
- * Construye UNA sola vez el mesh/aggregate/animaciones del personaje. A diferencia de poc2
- * (donde boardMesh/boardAggregate representan un vehículo separado del personaje), acá
- * StandAlone y Jetpack son el MISMO cuerpo físico — sólo cambia qué controller le aplica
- * fuerzas. Por eso esto vive en character.base.ts (dueño único), no en cada strategy.
- *
- * `capsule` (invisible) es la que lleva el PhysicsAggregate y por lo tanto la que se
- * devuelve como characterMesh. `character` (el GLB visible) se parentea a la cápsula para
- * seguir su transform físico automáticamente — mismo criterio que AssetManager usa
- * internamente para pegar tailMesh a boardMesh.
- *
- * El offset/rotación del GLB dentro de la cápsula está portado de
- * board_character_builder() en poc2 (mismo problema: el origen del modelo no coincide con
- * el centro de la cápsula, y el modelo mira para el lado contrario). ÚNICA diferencia:
- * poc2 hardcodea `capsuleHeight = 2` ("ajustá según la altura de tu cápsula") — acá se
- * toma de `generalConfig.playerConfig.height`, la MISMA fuente que usa AssetManager para
- * construir la cápsula, para que nunca se desincronicen.
- */
-export function character_builder(scene: Scene): CharacterBuildResult {
-  const capsuleResult = AssetManager.getMesh("character-capsule", "character-capsule");
-  const characterResult = AssetManager.getMesh("character", "character");
-
-  if (!capsuleResult || !characterResult) {
-    throw new Error("AssetManager: 'character' o 'character-capsule' no disponibles (¿faltó awaitear cargarTodo()?).");
-  }
-
-  const capsule = capsuleResult.mesh as Mesh;
-  const character = characterResult.mesh;
-
-  capsule.position.y = TMP_CONFIG.spawnHeight;
-  capsule.setEnabled(true);
-
-  character.setEnabled(true);
-  character.parent = capsule;
-
-  // Offset + rotación portados de poc2 (board_character_builder): el origen del GLB
-  // está en el centro del modelo, no en los pies, y el modelo arranca mirando al revés.
-  const capsuleHeight = generalConfig.playerConfig.height;
-  character.position.set(0, -(capsuleHeight / 2), 0);
-  character.rotate(Axis.Y, Math.PI, Space.LOCAL);
-
-  for (const meshName of CHARACTER_NON_PICKABLE_MESH_NAMES) {
-    const mesh = scene.getMeshByName(meshName);
-    if (mesh) {
-      mesh.isPickable = false;
-    } else {
-      console.warn(
-        `character_builder: mesh esperado "${meshName}" no encontrado en la escena — ` +
-        `¿cambió el export del GLB? Si el ground-check vuelve a autodetectarse, revisar esta lista.`,
-      );
-    }
-  }
-
-  const characterAggregate = new PhysicsAggregate(
-    capsule,
-    PhysicsShapeType.CAPSULE,
-    { mass: TMP_CONFIG.characterMass, restitution: 0 },
-    scene,
-  );
-
-  const camera = AssetManager.getCamera('follow', false, 'main_camera')
-  camera.lockedTarget = character;
-  scene.activeCamera = camera;
-
-  return {
-    characterMesh: capsule,
-    characterAggregate,
-    characterAnimations: characterResult.animations,
-  };
 }
 
 const platformsData = [
@@ -178,10 +94,96 @@ const addMapAggregate = (scene: Scene) => {
 
 };
 
-export function weapon_builder(): WeaponBuildResult {
-  const result = AssetManager.getWeapon();
-  if (!result) {
-    throw new Error("weapon_builder: no se pudo obtener 'player_weapon' del AssetManager.");
-  }
-  return result;
+export interface CharacterBuildResult {
+  characterMesh: Mesh;
+  characterAggregate: PhysicsAggregate;
+  characterAnimations: ICharacterAnimations | null;
 }
+
+export interface CharacterAndEquipmentBuildResult extends CharacterBuildResult {
+  weaponRoot: WeaponBuildResult["weaponRoot"];
+  muzzle: WeaponBuildResult["muzzle"];
+  thrusterGroup: TransformNode;
+  thrusterLeft: Mesh;
+  thrusterRight: Mesh;
+  thrusterLeftNozzle: TransformNode; // NUEVO
+  thrusterRightNozzle: TransformNode; // NUEVO
+}
+
+export function characterAndEquipment_builder(scene: Scene): CharacterAndEquipmentBuildResult {
+  const capsuleResult = AssetManager.getMesh("character-capsule", "character-capsule"); // sin cambios — sigue sin clonar, single-player
+  const characterResult = AssetManager.getMesh("character", "character", { cloneAnimations: true }); // CAMBIADO — antes clonaba solo por ser "character"; ahora hay que pedirlo explícito
+
+  if (!capsuleResult || !characterResult) {
+    throw new Error("AssetManager: 'character' o 'character-capsule' no disponibles (¿faltó awaitear cargarTodo()?).");
+  }
+
+  const capsule = capsuleResult.mesh as Mesh;
+  const character = characterResult.mesh;
+
+  capsule.position.y = TMP_CONFIG.spawnHeight;
+  capsule.setEnabled(true);
+
+  character.setEnabled(true);
+  character.parent = capsule;
+
+  const capsuleHeight = generalConfig.playerConfig.height;
+  character.position.set(0, -(capsuleHeight / 2), 0);
+  character.rotate(Axis.Y, Math.PI, Space.LOCAL);
+
+  for (const meshName of CHARACTER_NON_PICKABLE_MESH_NAMES) {
+    const mesh = scene.getMeshByName(meshName);
+    if (mesh) {
+      mesh.isPickable = false;
+    } else {
+      console.warn(
+        `characterAndEquipment_builder: mesh esperado "${meshName}" no encontrado en la escena — ` +
+        `¿cambió el export del GLB? Si el ground-check vuelve a autodetectarse, revisar esta lista.`,
+      );
+    }
+  }
+
+  const characterAggregate = new PhysicsAggregate(
+    capsule,
+    PhysicsShapeType.CAPSULE,
+    { mass: TMP_CONFIG.characterMass, restitution: 0 },
+    scene,
+  );
+
+  const camera = AssetManager.getCamera('follow', false, 'main_camera')
+  camera.lockedTarget = character;
+  scene.activeCamera = camera;
+
+  // Weapon: parenteado simple a la cápsula, con offsets manuales por estado (ver WEAPON_OFFSETS
+  // en character.base.ts / OnGroundFsm / OnGroundCrouchedFsm). Se intentó attachToBone acá pero
+  // se descartó por un desfasaje de handedness entre bone-space y world-space no resuelto —
+  // ver nota en config si se retoma con un modelo nuevo.
+  const weaponResult = AssetManager.getWeapon();
+  if (!weaponResult) {
+    throw new Error("characterAndEquipment_builder: no se pudo obtener 'player_weapon' del AssetManager.");
+  }
+  const { weaponRoot, muzzle } = weaponResult;
+
+  // NUEVO — thrusters, parentados a la cápsula, offset hombros/espalda (ajustar a ojo)
+  const thrusterResult = AssetManager.getThrusters();
+  if (!thrusterResult) {
+    throw new Error("characterAndEquipment_builder: no se pudo obtener thrusters del AssetManager.");
+  }
+  const { thrusterGroup, thrusterLeft, thrusterRight, thrusterLeftNozzle, thrusterRightNozzle } = thrusterResult; // CAMBIADO
+  thrusterGroup.parent = capsule;
+  thrusterGroup.position.set(0,0.3,0.06);
+
+  return {
+    characterMesh: capsule,
+    characterAggregate,
+    characterAnimations: characterResult.animations,
+    weaponRoot,
+    muzzle,
+    thrusterGroup,
+    thrusterLeft,
+    thrusterRight,
+    thrusterLeftNozzle, // NUEVO
+    thrusterRightNozzle, // NUEVO
+  };
+}
+

@@ -46,19 +46,22 @@ export async function buildStandAloneStrategy(
   // durante JumpImpulseStart/OnAir/LandingX/EquippingHoverBoardStart.
   const isAimingActive = (): boolean => {
     const groundState = characterFsm.getActiveSubState();
-  // CAMBIADO — mismo fix que character.base.ts, ver comentario ahí.
-  const canAimHere =
-    groundState === "Idle" ||
-    groundState === "Walking" ||
-    groundState === "WalkingBackwards" ||
-    groundState === "Running" ||
-    groundState === "ShootingStrafeLeft" ||
-    groundState === "ShootingStrafeRight";
-  return canAimHere && input.current.shoot;
-};
+    // CAMBIADO — mismo fix que character.base.ts, ver comentario ahí.
+    const canAimHere =
+      groundState === "Idle" ||
+      groundState === "Walking" ||
+      groundState === "WalkingBackwards" ||
+      groundState === "Running" ||
+      groundState === "ShootingStrafeLeft" ||
+      groundState === "ShootingStrafeRight" ||
+      groundState === "CrouchIdle" ||            
+      groundState === "CrouchWalking" ||          
+      groundState === "CrouchWalkingBackwards";   
+    return canAimHere && input.current.shoot;
+  };
 
   const animation = new StandAloneAnimationController(characterAnimations, characterFsm.standAloneSubFsm, isAimingActive); // CAMBIADO
-  const weapon = new ProjectileWeaponController( // NUEVO
+  const weapon = new ProjectileWeaponController( 
     scene,
     weaponMuzzle,
     isAimingActive,

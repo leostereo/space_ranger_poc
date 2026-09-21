@@ -13,19 +13,12 @@ export interface BoardBuildResult {
   boardAggregate: PhysicsAggregate;
 }
 
-/**
- * Extraído de board_character_builder (POC2): sólo crea el mesh + aggregate del board.
- * A diferencia de POC2, NO crea skater/cápsula — en POC4 ya existen (character_builder),
- * y el parenting se hace aparte en _swapToHoverBoard(). spawnPosition es la posición
- * actual de la cápsula al momento de equipar (no generalConfig.board.spawn, que es un
- * punto fijo pensado para el modo standalone de POC2).
- */
 export function board_builder(
   scene: Scene,
   spawnPosition: Vector3,
-  spawnRotationY: number = 0, // NUEVO parámetro, default 0 para no romper otros usos
+  spawnRotationY: number = 0,
 ): BoardBuildResult {
-  const boardResult = AssetManager.getMesh("board", "skateboard");
+  const boardResult = AssetManager.getMesh("board", "skateboard", { cloneMesh: true }); // CAMBIADO — antes clon local en este archivo
   const boardMesh = boardResult?.mesh as Mesh;
 
   if (!boardMesh) {
@@ -33,7 +26,6 @@ export function board_builder(
   }
 
   boardMesh.position.copyFrom(spawnPosition);
-  // CAMBIADO: aplicar el yaw de spawn ANTES de crear el aggregate, no Identity()
   boardMesh.rotationQuaternion = Quaternion.FromEulerAngles(0, spawnRotationY, 0);
 
   const { mass, friction, restitution } = generalConfig.board;

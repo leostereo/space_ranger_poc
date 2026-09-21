@@ -69,8 +69,8 @@ export interface CharacterBuildResult {
  * construir la cápsula, para que nunca se desincronicen.
  */
 export function character_builder(scene: Scene): CharacterBuildResult {
-  const capsuleResult = AssetManager.getMesh("character-capsule", "character-capsule");
-  const characterResult = AssetManager.getMesh("character", "character");
+  const capsuleResult = AssetManager.getMesh("character-capsule", "character-capsule"); // sin cambios — sigue sin clonar, single-player
+  const characterResult = AssetManager.getMesh("character", "character", { cloneAnimations: true }); // CAMBIADO — antes clonaba solo por ser "character"; ahora hay que pedirlo explícito
 
   if (!capsuleResult || !characterResult) {
     throw new Error("AssetManager: 'character' o 'character-capsule' no disponibles (¿faltó awaitear cargarTodo()?).");

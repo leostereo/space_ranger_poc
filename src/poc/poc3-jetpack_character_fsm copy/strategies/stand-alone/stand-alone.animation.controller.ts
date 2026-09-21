@@ -2,12 +2,11 @@
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { ICharacterAnimations } from "@/services/assets-manager";
 import type { IAnimationController } from "../contracts/ianimation-controller";
-import type { StandAloneFsm } from "../../character-fsm/character.fsm.stand-alone";
-import type { OnGroundSubState } from "../../character-fsm/character.fsm.stand-alone.on-ground";
+import type { StandAloneFsm } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone";
+import type { OnGroundSubState } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone.on-ground";
+import { OnGroundCrouchedSubState } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone.on-ground-crouched";
 
-/** Combina el estado flat de StandAloneFsm con el sub-estado real de OnGroundFsm cuando aplica —
- * mismo valor que devuelve StandAloneFsm.getActiveSubState(). */
-type ResolvedStandAloneState = OnGroundSubState | "JumpImpulseStart" | "OnAir" | "RunningJumpImpulseStart";
+type ResolvedStandAloneState = OnGroundSubState | OnGroundCrouchedSubState | "JumpImpulseStart" | "OnAir" | "RunningJumpImpulseStart" | "CrouchRollStart";
 
 export class StandAloneAnimationController implements IAnimationController {
   private currentAnimation: AnimationGroup | null = null;
@@ -20,6 +19,7 @@ export class StandAloneAnimationController implements IAnimationController {
   ) {
     this.standAloneFsm.onStateChange(() => this._render(this.standAloneFsm.getActiveSubState()));
     this.standAloneFsm.onGroundSubFsm.onStateChange(() => this._render(this.standAloneFsm.getActiveSubState()));
+    this.standAloneFsm.onGroundCrouchedSubFsm.onStateChange(() => this._render(this.standAloneFsm.getActiveSubState())); // NUEVO
     this._render(this.standAloneFsm.getActiveSubState());
 
     if (this.animations) {
@@ -79,6 +79,16 @@ export class StandAloneAnimationController implements IAnimationController {
       if (state === "Running" && this.animations.running_aimming) {
         return { animation: this.animations.running_aimming, loop: true };
       }
+      // NUEVO — sin clips dedicados todavía, cae al switch de abajo (placeholders normales de crouch)
+      if (state === "CrouchIdle" && this.animations.crouch_idle_aim) {
+        return { animation: this.animations.crouch_idle_aim, loop: true };
+      }
+      if (state === "CrouchWalking" && this.animations.crouch_walk_aim) {
+        return { animation: this.animations.crouch_walk_aim, loop: true };
+      }
+      if (state === "CrouchWalkingBackwards" && this.animations.crouch_walkbackwards_aim) {
+        return { animation: this.animations.crouch_walkbackwards_aim, loop: true };
+      }
     }
 
     switch (state) {
@@ -108,6 +118,14 @@ export class StandAloneAnimationController implements IAnimationController {
         return { animation: this.animations.roll_landing, loop: false };
       case "LandingCrash":
         return { animation: this.animations.crash_landing, loop: false };
+      case "CrouchIdle": 
+        return { animation: this.animations.cruising_maxVel_idle, loop: true };
+      case "CrouchWalking": 
+        return { animation: this.animations.crouch_walk, loop: true };
+      case "CrouchWalkingBackwards": 
+        return { animation: this.animations.crouch_walkbackwards, loop: true };
+      case "CrouchRollStart": // NUEVO
+        return { animation: this.animations.running_roll, loop: false, waitForCompletion: true };
       default:
         return null;
     }

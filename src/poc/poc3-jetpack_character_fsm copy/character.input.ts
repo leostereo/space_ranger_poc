@@ -6,6 +6,7 @@ export interface CharacterInputState {
   up: boolean;       // Space (empuje del jetpack mientras está equipado)
   cruise: boolean;   // Shift — mantenido en Jetpack/On dispara Cruising, al soltar vuelve a On
   shoot: boolean;     // "/" — mantenido en Jetpack/On dispara Shooting, Shift tiene prioridad
+  crouch: boolean;   // "." — mantenido en OnGround (Idle/Walking/WalkingBackwards) dispara Crouch
 }
 
 export class CharacterInput {
@@ -17,6 +18,7 @@ export class CharacterInput {
     up: false,
     cruise: false,
     shoot: false,
+    crouch: false,
   };
 
   /**
@@ -25,6 +27,7 @@ export class CharacterInput {
    */
   private equipRequested = false;
   private jumpRequested = false;
+  private crouchRollRequested = false;
 
   constructor() {
     window.addEventListener("keydown", this._onKeyDown);
@@ -47,6 +50,12 @@ export class CharacterInput {
     return true;
   }
 
+  consumeCrouchRollRequest(): boolean {
+    if (!this.crouchRollRequested) return false;
+    this.crouchRollRequested = false;
+    return true;
+  }
+
   dispose(): void {
     window.removeEventListener("keydown", this._onKeyDown);
     window.removeEventListener("keyup", this._onKeyUp);
@@ -63,12 +72,12 @@ export class CharacterInput {
       case "ShiftRight":
         this.state.cruise = true;
         break;
-      case "Slash": // NUEVO — tecla "/"
+      case "Comma": // CAMBIADO — antes "Slash", ahora "," dispara
         this.state.shoot = true;
         break;
-      case "ControlLeft":
-      case "ControlRight":
-        this.equipRequested = true;
+      case "Period":
+        this.state.crouch = true;
+        this.crouchRollRequested = true; // NUEVO — edge trigger, consumido una sola vez
         break;
     }
   };
@@ -84,8 +93,14 @@ export class CharacterInput {
       case "ShiftRight":
         this.state.cruise = false;
         break;
-      case "Slash": // NUEVO
+      case "Comma": // CAMBIADO — antes "Slash"
         this.state.shoot = false;
+        break;
+      case "Period": // sin cambios
+        this.state.crouch = false;
+        break;
+      case "Slash": // CAMBIADO — antes disparaba shoot, ahora "/" es equip
+        this.equipRequested = true;
         break;
     }
   };

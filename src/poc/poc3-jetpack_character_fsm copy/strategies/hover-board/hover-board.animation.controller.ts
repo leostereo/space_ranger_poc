@@ -75,7 +75,7 @@ export class HoverBoardAnimationController implements IAnimationController {
     if (macroState === "Hovering") {
       switch (subState as HoveringSubState) {
         case "CruisingIdle":
-          return { animation: this.animations.standing_idle, loop: true };
+          return { animation: this.animations.cruising_idle, loop: true };
         case "CruisingFast":
           return { animation: this.animations.cruising_forward_idle, loop: true };
         case "CruisingVeryFast":

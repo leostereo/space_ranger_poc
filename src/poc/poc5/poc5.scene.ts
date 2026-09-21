@@ -4,7 +4,7 @@ import { InputController } from "./character/controllers/InputController";
 import { AnimacionController } from "./character/controllers/AnimacionController";
 import { FisicaController } from "./character/controllers/FisicaController";
 import { MeshBuilder, PhysicsAggregate, PhysicsShapeType, Scene } from "@babylonjs/core";
-import { character_builder } from "../poc3-jetpack_character_fsm copy/utils/buildUtils";
+import { characterAndEquipment_builder } from "../poc3-jetpack_character_fsm copy/utils/buildUtils";
 import { AssetManager } from "@/services/assets-manager";
 import { Poc } from "../types";
 
@@ -26,7 +26,7 @@ export default class poc5 implements Poc {
             // await AssetManager.cargarTodo(); // Descomentá o adaptá según el método real de tu servicio
 
             // En tu método build() de poc5.scene.ts:
-            const buildResult = character_builder(scene);
+            const buildResult = characterAndEquipment_builder(scene);
 
             const inputs = new InputController(scene);
             const anims = new AnimacionController(buildResult.characterAnimations);

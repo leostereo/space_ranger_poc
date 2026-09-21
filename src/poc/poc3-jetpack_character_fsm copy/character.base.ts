@@ -9,7 +9,6 @@ import { Poc } from "../types";
 import { CharacterFsm } from "./character-fsm/character.fsm";
 import { CharacterInput } from "./character.input";
 import { CharacterHud } from "./character.hud";
-import { character_builder, scene_builder, weapon_builder } from "./utils/buildUtils";
 import { buildStandAloneStrategy, type StandAloneStrategyResult } from "./strategies/stand-alone/stand-alone.strategy";
 import { buildJetpackStrategy, type JetpackStrategyResult } from "./strategies/jetpack/jetpack.strategy";
 import type { IVehicleStrategy } from "./strategies/contracts/ivehicle-strategy";
@@ -19,12 +18,13 @@ import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { HoverBoardPhysicsController } from "./strategies/hover-board/hover-board.physics.controller";
 import { HoverBoardInputAdapter } from "./strategies/hover-board/hover-board.input.adapter";
 import { buildHoverBoardStrategy } from "./strategies/hover-board/hover-board.strategy";
-
+import { characterAndEquipment_builder, scene_builder } from "./utils/buildUtils";
 
 const JUMP_IMPULSE_FRAME = 30;
 const EQUIP_BOARD_FRAME = 60; // placeholder — ajustar cuando definan el frame real del clip
 const WEAPON_HOVERBOARD_YAW_COMPENSATION = Math.PI / 8; // cancela characterMesh.rotation.y = -PI/8 en HoverBoard
 const RUNNING_JUMP_IMPULSE_FRAME = 10; // placeholder — ajustar al frame real del clip
+const CROUCH_ROLL_COMPLETE_FRAME = 85; // placeholder — ajustar al frame real del clip running_roll
 
 const WEAPON_OFFSETS = {
   jetpack: { x: -0.1, y: 0.16, z: 0 },
@@ -60,20 +60,35 @@ export default class CharacterBase implements Poc {
   private weaponRoot: WeaponBuildResult["weaponRoot"] | null = null;
   private weaponMuzzle: WeaponBuildResult["muzzle"] | null = null;
 
+  private thrusterGroup: TransformNode | null = null; // NUEVO
+  private thrusterLeft: Mesh | null = null;
+  private thrusterRight: Mesh | null = null;
+  private thrusterLeftNozzle: TransformNode | null = null; // NUEVO
+  private thrusterRightNozzle: TransformNode | null = null; // NUEVO
+
   async build(scene: Scene): Promise<void> {
     this.scene = scene;
     scene_builder(scene);
 
-    const { characterMesh, characterAggregate, characterAnimations } = character_builder(scene);
+    const { characterMesh, characterAggregate, characterAnimations, weaponRoot, muzzle,
+      thrusterGroup, thrusterLeft, thrusterRight, thrusterLeftNozzle, thrusterRightNozzle } = characterAndEquipment_builder(scene); // CAMBIADO
     this.characterMesh = characterMesh;
     this.characterAggregate = characterAggregate;
     this.characterAnimations = characterAnimations;
+    this.weaponRoot = weaponRoot;
+    this.weaponMuzzle = muzzle;
+    this.thrusterGroup = thrusterGroup; // NUEVO
+    this.thrusterLeft = thrusterLeft; // NUEVO
+    this.thrusterRight = thrusterRight; // NUEVO
+    this.thrusterLeftNozzle = thrusterLeftNozzle; // NUEVO
+    this.thrusterRightNozzle = thrusterRightNozzle; // NUEVO
+    weaponRoot.parent = this.characterMesh;
+    this._applyWeaponOffset(WEAPON_OFFSETS.standAlone);
 
     if (!this.characterMesh.rotationQuaternion) {
       this.characterMesh.rotationQuaternion = Quaternion.Identity();
     }
 
-    const { weaponRoot, muzzle } = weapon_builder();
     weaponRoot.parent = this.characterMesh;
     this.weaponRoot = weaponRoot;
     this.weaponMuzzle = muzzle;
@@ -98,6 +113,7 @@ export default class CharacterBase implements Poc {
       isLeftHeld: () => this.input.current.left,
       isRightHeld: () => this.input.current.right,
       isAimingHeld: () => this._isAimingActive(),
+      isCrouchHeld: () => this.input.current.crouch,
       onEnterHoverBoard: () => this._swapToHoverBoard(),
       getVerticalSpeed: () => this.activeStandAlonePhysics?.getLastImpactVerticalSpeed() ?? 0,
       getHorizontalSpeed: () => this.activeStandAlonePhysics?.getLastImpactHorizontalSpeed() ?? 0,
@@ -119,13 +135,18 @@ export default class CharacterBase implements Poc {
       onEnterDiving: () => { },
       onEnterGliderBoost: () => this.activeBoardPhysics?.onEnterGliderBoost(),
       onEnterRunningJumpOnAir: () => this.activeStandAlonePhysics?.applyRunningJumpImpulse(),
-      weaponRoot
+      weaponRoot,
+      onEnterCrouch: () => this.activeStandAlonePhysics?.notifyCrouchEnter(), // NUEVO
+      onExitCrouch: () => this.activeStandAlonePhysics?.notifyCrouchExit(),  // NUEVO
+      onEnterCrouchRoll: () => this.activeStandAlonePhysics?.notifyCrouchRollStart(), // NUEVO
+      onExitCrouchRoll: () => this.activeStandAlonePhysics?.notifyCrouchRollEnd(),
     });
 
     this._wireJumpAnimationEvent();
     this._wireEquipBoardAnimationEvent();
     this._wireLandingAnimationEvents();
     this._wireRunningJumpAnimationEvent();
+    this._wireCrouchRollAnimationEvent();
 
     const { strategy, physicsController } = await buildStandAloneStrategy(
       this.scene,
@@ -145,32 +166,34 @@ export default class CharacterBase implements Poc {
     this._bindObservables();
   }
 
-private _isAimingActive(): boolean {
-  if (this.fsm.getState() === "Jetpack") {
-    return this.fsm.jetpackSubFsm.getState() === "Shooting";
+  private _isAimingActive(): boolean {
+    if (this.fsm.getState() === "Jetpack") {
+      return this.fsm.jetpackSubFsm.getState() === "Shooting";
+    }
+    if (this.fsm.getState() === "StandAlone") {
+      const groundState = this.fsm.getActiveSubState();
+      const canAimHere =
+        groundState === "Idle" ||
+        groundState === "Walking" ||
+        groundState === "WalkingBackwards" ||
+        groundState === "Running" ||
+        groundState === "ShootingStrafeLeft" ||
+        groundState === "ShootingStrafeRight" ||
+        groundState === "CrouchIdle" ||            // NUEVO
+        groundState === "CrouchWalking" ||          // NUEVO
+        groundState === "CrouchWalkingBackwards";   // NUEVO
+      return canAimHere && this.input.current.shoot;
+    }
+    if (this.fsm.getState() === "HoverBoard") {
+      return this.input.current.shoot;
+    }
+    return false;
   }
-  if (this.fsm.getState() === "StandAlone") {
-    const groundState = this.fsm.getActiveSubState();
-    // CAMBIADO — sin ShootingStrafeLeft/Right acá, se rompía el ciclo apenas se
-    // entraba a strafe: isAimingHeld() pasaba a false, lo cual disparaba la salida
-    // inmediata de OnGroundFsm de vuelta a Idle (loop Idle<->Strafe cada tick).
-    const canAimHere =
-      groundState === "Idle" ||
-      groundState === "Walking" ||
-      groundState === "WalkingBackwards" ||
-      groundState === "Running" ||
-      groundState === "ShootingStrafeLeft" ||
-      groundState === "ShootingStrafeRight";
-    return canAimHere && this.input.current.shoot;
-  }
-  if (this.fsm.getState() === "HoverBoard") {
-    return this.input.current.shoot;
-  }
-  return false;
-}
 
   private _updateWeaponVisibility(): void {
-    this.weaponRoot?.setEnabled(this._isAimingActive());
+    setTimeout(() => {
+      this.weaponRoot?.setEnabled(this._isAimingActive());
+    }, 3000)
   }
 
   private _wireJumpAnimationEvent(): void {
@@ -192,6 +215,17 @@ private _isAimingActive(): boolean {
     runningJumpAnimation.addEvent(
       new AnimationEvent(RUNNING_JUMP_IMPULSE_FRAME, () => {
         this.fsm.standAloneSubFsm.notifyRunningJumpImpulseFrame();
+      }, false),
+    );
+  }
+
+  private _wireCrouchRollAnimationEvent(): void { // NUEVO
+    const crouchRollAnimation = this.characterAnimations?.running_roll.targetedAnimations[0]?.animation;
+    if (!crouchRollAnimation) return;
+
+    crouchRollAnimation.addEvent(
+      new AnimationEvent(CROUCH_ROLL_COMPLETE_FRAME, () => {
+        this.fsm.standAloneSubFsm.notifyCrouchRollComplete();
       }, false),
     );
   }
@@ -254,7 +288,13 @@ private _isAimingActive(): boolean {
       throw new Error("_swapToJetpack: weaponMuzzle no está inicializado — revisar build().");
     }
 
+    if (!this.thrusterGroup || !this.thrusterLeft || !this.thrusterRight || !this.thrusterLeftNozzle || !this.thrusterRightNozzle) {
+      throw new Error("_swapToJetpack: thrusters no inicializados — revisar build().");
+    }
+
     this._applyWeaponOffset(WEAPON_OFFSETS.jetpack); // NUEVO
+    this._setThrustersEnabled(true); // NUEVO
+
 
     const { strategy, physicsController } = await buildJetpackStrategy(
       this.scene,
@@ -263,6 +303,9 @@ private _isAimingActive(): boolean {
       this.fsm,
       this.characterAnimations,
       this.weaponMuzzle,
+      this.thrusterGroup,
+      this.thrusterLeftNozzle, // CAMBIADO — antes thrusterLeft (mesh), ahora el nozzle
+      this.thrusterRightNozzle, // CAMBIADO
     );
 
     this.activeStrategy = strategy;
@@ -289,7 +332,7 @@ private _isAimingActive(): boolean {
       this.characterMesh.position.copyFrom(spawnPosition);
       this.characterMesh.rotationQuaternion = Quaternion.FromEulerAngles(0, spawnRotationY, 0);
       this.weaponRoot?.rotation.set(0, 0, 0);
-      
+
       this._activeBoardAggregate.dispose();
       this._activeBoardMesh.dispose();
       this._activeBoardMesh = null;
@@ -318,7 +361,8 @@ private _isAimingActive(): boolean {
       throw new Error("_swapToStandAlone: weaponMuzzle no está inicializado — revisar build().");
     }
 
-    this._applyWeaponOffset(WEAPON_OFFSETS.standAlone); // NUEVO
+    this._applyWeaponOffset(WEAPON_OFFSETS.standAlone);
+    this._setThrustersEnabled(false); // NUEVO
 
     const { strategy, physicsController } = await buildStandAloneStrategy(
       this.scene,
@@ -401,6 +445,10 @@ private _isAimingActive(): boolean {
 
   private _applyWeaponOffset(offset: { x: number; y: number; z: number }): void {
     this.weaponRoot?.position.set(offset.x, offset.y, offset.z);
+  }
+
+  private _setThrustersEnabled(enabled: boolean): void {
+    this.thrusterGroup?.setEnabled(enabled); // CAMBIADO — un solo toggle, cascada automática
   }
 
   // Helper nuevo — agregalo como método privado de la clase (cerca de _swapToStandAlone/_swapToHoverBoard)

@@ -24,7 +24,7 @@
 // Vale la pena migrarlo a `getMesh('character', ...).animations` cuando se retome poc2,
 // para no tener la lógica de nombres de clips duplicada en dos lugares.
 
-import { Texture, Material, AbstractMesh, AnimationGroup, Scene, AssetsManager, StandardMaterial, MeshBuilder, Color3, Tools, PhysicsAggregate, PhysicsShapeType, Mesh, ArcRotateCamera, Vector3, FollowCamera, HemisphericLight, Axis, Space, Quaternion, TransformNode } from "@babylonjs/core";
+import { Texture, Material, AbstractMesh, AnimationGroup, Scene, AssetsManager, StandardMaterial, MeshBuilder, Color3, Tools, PhysicsAggregate, PhysicsShapeType, Mesh, ArcRotateCamera, Vector3, FollowCamera, HemisphericLight, Axis, Space, Quaternion, TransformNode, Skeleton } from "@babylonjs/core";
 import { GridMaterial } from "@babylonjs/materials/grid/gridMaterial";
 import { generalConfig } from "@/poc/config.general";
 import "@babylonjs/loaders/glTF"; // Obligatorio en Babylon para leer archivos .glb
@@ -46,6 +46,7 @@ export type TexturetKey = "flare";
  */
 export interface ICharacterAnimations {
     standing_idle: AnimationGroup;
+    cruising_idle: AnimationGroup;
     cruising_forward_idle: AnimationGroup;
     cruising_faster_idle: AnimationGroup;
     cruising_maxVel_idle: AnimationGroup;
@@ -77,6 +78,15 @@ export interface ICharacterAnimations {
     strafe_right: AnimationGroup,
     strafe_left: AnimationGroup,
 
+    crouch_walk: AnimationGroup,
+    crouch_walkbackwards: AnimationGroup,
+
+    crouch_walk_aim: AnimationGroup
+    crouch_walkbackwards_aim: AnimationGroup
+    crouch_idle_aim: AnimationGroup
+
+    running_roll: AnimationGroup
+
 }
 
 export interface MeshInstanceResult {
@@ -90,6 +100,14 @@ export interface WeaponBuildResult {
     muzzle: TransformNode;
 }
 
+export interface ThrusterBuildResult {
+    thrusterGroup: TransformNode;
+    thrusterLeft: Mesh;
+    thrusterRight: Mesh;
+    thrusterLeftNozzle: TransformNode; // NUEVO
+    thrusterRightNozzle: TransformNode; // NUEVO
+}
+
 export class AssetManager {
     // Diccionarios en memoria (privados para que nadie los modifique por fuera)
     private static textures: Record<string, Texture> = {};
@@ -99,6 +117,8 @@ export class AssetManager {
     private static cams: Record<string, ArcRotateCamera | FollowCamera> = {};
     private static lights: Record<string, HemisphericLight> = {};
     private static weaponResult: WeaponBuildResult | null = null;
+    private static skeletons: Record<MeshAssetKey, Skeleton> = {} as Record<MeshAssetKey, Skeleton>;
+    private static thrusterResult: ThrusterBuildResult | null = null; // NUEVO
 
     // Almacén para las animaciones originales de los GLB (crudo, por nombre de clip tal
     // cual viene del archivo — sigue existiendo para getAnimations(), sin cambios).
@@ -126,7 +146,7 @@ export class AssetManager {
             };
 
             // --- RECURSO 2: Modelo GLB Externo ---
-            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver10.glb");
+            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver11.glb");
             tareaGLB.onSuccess = (task) => {
                 // Buscamos el nodo raíz que crea automáticamente Babylon para los GLB
 
@@ -136,6 +156,16 @@ export class AssetManager {
                     // Desactivamos el nodo raíz (apaga al personaje entero y sus hijos)
                     root.setEnabled(false);
                     this.meshes["character"] = root;
+
+                    if (task.loadedSkeletons && task.loadedSkeletons.length > 0) {
+                        this.skeletons["character"] = task.loadedSkeletons[0];
+                    } else {
+                        // Nota: En algunos GLB modernos de Babylon, los huesos se importan como TransformNodes 
+                        // en lugar de un objeto Skeleton tradicional. Si el array viene vacío, se busca en los nodos:
+                        const totalSkeleton = root.getChildren((node) => node.getClassName() === "Bone", false);
+                        console.log("Huesos encontrados como nodos:", totalSkeleton);
+                    }
+
 
                     // Guardamos las animaciones que traía este GLB específico
                     this.animationGroups["character"] = task.loadedAnimationGroups;
@@ -281,7 +311,74 @@ export class AssetManager {
         this._buildBoard(scene);
         this._prepareCharacterAnimations();
         this._buildWeapons(scene);
+        this._buildThrusters(scene); // NUEVO
 
+    }
+
+    private static _buildThrusters(scene: Scene): void {
+        const bodyLength = 0.12;
+        const bodyDiameter = 0.06;
+        const coneLength = 0.05; // CAMBIADO — antes tipLength
+        const coneBaseDiameter = 0.09; // CAMBIADO — antes tipDiameter, ahora es la base ancha del cono
+
+        const thrusterGroup = new TransformNode("thrusterGroup", scene);
+
+        const buildOne = (name: string): { root: Mesh; nozzle: TransformNode } => {
+            const root = MeshBuilder.CreateBox(`${name}Root`, { size: 0.0001 }, scene);
+            root.isVisible = false;
+            root.isPickable = false;
+            root.parent = thrusterGroup;
+
+            const body = MeshBuilder.CreateCylinder(
+                `${name}Body`,
+                { diameter: bodyDiameter, height: bodyLength, tessellation: 16 },
+                scene,
+            );
+            body.parent = root;
+            body.rotation.x = Math.PI / 2;
+            body.position.z = bodyLength / 2;
+            body.isPickable = false;
+
+            // CAMBIADO — cono en vez de cilindro para la punta: diameterTop en 0 da la forma
+            // cónica real (base ancha pegada al body, vértice hacia afuera = salida del chorro).
+            const cone = MeshBuilder.CreateCylinder(
+                `${name}Cone`,
+                { diameterTop: 0, diameterBottom: coneBaseDiameter, height: coneLength, tessellation: 16 },
+                scene,
+            );
+            cone.parent = root;
+            cone.rotation.x = -Math.PI / 2;
+            cone.position.z = bodyLength + coneLength / 2;
+            cone.isPickable = false;
+
+            const mat = new StandardMaterial(`${name}Mat`, scene);
+            mat.diffuseColor = new Color3(0.25, 0.25, 0.3);
+            mat.specularColor = new Color3(0.1, 0.1, 0.1);
+            body.material = mat;
+            cone.material = mat; // CAMBIADO — antes tip.material
+
+            const nozzle = new TransformNode(`${name}Nozzle`, scene);
+            nozzle.parent = root;
+            nozzle.position.set(0, 0, bodyLength + coneLength); // CAMBIADO — punta del cono, no del tip cilíndrico
+
+            return { root, nozzle };
+        };
+
+        const left = buildOne("thrusterLeft");
+        const right = buildOne("thrusterRight");
+
+        left.root.position.set(-0.08, 0, 0);
+        right.root.position.set(0.08, 0, 0);
+
+        thrusterGroup.setEnabled(false);
+
+        this.thrusterResult = {
+            thrusterGroup,
+            thrusterLeft: left.root,
+            thrusterRight: right.root,
+            thrusterLeftNozzle: left.nozzle,
+            thrusterRightNozzle: right.nozzle,
+        };
     }
 
     private static _buildWeapons(scene: Scene): void {
@@ -341,6 +438,7 @@ export class AssetManager {
         const find = (name: string): AnimationGroup | undefined => groups.find((g) => g.name === name);
 
         const standing_idle = find("standing idle");
+        const cruising_idle = find("skateboarding");
         const cruising_forward_idle = find("skate_idle");
         const cruising_faster_idle = find("ninja crouch idle mirror");
         const cruising_maxVel_idle = find("skate crouching idle");
@@ -355,7 +453,7 @@ export class AssetManager {
         const falling_idle = find("falling idle");
         const flying = find("flying");
         const floating = find("floating");
-        
+
         const jump_on_board = find("jump on board");
         const walking_forward = find("walking forward");
         const walking_backwards = find("walking backwards");
@@ -372,24 +470,35 @@ export class AssetManager {
         const strafe_right = find("strafe left"); //both are inverted
         const strafe_left = find("strafe right");
 
+        const crouch_walk = find("crouched walk");
+        const crouch_walkbackwards = find("crouched walk backwards");
+
+        const crouch_walk_aim = find("crouched walk aiming");
+        const crouch_walkbackwards_aim = find("crouched walk aim backwards");
+        const crouch_idle_aim = find("crouch aim");
+
+        const running_roll = find("roll to run");
 
 
 
-        if (!standing_idle || !cruising_forward_idle || !cruising_faster_idle || !cruising_maxVel_idle || !jump_while_running || 
+
+        if (!standing_idle || !cruising_idle || !cruising_forward_idle || !cruising_faster_idle || !cruising_maxVel_idle || !jump_while_running ||
             !standing_to_crouch || !crouch_to_standing || !jump || !normal_landing || !crash_landing || !roll_landing || !falling_idle ||
             !flying || !floating || !jump_on_board || !walking_forward || !walking_backwards ||
             !running_normal || !running_fast || !aiming_jetpack || !crouch_aimming || !idle_aimming || !walking_backwards_aimming ||
-            !walking_aimming || !running_aimming || !strafe_right || !strafe_left) {
+            !walking_aimming || !running_aimming || !strafe_right || !strafe_left || !crouch_walk || !crouch_walkbackwards ||
+            !crouch_walk_aim || !crouch_walkbackwards_aim || !crouch_idle_aim || !running_roll) {
             console.warn("AssetManager: faltan animaciones de 'character' — revisar nombres de clips en el GLB.");
             return;
         }
 
         const mold: ICharacterAnimations = {
-            standing_idle, cruising_forward_idle, cruising_faster_idle, cruising_maxVel_idle,
+            standing_idle, cruising_idle, cruising_forward_idle, cruising_faster_idle, cruising_maxVel_idle,
             standing_to_crouch, crouch_to_standing, jump, normal_landing, crash_landing, roll_landing, floating, flying,
-            falling_idle, jump_on_board, walking_forward, walking_backwards,running_fast, running_normal, aiming_jetpack,
+            falling_idle, jump_on_board, walking_forward, walking_backwards, running_fast, running_normal, aiming_jetpack,
             jump_while_running, crouch_aimming, idle_aimming, walking_aimming, walking_backwards_aimming, running_aimming,
-            strafe_right, strafe_left
+            strafe_right, strafe_left, crouch_walk, crouch_walkbackwards, crouch_walk_aim, crouch_walkbackwards_aim,
+            crouch_idle_aim, running_roll
         };
 
         Object.values(mold).forEach((ag) => {
@@ -414,6 +523,7 @@ export class AssetManager {
         const mold = this.characterAnimationsMold;
         return {
             standing_idle: cloneOne(mold.standing_idle),
+            cruising_idle: cloneOne(mold.cruising_idle),
             cruising_forward_idle: cloneOne(mold.cruising_forward_idle),
             cruising_faster_idle: cloneOne(mold.cruising_faster_idle),
             cruising_maxVel_idle: cloneOne(mold.cruising_maxVel_idle),
@@ -439,7 +549,15 @@ export class AssetManager {
             walking_backwards_aimming: cloneOne(mold.walking_backwards_aimming),
             running_aimming: cloneOne(mold.running_aimming),
             strafe_right: cloneOne(mold.strafe_right),
-            strafe_left: cloneOne(mold.strafe_left)
+            strafe_left: cloneOne(mold.strafe_left),
+            crouch_walk: cloneOne(mold.crouch_walk),
+            crouch_walkbackwards: cloneOne(mold.crouch_walkbackwards),
+
+            crouch_idle_aim: cloneOne(mold.crouch_idle_aim),
+            crouch_walk_aim: cloneOne(mold.crouch_walk_aim),
+            crouch_walkbackwards_aim: cloneOne(mold.crouch_walkbackwards_aim),
+
+            running_roll: cloneOne(mold.running_roll)
         };
     }
 
@@ -451,24 +569,40 @@ export class AssetManager {
      * (ver _prepareCharacterAnimations), clonado y remapeado contra esta instancia. Para
      * el resto de las claves (sin animaciones), `animations` es null.
      */
-    public static getMesh(clave: MeshAssetKey, nombreInstancia: string): MeshInstanceResult | null {
+
+    public static getMesh(
+        clave: MeshAssetKey,
+        nombreInstancia: string,
+        options: { cloneMesh?: boolean; cloneAnimations?: boolean } = {}, // NUEVO
+    ): MeshInstanceResult | null {
+        const { cloneMesh = false, cloneAnimations = false } = options; // NUEVO — ambos default false, comportamiento explícito por llamada
+
         const molde = this.meshes[clave];
         if (!molde) {
             console.error(`El asset "${clave}" no existe en el AssetManager.`);
             return null;
         }
 
-        // 1. Clonamos el mesh base (sea de código o el __root__ del GLB)
-        const clon = molde.clone(nombreInstancia, null);
-        if (!clon) return null;
+        // NUEVO — clon real si se pide, sino la referencia directa (comportamiento previo)
+        const resultMesh = cloneMesh ? (molde.clone(nombreInstancia, null) as Mesh) : molde;
+        if (!resultMesh) {
+            console.error(`getMesh: clone() de "${clave}" devolvió null (nombreInstancia="${nombreInstancia}").`);
+            return null;
+        }
 
-        // 2. Si es 'character' y el molde de animaciones está listo, clonamos el
-        //    diccionario semántico completo usando ESTE clon para el remapeo de huesos.
-        const animations = clave === "character" ? this._cloneCharacterAnimations(clon, nombreInstancia) : null;
+        // CAMBIADO — antes se clonaban SIEMPRE para 'character'; ahora es explícito por llamada,
+        // igual criterio que cloneMesh. Sobre qué mesh remapear los huesos: el clon si cloneMesh,
+        // sino el original (sigue siendo válido para animar una única instancia compartida).
+        const animations = clave === "character" && cloneAnimations
+            ? this._cloneCharacterAnimations(resultMesh, nombreInstancia)
+            : null;
 
-        // 3. Lo activamos para que sea visible y retorne al código
-        clon.setEnabled(true);
-        return { mesh: clon, animations };
+        resultMesh.setEnabled(true);
+        return { mesh: resultMesh, animations };
+    }
+
+    public static getSkeleton(key: MeshAssetKey): Skeleton | undefined {
+        return this.skeletons[key];
     }
 
     public static getTexture(key: TexturetKey): Texture {
@@ -525,6 +659,14 @@ export class AssetManager {
             return null;
         }
         return this.weaponResult;
+    }
+
+    public static getThrusters(): ThrusterBuildResult | null {
+        if (!this.thrusterResult) {
+            console.error(`Los assets de thrusters no fueron construidos — revisar _buildThrusters().`);
+            return null;
+        }
+        return this.thrusterResult;
     }
 
     //privates
