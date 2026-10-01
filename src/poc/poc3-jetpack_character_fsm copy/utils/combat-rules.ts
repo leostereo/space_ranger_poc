@@ -50,7 +50,14 @@ export class CombatRules {
   };
 
   isShielding = (): boolean => {
-    if (this.fsm.getState() !== "StandAlone") return false;
-    return isShieldActive(this.fsm.getActiveSubState(), this.input.current);
+    const input = this.input.current;
+    switch (this.fsm.getState()) {
+      case "StandAlone":
+        return isShieldActive(this.fsm.getActiveSubState(), input);
+      case "HoverBoard":
+        return input.shield;
+      default: // Jetpack: sin escudo
+        return false;
+    }
   };
 }

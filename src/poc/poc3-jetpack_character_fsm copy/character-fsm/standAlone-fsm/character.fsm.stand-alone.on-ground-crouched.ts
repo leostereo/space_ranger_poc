@@ -1,5 +1,6 @@
 import { TransformNode } from "@babylonjs/core";
 import { BaseFsm, TransitionTable } from "../../abstract/base-fsm";
+import { SHIELD_OFFSETS, WEAPON_OFFSETS } from "../../character.base";
 
 export type OnGroundCrouchedSubState = "CrouchIdle" | "CrouchWalking" | "CrouchWalkingBackwards";
 
@@ -9,16 +10,6 @@ export interface OnGroundCrouchedFsmDeps {
   weaponRoot: TransformNode;
   shieldRoot: TransformNode; // NUEVO
 }
-
-const WEAPON_OFFSETS = {
-  crouchIdle: { x: -0.08, y: -0.06, z: 0 },
-  crouchWalking: { x: -0.08, y: 0, z: 0 },
-  crouchWalkingBackwards: { x: -0.08, y: 0, z: 0 },
-} as const;
-
-const SHIELD_OFFSETS = {
-  crouchIdle: { x: 0, y: -0.1, z: 0.3 },
-} as const;
 
 export class OnGroundCrouchedFsm extends BaseFsm<OnGroundCrouchedSubState> {
   protected transitions: TransitionTable<OnGroundCrouchedSubState>;

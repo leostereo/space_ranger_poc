@@ -2,6 +2,7 @@ import { TransformNode } from "@babylonjs/core";
 import { BaseFsm, TransitionTable } from "../../abstract/base-fsm";
 import { OnGroundFsm, type OnGroundSubState } from "./character.fsm.stand-alone.on-ground";
 import { OnGroundCrouchedFsm, type OnGroundCrouchedSubState } from "./character.fsm.stand-alone.on-ground-crouched";
+import { SHIELD_OFFSETS, WEAPON_OFFSETS } from "../../character.base";
 
 export type StandAloneSubState = "OnGround" | "JumpImpulseStart" | "RunningJumpImpulseStart" | "OnAir" | "Crouch" | "CrouchRollStart"; // CAMBIADO
 
@@ -31,10 +32,6 @@ export interface StandAloneFsmDeps {
   onExitCrouchRoll: () => void;
 }
 
-const WEAPON_OFFSETS = {
-  standAlone: { x: -0.08, y: 0.2, z: 0 },
-  crouchIdle: { x: -0.08, y: -0.06, z: 0 },
-} as const;
 
 export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
 
@@ -173,6 +170,7 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
       this.onGroundCrouchedSubFsm.resetToIdle();
       this.deps.onEnterCrouch();
       this._applyWeaponOffset(WEAPON_OFFSETS.crouchIdle);
+      this._applyShieldOffset(SHIELD_OFFSETS.crouchIdle);
     }
     if (state === "CrouchRollStart") { // NUEVO
       this.deps.onEnterCrouchRoll();
@@ -185,6 +183,7 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
     }
     if (state === "Crouch") {
       this._applyWeaponOffset(WEAPON_OFFSETS.standAlone);
+      this._applyShieldOffset(SHIELD_OFFSETS.idle);
       this.deps.onExitCrouch();
     }
     if (state === "CrouchRollStart") { // NUEVO
@@ -194,6 +193,10 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
 
   private _applyWeaponOffset(offset: { x: number; y: number; z: number }): void {
     this.deps.weaponRoot?.position.set(offset.x, offset.y, offset.z);
+  }
+
+  private _applyShieldOffset(offset: { x: number; y: number; z: number }): void {
+    this.deps.shieldRoot?.position.set(offset.x, offset.y, offset.z);
   }
 
   dispose(): void {

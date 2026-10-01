@@ -27,10 +27,26 @@ const WEAPON_HOVERBOARD_YAW_COMPENSATION = Math.PI / 8; // cancela characterMesh
 const RUNNING_JUMP_IMPULSE_FRAME = 10; // placeholder — ajustar al frame real del clip
 const CROUCH_ROLL_COMPLETE_FRAME = 85; // placeholder — ajustar al frame real del clip running_roll
 
-const WEAPON_OFFSETS = {
+export const WEAPON_OFFSETS = {
   jetpack: { x: -0.1, y: 0.16, z: 0 },
   standAlone: { x: -0.08, y: 0.2, z: 0 },
   hoverBoard: { x: -0.15, y: -0.05, z: 0 },
+  crouchIdle: { x: -0.08, y: -0.06, z: 0 },
+  strafe_right: { x: -0.08, y: 0.08, z: 0.2 },
+  strafe_left: { x: -0.12, y: 0.08, z: 0.2 },
+  crouchWalking: { x: -0.08, y: 0, z: 0 },
+  crouchWalkingBackwards: { x: -0.08, y: 0, z: 0 },
+} as const;
+
+  const SHIELD_HOVERBOARD_OFFSET = { x: -0.05, y: -0.1, z: 0.45 } as const;
+  
+  export const SHIELD_OFFSETS = {
+    idle: { x: -0.1, y: 0.1, z: 0.3 },
+    walking: { x: 0, y: 0.1, z: 0.3 },
+    walkingBackwards: { x: 0, y: 0.1, z: 0.3 },
+    strafe_left: { x: -0.1, y: 0.1, z: 0.3 },
+    strafe_right: { x: -0.1, y: 0.1, z: 0.3 },
+    crouchIdle: { x: -0.1, y: -0.1, z: 0.3 },
 } as const;
 
 export default class CharacterBase implements Poc {
@@ -321,6 +337,7 @@ export default class CharacterBase implements Poc {
       this.characterMesh.position.copyFrom(spawnPosition);
       this.characterMesh.rotationQuaternion = Quaternion.FromEulerAngles(0, spawnRotationY, 0);
       this.weaponRoot?.rotation.set(0, 0, 0);
+      this.shieldRoot?.rotation.set(0, 0, 0);
 
       this._activeBoardAggregate.dispose();
       this._activeBoardMesh.dispose();
@@ -351,6 +368,7 @@ export default class CharacterBase implements Poc {
     }
 
     this._applyWeaponOffset(WEAPON_OFFSETS.standAlone);
+    this._applyShieldOffset(SHIELD_OFFSETS.idle); // NUEVO
     this._setThrustersEnabled(false); // NUEVO
 
     const { strategy, physicsController } = await buildStandAloneStrategy(
@@ -407,6 +425,7 @@ export default class CharacterBase implements Poc {
     this.characterMesh.position.set(offsetX_Capsule, capsuleYOffset, offsetZ_Capsule);
     this.characterMesh.rotation.set(0, -Math.PI / 8, 0);
     this.weaponRoot?.rotation.set(0, WEAPON_HOVERBOARD_YAW_COMPENSATION, 0);
+    this.shieldRoot?.rotation.set(0, WEAPON_HOVERBOARD_YAW_COMPENSATION, 0);
 
     this._activeBoardMesh = boardMesh;
     this._activeBoardAggregate = boardAggregate;
@@ -416,6 +435,7 @@ export default class CharacterBase implements Poc {
     }
 
     this._applyWeaponOffset(WEAPON_OFFSETS.hoverBoard); // NUEVO
+    this._applyShieldOffset(SHIELD_HOVERBOARD_OFFSET); // NUEVO
 
     const { strategy, physicsController } = await buildHoverBoardStrategy(
       this.scene,
@@ -424,8 +444,9 @@ export default class CharacterBase implements Poc {
       this.input,
       this.fsm,
       this.characterAnimations,
-      this.characterMesh, // NUEVO
-      this.weaponMuzzle,  // NUEVO
+      this.characterMesh,
+      this.weaponMuzzle,
+      this.combat, // NUEVO
     );
 
     this.activeStrategy = strategy;
@@ -435,6 +456,10 @@ export default class CharacterBase implements Poc {
 
   private _applyWeaponOffset(offset: { x: number; y: number; z: number }): void {
     this.weaponRoot?.position.set(offset.x, offset.y, offset.z);
+  }
+
+  private _applyShieldOffset(offset: { x: number; y: number; z: number }): void {
+    this.shieldRoot?.position.set(offset.x, offset.y, offset.z);
   }
 
   private _setThrustersEnabled(enabled: boolean): void {

@@ -1,5 +1,6 @@
 import { TransformNode } from "@babylonjs/core";
 import { BaseFsm, TransitionTable } from "../../abstract/base-fsm";
+import { SHIELD_OFFSETS, WEAPON_OFFSETS } from "../../character.base";
 
 export type OnGroundSubState =
   | "Idle"
@@ -32,19 +33,6 @@ export interface OnGroundFsmDeps {
 
 const LANDING_CRASH_VERTICAL_THRESHOLD = -10; // m/s
 const LANDING_ROLL_RATIO_THRESHOLD = 3; // horizontal:vertical
-const WEAPON_OFFSETS = {
-  standAlone: { x: -0.08, y: 0.2, z: 0 },
-  strafe_right: { x: -0.08, y: 0.08, z: 0.2 },
-  strafe_left: { x: -0.12, y: 0.08, z: 0.2 },
-} as const;
-
-const SHIELD_OFFSETS = {
-  idle: { x: -0.1, y: 0.1, z: 0.3 },
-  walking: { x: 0, y: 0.1, z: 0.3 },
-  walkingBackwards: { x: 0, y: 0.1, z: 0.3 },
-  strafe_left: { x: -0.1, y: 0.1, z: 0.3 },
-  strafe_right: { x: -0.1, y: 0.1, z: 0.3 },
-} as const;
 
 export class OnGroundFsm extends BaseFsm<OnGroundSubState> {
   protected transitions: TransitionTable<OnGroundSubState>;

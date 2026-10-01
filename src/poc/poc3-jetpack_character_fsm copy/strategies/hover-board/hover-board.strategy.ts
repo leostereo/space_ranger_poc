@@ -13,6 +13,7 @@ import type { ICharacterAnimations } from "@/services/assets-manager";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { ProjectileWeaponController } from "../weapon/projectile-weapon.controller";
+import type { CombatRules } from "../../utils/combat-rules";
 
 export interface HoverBoardStrategyResult {
     strategy: IVehicleStrategy;
@@ -26,8 +27,9 @@ export async function buildHoverBoardStrategy(
     input: CharacterInput,
     characterFsm: CharacterFsm,
     characterAnimations: ICharacterAnimations | null,
-    characterMesh: AbstractMesh, // NUEVO — para excludeMeshes (no hay characterAggregate propio acá)
-    weaponMuzzle: TransformNode, // NUEVO
+    characterMesh: AbstractMesh,
+    weaponMuzzle: TransformNode,
+    combat: CombatRules, // NUEVO
 ): Promise<HoverBoardStrategyResult> {
     const inputAdapter = new HoverBoardInputAdapter(input);
 
@@ -42,7 +44,9 @@ export async function buildHoverBoardStrategy(
     const animation = new HoverBoardAnimationController(
         characterAnimations,
         characterFsm.boardSubFsm,
-        () => input.current.shoot, // NUEVO
+        combat.isAiming,
+        combat.isShielding,
+        // NUEVO
     );
     // NUEVO — sin restricción de sub-estado: dispara en cualquier momento que se
     // sostenga "/", sin importar Hovering/Falling/Jumping/Diving. La dirección la
@@ -51,7 +55,7 @@ export async function buildHoverBoardStrategy(
     const weapon = new ProjectileWeaponController(
         scene,
         weaponMuzzle,
-        () => input.current.shoot,
+        combat.isAiming, // CAMBIADO
         [boardMesh as AbstractMesh, characterMesh],
     );
 
