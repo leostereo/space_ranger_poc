@@ -21,12 +21,14 @@ export interface StandAloneFsmDeps {
   isLeftHeld: () => boolean;
   isRightHeld: () => boolean;
   isAimingHeld: () => boolean;
+  isShieldHeld: () => boolean;
   isCrouchHeld: () => boolean;
   weaponRoot: TransformNode;
-  onEnterCrouch: () => void; // NUEVO
-  onExitCrouch: () => void;  // NUEVO
-  onEnterCrouchRoll: () => void; // NUEVO
-  onExitCrouchRoll: () => void;  // NUEVO
+  shieldRoot: TransformNode;
+  onEnterCrouch: () => void;
+  onExitCrouch: () => void;
+  onEnterCrouchRoll: () => void;
+  onExitCrouchRoll: () => void;
 }
 
 const WEAPON_OFFSETS = {
@@ -52,17 +54,20 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
       isLeftHeld: this.deps.isLeftHeld,
       isRightHeld: this.deps.isRightHeld,
       isAimingHeld: this.deps.isAimingHeld,
+      isShieldHeld: this.deps.isShieldHeld,
       getVerticalSpeed: this.deps.getVerticalSpeed,
       getHorizontalSpeed: this.deps.getHorizontalSpeed,
       onEnterLandingRoll: this.deps.onEnterLandingRoll,
       onExitLandingRoll: this.deps.onExitLandingRoll,
-      weaponRoot: this.deps.weaponRoot
+      weaponRoot: this.deps.weaponRoot,
+      shieldRoot: this.deps.shieldRoot
     });
 
     this.onGroundCrouchedSubFsm = new OnGroundCrouchedFsm({ // NUEVO
       isForwardHeld: this.deps.isForwardHeld,
       isBackwardHeld: this.deps.isBackwardHeld,
-      weaponRoot: this.deps.weaponRoot
+      weaponRoot: this.deps.weaponRoot,
+      shieldRoot: deps.shieldRoot, // NUEVO
     });
 
     this.transitions = {

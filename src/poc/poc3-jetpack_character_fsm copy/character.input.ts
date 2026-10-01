@@ -5,8 +5,9 @@ export interface CharacterInputState {
   right: boolean;    // D
   up: boolean;       // Space (empuje del jetpack mientras está equipado)
   cruise: boolean;   // Shift — mantenido en Jetpack/On dispara Cruising, al soltar vuelve a On
-  shoot: boolean;     // "/" — mantenido en Jetpack/On dispara Shooting, Shift tiene prioridad
+  shoot: boolean;     // "," — mantenido en Jetpack/On dispara Shooting, Shift tiene prioridad
   crouch: boolean;   // "." — mantenido en OnGround (Idle/Walking/WalkingBackwards) dispara Crouch
+  shield: boolean;   // "/" — mantenido en OnGround (Idle/Walking/WalkingBackwards/Strafe, CrouchIdle) levanta el escudo
 }
 
 export class CharacterInput {
@@ -19,6 +20,7 @@ export class CharacterInput {
     cruise: false,
     shoot: false,
     crouch: false,
+    shield: false,
   };
 
   /**
@@ -79,6 +81,9 @@ export class CharacterInput {
         this.state.crouch = true;
         this.crouchRollRequested = true; // NUEVO — edge trigger, consumido una sola vez
         break;
+      case "Slash":
+        this.state.shield = true;
+        break;
     }
   };
 
@@ -99,8 +104,11 @@ export class CharacterInput {
       case "Period": // sin cambios
         this.state.crouch = false;
         break;
-      case "Slash": // CAMBIADO — antes disparaba shoot, ahora "/" es equip
+      case "KeyL": 
         this.equipRequested = true;
+        break;
+      case "Slash":
+        this.state.shield = false;
         break;
     }
   };

@@ -6,13 +6,18 @@ export type OnGroundCrouchedSubState = "CrouchIdle" | "CrouchWalking" | "CrouchW
 export interface OnGroundCrouchedFsmDeps {
   isForwardHeld: () => boolean;
   isBackwardHeld: () => boolean;
-  weaponRoot: TransformNode; // NUEVO
+  weaponRoot: TransformNode;
+  shieldRoot: TransformNode; // NUEVO
 }
 
 const WEAPON_OFFSETS = {
   crouchIdle: { x: -0.08, y: -0.06, z: 0 },
   crouchWalking: { x: -0.08, y: 0, z: 0 },
   crouchWalkingBackwards: { x: -0.08, y: 0, z: 0 },
+} as const;
+
+const SHIELD_OFFSETS = {
+  crouchIdle: { x: 0, y: -0.1, z: 0.3 },
 } as const;
 
 export class OnGroundCrouchedFsm extends BaseFsm<OnGroundCrouchedSubState> {
@@ -40,10 +45,16 @@ export class OnGroundCrouchedFsm extends BaseFsm<OnGroundCrouchedSubState> {
   /** Fuerza vuelta a CrouchIdle — llamado por OnGroundFsm cada vez que se re-entra a Crouch. */
   resetToIdle(): void {
     this.state = "CrouchIdle";
+    this._applyWeaponOffset(WEAPON_OFFSETS.crouchIdle);
+    this._applyShieldOffset(SHIELD_OFFSETS.crouchIdle);
   }
 
   private _applyWeaponOffset(offset: { x: number; y: number; z: number }): void {
     this.deps.weaponRoot?.position.set(offset.x, offset.y, offset.z);
+  }
+
+  private _applyShieldOffset(offset: { x: number; y: number; z: number }): void {
+    this.deps.shieldRoot?.position.set(offset.x, offset.y, offset.z);
   }
 
   protected onEnter(_state: OnGroundCrouchedSubState): void { // CAMBIADO
@@ -55,6 +66,9 @@ export class OnGroundCrouchedFsm extends BaseFsm<OnGroundCrouchedSubState> {
     }
     if (this.state === "CrouchWalkingBackwards") {
       this._applyWeaponOffset(WEAPON_OFFSETS.crouchWalkingBackwards);
+    }
+    if (this.state === "CrouchIdle") {
+      this._applyShieldOffset(SHIELD_OFFSETS.crouchIdle); // NUEVO — al volver de CrouchWalking*
     }
   }
   protected onExit(_state: OnGroundCrouchedSubState): void { }

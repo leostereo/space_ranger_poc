@@ -106,8 +106,9 @@ export interface CharacterAndEquipmentBuildResult extends CharacterBuildResult {
   thrusterGroup: TransformNode;
   thrusterLeft: Mesh;
   thrusterRight: Mesh;
-  thrusterLeftNozzle: TransformNode; // NUEVO
-  thrusterRightNozzle: TransformNode; // NUEVO
+  thrusterLeftNozzle: TransformNode;
+  thrusterRightNozzle: TransformNode;
+  shieldRoot: TransformNode;
 }
 
 export function characterAndEquipment_builder(scene: Scene): CharacterAndEquipmentBuildResult {
@@ -173,6 +174,15 @@ export function characterAndEquipment_builder(scene: Scene): CharacterAndEquipme
   thrusterGroup.parent = capsule;
   thrusterGroup.position.set(0,0.3,0.06);
 
+  const shieldResult = AssetManager.getShield();
+  if (!shieldResult) {
+    throw new Error("characterAndEquipment_builder: no se pudo obtener el shield del AssetManager.");
+  }
+  const { shieldRoot } = shieldResult;
+  shieldRoot.parent = capsule;
+  shieldRoot.position.set(0, 0.1, 0.5); // ajustar a ojo; el offset por estado lo maneja character.base.ts
+
+
   return {
     characterMesh: capsule,
     characterAggregate,
@@ -182,8 +192,9 @@ export function characterAndEquipment_builder(scene: Scene): CharacterAndEquipme
     thrusterGroup,
     thrusterLeft,
     thrusterRight,
-    thrusterLeftNozzle, // NUEVO
-    thrusterRightNozzle, // NUEVO
+    thrusterLeftNozzle,
+    thrusterRightNozzle,
+    shieldRoot
   };
 }
 

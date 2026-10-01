@@ -87,6 +87,13 @@ export interface ICharacterAnimations {
 
     running_roll: AnimationGroup
 
+    shield_idle: AnimationGroup,
+    shield_idle_crouched: AnimationGroup,
+    shield_strafe_left: AnimationGroup,
+    shield_strafe_right: AnimationGroup,
+    shield_walk_forward: AnimationGroup,
+    shield_walk_backwards: AnimationGroup,
+
 }
 
 export interface MeshInstanceResult {
@@ -108,6 +115,10 @@ export interface ThrusterBuildResult {
     thrusterRightNozzle: TransformNode; // NUEVO
 }
 
+export interface ShieldBuildResult {
+    shieldRoot: TransformNode;
+}
+
 export class AssetManager {
     // Diccionarios en memoria (privados para que nadie los modifique por fuera)
     private static textures: Record<string, Texture> = {};
@@ -119,6 +130,7 @@ export class AssetManager {
     private static weaponResult: WeaponBuildResult | null = null;
     private static skeletons: Record<MeshAssetKey, Skeleton> = {} as Record<MeshAssetKey, Skeleton>;
     private static thrusterResult: ThrusterBuildResult | null = null; // NUEVO
+    private static shieldResult: ShieldBuildResult | null = null;
 
     // Almacén para las animaciones originales de los GLB (crudo, por nombre de clip tal
     // cual viene del archivo — sigue existiendo para getAnimations(), sin cambios).
@@ -146,7 +158,7 @@ export class AssetManager {
             };
 
             // --- RECURSO 2: Modelo GLB Externo ---
-            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver11.glb");
+            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver13.glb");
             tareaGLB.onSuccess = (task) => {
                 // Buscamos el nodo raíz que crea automáticamente Babylon para los GLB
 
@@ -311,9 +323,39 @@ export class AssetManager {
         this._buildBoard(scene);
         this._prepareCharacterAnimations();
         this._buildWeapons(scene);
-        this._buildThrusters(scene); // NUEVO
-
+        this._buildThrusters(scene);
+        this._buildShield(scene)
     }
+
+    private static _buildShield(scene: Scene): void {
+        const shieldWidth = 0.45;      // antes 0.56 (0.7 original)
+        const shieldHeight = 0.58;     // antes 0.72 (0.9 original)
+        const shieldThickness = 0.05;  // antes 0.06
+
+        const radius = shieldWidth / 2; // el ancho lo define el radio de la cápsula
+
+        const shieldRoot = new TransformNode("shieldRoot", scene);
+
+        // Cápsula vertical (eje Y), height es el alto TOTAL incluyendo las dos tapas.
+        const panel = MeshBuilder.CreateCapsule(
+            "shieldPanel",
+            { height: shieldHeight, radius, tessellation: 24, capSubdivisions: 6 },
+            scene,
+        );
+        panel.parent = shieldRoot;
+        panel.scaling.z = shieldThickness / shieldWidth; // aplasta en Z: diámetro en Z = thickness
+        panel.isPickable = false;
+
+        const mat = new StandardMaterial("shieldMat", scene);
+        mat.diffuseColor = new Color3(0.2, 0.55, 0.85);
+        mat.emissiveColor = new Color3(0.1, 0.35, 0.6);
+        mat.specularColor = new Color3(0.1, 0.1, 0.1);
+        mat.alpha = 0.45;
+        panel.material = mat;
+
+    shieldRoot.setEnabled(false);
+    this.shieldResult = { shieldRoot };
+}
 
     private static _buildThrusters(scene: Scene): void {
         const bodyLength = 0.12;
@@ -379,6 +421,14 @@ export class AssetManager {
             thrusterLeftNozzle: left.nozzle,
             thrusterRightNozzle: right.nozzle,
         };
+    }
+
+    public static getShield(): ShieldBuildResult | null {
+        if (!this.shieldResult) {
+            console.error(`El asset "shield" no fue construido — revisar _buildShield().`);
+            return null;
+        }
+        return this.shieldResult;
     }
 
     private static _buildWeapons(scene: Scene): void {
@@ -479,6 +529,12 @@ export class AssetManager {
 
         const running_roll = find("roll to run");
 
+        const shield_idle = find("shield idle");
+        const shield_idle_crouched = find("shield crouched idle");
+        const shield_strafe_left = find("shield strafe left");
+        const shield_strafe_right = find("shield strafe right");
+        const shield_walk_forward = find("shield walking forward");
+        const shield_walk_backwards = find("shield walking backwards");
 
 
 
@@ -487,7 +543,8 @@ export class AssetManager {
             !flying || !floating || !jump_on_board || !walking_forward || !walking_backwards ||
             !running_normal || !running_fast || !aiming_jetpack || !crouch_aimming || !idle_aimming || !walking_backwards_aimming ||
             !walking_aimming || !running_aimming || !strafe_right || !strafe_left || !crouch_walk || !crouch_walkbackwards ||
-            !crouch_walk_aim || !crouch_walkbackwards_aim || !crouch_idle_aim || !running_roll) {
+            !crouch_walk_aim || !crouch_walkbackwards_aim || !crouch_idle_aim || !running_roll || !shield_idle ||
+            !shield_idle_crouched || !shield_strafe_left || !shield_strafe_right || !shield_walk_forward || !shield_walk_backwards) {
             console.warn("AssetManager: faltan animaciones de 'character' — revisar nombres de clips en el GLB.");
             return;
         }
@@ -498,7 +555,8 @@ export class AssetManager {
             falling_idle, jump_on_board, walking_forward, walking_backwards, running_fast, running_normal, aiming_jetpack,
             jump_while_running, crouch_aimming, idle_aimming, walking_aimming, walking_backwards_aimming, running_aimming,
             strafe_right, strafe_left, crouch_walk, crouch_walkbackwards, crouch_walk_aim, crouch_walkbackwards_aim,
-            crouch_idle_aim, running_roll
+            crouch_idle_aim, running_roll, shield_idle, shield_idle_crouched, shield_strafe_left, shield_strafe_right,
+            shield_walk_backwards, shield_walk_forward
         };
 
         Object.values(mold).forEach((ag) => {
@@ -557,7 +615,15 @@ export class AssetManager {
             crouch_walk_aim: cloneOne(mold.crouch_walk_aim),
             crouch_walkbackwards_aim: cloneOne(mold.crouch_walkbackwards_aim),
 
-            running_roll: cloneOne(mold.running_roll)
+            running_roll: cloneOne(mold.running_roll),
+
+            shield_idle: cloneOne(mold.shield_idle),
+            shield_idle_crouched: cloneOne(mold.shield_idle_crouched),
+            shield_strafe_left: cloneOne(mold.shield_strafe_left),
+            shield_strafe_right: cloneOne(mold.shield_strafe_right),
+            shield_walk_backwards: cloneOne(mold.shield_walk_backwards),
+            shield_walk_forward: cloneOne(mold.shield_walk_forward)
+
         };
     }
 

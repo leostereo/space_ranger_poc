@@ -32,6 +32,7 @@ export interface CharacterFsmDeps {
   isLeftHeld: () => boolean;
   isRightHeld: () => boolean;
   isAimingHeld: () => boolean;
+  isShieldHeld: () => boolean;
   isCrouchHeld: () => boolean; // NUEVO
   onEnterHoverBoard: () => void;
   /** Threading hacia OnGroundFsmDeps, vía StandAloneFsmDeps — mismo criterio que isMoveHeld/isRunHeld. */
@@ -54,6 +55,7 @@ export interface CharacterFsmDeps {
   onEnterDiving: () => void;
   onEnterGliderBoost: () => void;
   weaponRoot:TransformNode;
+  shieldRoot:TransformNode;
   onEnterCrouch: () => void;
   onExitCrouch: () => void;
   onEnterCrouchRoll: () => void; // NUEVO
@@ -82,6 +84,7 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
       isLeftHeld: this.deps.isLeftHeld,     
       isRightHeld: this.deps.isRightHeld,   
       isAimingHeld: this.deps.isAimingHeld,
+      isShieldHeld: this.deps.isShieldHeld,
       isCrouchHeld: this.deps.isCrouchHeld, // NUEVO
       getVerticalSpeed: this.deps.getVerticalSpeed,
       getHorizontalSpeed: this.deps.getHorizontalSpeed,
@@ -91,6 +94,7 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
       onExitJumpWindup: this.deps.onExitJumpWindup,
       onEnterRunningJumpOnAir: this.deps.onEnterRunningJumpOnAir,
       weaponRoot: this.deps.weaponRoot,
+      shieldRoot:this.deps.shieldRoot,
       onEnterCrouch: this.deps.onEnterCrouch,
       onExitCrouch: this.deps.onExitCrouch,
       onEnterCrouchRoll: this.deps.onEnterCrouchRoll, // NUEVO

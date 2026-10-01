@@ -17,16 +17,17 @@ export interface OnGroundFsmDeps {
   isForwardHeld: () => boolean;
   isBackwardHeld: () => boolean;
   isRunHeld: () => boolean;
-  isLeftHeld: () => boolean;   // NUEVO
-  isRightHeld: () => boolean;  // NUEVO
-  isAimingHeld: () => boolean; // NUEVO — mismo booleano que ya controla el arma/disparo
-  /** m/s, negativo = cayendo. Leído sólo en notifyLanding(). */
+  isLeftHeld: () => boolean;
+  isRightHeld: () => boolean;
+  isAimingHeld: () => boolean;
+  isShieldHeld: () => boolean; // NUEVO — escudo efectivamente activo (ya validado por estado)
   getVerticalSpeed: () => number;
   /** Magnitud XZ, m/s. Leído sólo en notifyLanding(). */
   getHorizontalSpeed: () => number;
   onEnterLandingRoll: () => void;
   onExitLandingRoll: () => void;
   weaponRoot: TransformNode;
+  shieldRoot: TransformNode;
 }
 
 const LANDING_CRASH_VERTICAL_THRESHOLD = -10; // m/s
@@ -35,6 +36,14 @@ const WEAPON_OFFSETS = {
   standAlone: { x: -0.08, y: 0.2, z: 0 },
   strafe_right: { x: -0.08, y: 0.08, z: 0.2 },
   strafe_left: { x: -0.12, y: 0.08, z: 0.2 },
+} as const;
+
+const SHIELD_OFFSETS = {
+  idle: { x: -0.1, y: 0.1, z: 0.3 },
+  walking: { x: 0, y: 0.1, z: 0.3 },
+  walkingBackwards: { x: 0, y: 0.1, z: 0.3 },
+  strafe_left: { x: -0.1, y: 0.1, z: 0.3 },
+  strafe_right: { x: -0.1, y: 0.1, z: 0.3 },
 } as const;
 
 export class OnGroundFsm extends BaseFsm<OnGroundSubState> {
@@ -88,14 +97,14 @@ export class OnGroundFsm extends BaseFsm<OnGroundSubState> {
       LandingCrash: { Idle: true },
 
       ShootingStrafeLeft: {
-        Idle: () => !this.deps.isAimingHeld() || !this.deps.isLeftHeld() || this.deps.isForwardHeld() || this.deps.isBackwardHeld(),
+        Idle: () => !this._strafeModeHeld() || !this.deps.isLeftHeld() || this.deps.isForwardHeld() || this.deps.isBackwardHeld(),
         ShootingStrafeRight: () => this._canStrafe() && this.deps.isRightHeld() && !this.deps.isLeftHeld(),
         LandingSoft: true,
         LandingRoll: true,
         LandingCrash: true,
       },
       ShootingStrafeRight: {
-        Idle: () => !this.deps.isAimingHeld() || !this.deps.isRightHeld() || this.deps.isForwardHeld() || this.deps.isBackwardHeld(),
+        Idle: () => !this._strafeModeHeld() || !this.deps.isRightHeld() || this.deps.isForwardHeld() || this.deps.isBackwardHeld(),
         ShootingStrafeLeft: () => this._canStrafe() && this.deps.isLeftHeld() && !this.deps.isRightHeld(),
         LandingSoft: true,
         LandingRoll: true,
@@ -165,13 +174,32 @@ export class OnGroundFsm extends BaseFsm<OnGroundSubState> {
     }
   }
 
+  private _strafeModeHeld(): boolean {
+    return this.deps.isAimingHeld() || this.deps.isShieldHeld();
+  }
+
   private _canStrafe(): boolean {
-    return this.deps.isAimingHeld() && !this.deps.isForwardHeld() && !this.deps.isBackwardHeld();
+    return this._strafeModeHeld() && !this.deps.isForwardHeld() && !this.deps.isBackwardHeld();
   }
 
   private _applyWeaponOffset(offset: { x: number; y: number; z: number }): void {
     this.deps.weaponRoot?.position.set(offset.x, offset.y, offset.z);
   }
+
+  private _applyShieldOffset(offset: { x: number; y: number; z: number }): void {
+    this.deps.shieldRoot?.position.set(offset.x, offset.y, offset.z);
+  }
+
+  private _shieldOffsetFor(state: OnGroundSubState) {
+    switch (state) {
+      case "Walking": return SHIELD_OFFSETS.walking;
+      case "WalkingBackwards": return SHIELD_OFFSETS.walkingBackwards;
+      case "ShootingStrafeLeft": return SHIELD_OFFSETS.strafe_left;
+      case "ShootingStrafeRight": return SHIELD_OFFSETS.strafe_right;
+      default: return SHIELD_OFFSETS.idle; // Idle, Running, landings, etc.
+    }
+  }
+
   protected onEnter(_state: OnGroundSubState): void {
     this._applyWeaponOffset(WEAPON_OFFSETS.standAlone)
     if (this.state === 'ShootingStrafeLeft') {
@@ -180,6 +208,7 @@ export class OnGroundFsm extends BaseFsm<OnGroundSubState> {
     if (this.state === 'ShootingStrafeRight') {
       this._applyWeaponOffset(WEAPON_OFFSETS.strafe_right)
     }
+    this._applyShieldOffset(this._shieldOffsetFor(this.state)); // NUEVO
   }
   protected onExit(_state: OnGroundSubState): void { }
   dispose(): void { }

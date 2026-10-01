@@ -9,6 +9,7 @@ import type { CharacterInputState } from "../../character.input";
 import { Color3, PhysicsShapeCapsule, RayHelper } from "@babylonjs/core";
 import { OnGroundSubState } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone.on-ground";
 import { OnGroundCrouchedSubState } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone.on-ground-crouched"; // NUEVO
+import { isShieldActive } from "../../utils/combat-rules";
 
 const WALK_SPEED = 4;
 const RUN_SPEED = 7;
@@ -51,7 +52,7 @@ export class StandAlonePhysicsController implements IPhysicsController {
     private characterAggregate: PhysicsAggregate,
     private getInput: () => CharacterInputState,
     initialGroundDetected: boolean,
-    private getSubState: () => OnGroundSubState | OnGroundCrouchedSubState | "JumpImpulseStart" | "RunningJumpImpulseStart" | "OnAir" | "CrouchRollStart", 
+    private getSubState: () => OnGroundSubState | OnGroundCrouchedSubState | "JumpImpulseStart" | "RunningJumpImpulseStart" | "OnAir" | "CrouchRollStart",
   ) {
     this._groundDetected = initialGroundDetected;
     this._setupFallAndLanding();
@@ -93,21 +94,32 @@ export class StandAlonePhysicsController implements IPhysicsController {
       return;
     }
 
-    // if (this._movementLocked) {
-    //   this.characterAggregate.body.setLinearVelocity(Vector3.Zero());
-    //   return;
-    // }
+    // ── desde acá es lo que cambia ──────────────────────────────────────
 
-    // NUEVO — strafe: traslada sin rotar, en vez de _applyTurn + _applyMove normales.
+    const input = this.getInput();
     const subState = this.getSubState();
+
     if (subState === "ShootingStrafeLeft" || subState === "ShootingStrafeRight") {
       this._applyStrafe(subState === "ShootingStrafeLeft" ? -1 : 1);
       return;
     }
 
-    const { forward, backward, left, right, cruise } = this.getInput();
-    this._applyTurn(left, right);
-    this._applyMove(forward, backward, cruise);
+    // NUEVO — bloque del escudo (el que preguntás)
+    if (isShieldActive(subState, input)) {
+      const strafeDir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+      const canStrafeNow = !input.forward && !input.backward && subState !== "CrouchIdle";
+      if (strafeDir !== 0 && canStrafeNow) {
+        this._applyStrafe(strafeDir as -1 | 1);
+        return;
+      }
+      this.characterAggregate.body.setAngularVelocity(Vector3.Zero());
+      this._applyMove(input.forward, input.backward, false);
+      return;
+    }
+
+    // flujo normal (sin escudo)
+    this._applyTurn(input.left, input.right);
+    this._applyMove(input.forward, input.backward, input.cruise);
   }
 
   private _applyJumpWindupDamping(dt: number): void {
@@ -232,7 +244,7 @@ export class StandAlonePhysicsController implements IPhysicsController {
     this._isRolling = false;
   }
 
-    notifyCrouchRollStart(): void { // NUEVO
+  notifyCrouchRollStart(): void { // NUEVO
     this._rollDirection = this.characterAggregate.transformNode.forward.clone();
     this._rollSpeed = CROUCH_ROLL_SPEED;
     this._rollDuration = CROUCH_ROLL_DURATION_SECONDS;
@@ -281,13 +293,13 @@ export class StandAlonePhysicsController implements IPhysicsController {
     this._applyCapsuleShape(CAPSULE_STANDING_TOP);
   }
 
-private _applyCapsuleShape(topY: number): void {
-  const pointA = new Vector3(0, CAPSULE_BOTTOM, 0);
-  const pointB = new Vector3(0, topY, 0);
-  const newShape = new PhysicsShapeCapsule(pointA, pointB, CAPSULE_RADIUS, this.scene);
-  this.characterAggregate.shape = newShape;
-  // this.characterAggregate.body.shape = newShape; // NUEVO
-}
+  private _applyCapsuleShape(topY: number): void {
+    const pointA = new Vector3(0, CAPSULE_BOTTOM, 0);
+    const pointB = new Vector3(0, topY, 0);
+    const newShape = new PhysicsShapeCapsule(pointA, pointB, CAPSULE_RADIUS, this.scene);
+    this.characterAggregate.shape = newShape;
+    // this.characterAggregate.body.shape = newShape; // NUEVO
+  }
 
   getLastImpactVerticalSpeed(): number {
     return this._lastImpactVerticalSpeed;

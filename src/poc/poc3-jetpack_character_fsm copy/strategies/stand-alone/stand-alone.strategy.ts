@@ -11,6 +11,7 @@ import { StandAloneAnimationController } from "./stand-alone.animation.controlle
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { ProjectileWeaponController } from "../weapon/projectile-weapon.controller";
+import type { CombatRules } from "../../utils/combat-rules";
 
 export interface StandAloneStrategyResult {
   strategy: IVehicleStrategy;
@@ -29,6 +30,7 @@ export async function buildStandAloneStrategy(
   characterFsm: CharacterFsm,
   characterAnimations: ICharacterAnimations | null,
   weaponMuzzle: TransformNode, // NUEVO — antes del último param opcional
+  combat: CombatRules, // NUEVO — antes del último param opcional
   initialGroundDetectedOverride?: boolean,
 
 ): Promise<StandAloneStrategyResult> {
@@ -41,30 +43,14 @@ export async function buildStandAloneStrategy(
     () => characterFsm.standAloneSubFsm.getActiveSubState(), // NUEVO
   ); const inputController = new StandAloneInputController(input, characterFsm);
 
-  // Único predicado — determina si se dispara, si el arma es visible, y si toca la
-  // animación de apuntado en vez de la normal. Restringido a Idle/Walking/Running: no
-  // durante JumpImpulseStart/OnAir/LandingX/EquippingHoverBoardStart.
-  const isAimingActive = (): boolean => {
-    const groundState = characterFsm.getActiveSubState();
-    // CAMBIADO — mismo fix que character.base.ts, ver comentario ahí.
-    const canAimHere =
-      groundState === "Idle" ||
-      groundState === "Walking" ||
-      groundState === "WalkingBackwards" ||
-      groundState === "Running" ||
-      groundState === "ShootingStrafeLeft" ||
-      groundState === "ShootingStrafeRight" ||
-      groundState === "CrouchIdle" ||            
-      groundState === "CrouchWalking" ||          
-      groundState === "CrouchWalkingBackwards";   
-    return canAimHere && input.current.shoot;
-  };
 
-  const animation = new StandAloneAnimationController(characterAnimations, characterFsm.standAloneSubFsm, isAimingActive); // CAMBIADO
-  const weapon = new ProjectileWeaponController( 
+  const animation = new StandAloneAnimationController(
+    characterAnimations, characterFsm.standAloneSubFsm, combat.isAiming, combat.isShielding,
+  );
+  const weapon = new ProjectileWeaponController(
     scene,
     weaponMuzzle,
-    isAimingActive,
+    combat.isAiming,
     [characterAggregate.transformNode as AbstractMesh],
   );
 

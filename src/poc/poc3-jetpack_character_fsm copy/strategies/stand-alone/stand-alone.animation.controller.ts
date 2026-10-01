@@ -15,7 +15,8 @@ export class StandAloneAnimationController implements IAnimationController {
   constructor(
     private animations: ICharacterAnimations | null,
     private standAloneFsm: StandAloneFsm,
-    private isAiming: () => boolean, // NUEVO
+    private isAiming: () => boolean,
+    private isShielding: () => boolean, // NUEVO
   ) {
     this.standAloneFsm.onStateChange(() => this._render(this.standAloneFsm.getActiveSubState()));
     this.standAloneFsm.onGroundSubFsm.onStateChange(() => this._render(this.standAloneFsm.getActiveSubState()));
@@ -65,6 +66,25 @@ export class StandAloneAnimationController implements IAnimationController {
 
   private _resolve(state: ResolvedStandAloneState): { animation: AnimationGroup; loop: boolean; waitForCompletion?: boolean } | null {
     if (!this.animations) return null;
+
+    // NUEVO — el escudo tiene precedencia sobre el apuntado (con shield held, isAiming ya da false,
+    // pero lo dejamos explícito por si cambian las reglas)
+    if (this.isShielding()) {
+      switch (state) {
+        case "Idle":
+          return { animation: this.animations.shield_idle, loop: true };
+        case "Walking":
+          return { animation: this.animations.shield_walk_forward, loop: true };
+        case "WalkingBackwards":
+          return { animation: this.animations.shield_walk_backwards, loop: true };
+        case "ShootingStrafeLeft":
+          return { animation: this.animations.shield_strafe_left, loop: true };
+        case "ShootingStrafeRight":
+          return { animation: this.animations.shield_strafe_right, loop: true };
+        case "CrouchIdle":
+          return { animation: this.animations.shield_idle_crouched, loop: true };
+      }
+    }
 
     if (this.isAiming()) {
       if (state === "Idle" && this.animations.idle_aimming) {

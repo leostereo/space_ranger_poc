@@ -19,6 +19,7 @@ import { HoverBoardPhysicsController } from "./strategies/hover-board/hover-boar
 import { HoverBoardInputAdapter } from "./strategies/hover-board/hover-board.input.adapter";
 import { buildHoverBoardStrategy } from "./strategies/hover-board/hover-board.strategy";
 import { characterAndEquipment_builder, scene_builder } from "./utils/buildUtils";
+import { CombatRules } from "./utils/combat-rules";
 
 const JUMP_IMPULSE_FRAME = 30;
 const EQUIP_BOARD_FRAME = 60; // placeholder — ajustar cuando definan el frame real del clip
@@ -60,30 +61,34 @@ export default class CharacterBase implements Poc {
   private weaponRoot: WeaponBuildResult["weaponRoot"] | null = null;
   private weaponMuzzle: WeaponBuildResult["muzzle"] | null = null;
 
-  private thrusterGroup: TransformNode | null = null; // NUEVO
+  private thrusterGroup: TransformNode | null = null;
   private thrusterLeft: Mesh | null = null;
   private thrusterRight: Mesh | null = null;
-  private thrusterLeftNozzle: TransformNode | null = null; // NUEVO
-  private thrusterRightNozzle: TransformNode | null = null; // NUEVO
+  private thrusterLeftNozzle: TransformNode | null = null;
+  private thrusterRightNozzle: TransformNode | null = null;
+
+  private combat: CombatRules;
+  private shieldRoot: TransformNode | null = null;
 
   async build(scene: Scene): Promise<void> {
     this.scene = scene;
     scene_builder(scene);
 
     const { characterMesh, characterAggregate, characterAnimations, weaponRoot, muzzle,
-      thrusterGroup, thrusterLeft, thrusterRight, thrusterLeftNozzle, thrusterRightNozzle } = characterAndEquipment_builder(scene); // CAMBIADO
+      thrusterGroup, thrusterLeft, thrusterRight, thrusterLeftNozzle, thrusterRightNozzle, shieldRoot } = characterAndEquipment_builder(scene); // CAMBIADO
     this.characterMesh = characterMesh;
     this.characterAggregate = characterAggregate;
     this.characterAnimations = characterAnimations;
     this.weaponRoot = weaponRoot;
     this.weaponMuzzle = muzzle;
-    this.thrusterGroup = thrusterGroup; // NUEVO
-    this.thrusterLeft = thrusterLeft; // NUEVO
-    this.thrusterRight = thrusterRight; // NUEVO
-    this.thrusterLeftNozzle = thrusterLeftNozzle; // NUEVO
-    this.thrusterRightNozzle = thrusterRightNozzle; // NUEVO
+    this.thrusterGroup = thrusterGroup;
+    this.thrusterLeft = thrusterLeft;
+    this.thrusterRight = thrusterRight;
+    this.thrusterLeftNozzle = thrusterLeftNozzle;
+    this.thrusterRightNozzle = thrusterRightNozzle;
     weaponRoot.parent = this.characterMesh;
     this._applyWeaponOffset(WEAPON_OFFSETS.standAlone);
+    this.shieldRoot = shieldRoot;
 
     if (!this.characterMesh.rotationQuaternion) {
       this.characterMesh.rotationQuaternion = Quaternion.Identity();
@@ -112,7 +117,8 @@ export default class CharacterBase implements Poc {
       isRunHeld: () => this.input.current.cruise,
       isLeftHeld: () => this.input.current.left,
       isRightHeld: () => this.input.current.right,
-      isAimingHeld: () => this._isAimingActive(),
+      isAimingHeld: () => this.combat.isAiming(),
+      isShieldHeld: () => this.combat.isShielding(),
       isCrouchHeld: () => this.input.current.crouch,
       onEnterHoverBoard: () => this._swapToHoverBoard(),
       getVerticalSpeed: () => this.activeStandAlonePhysics?.getLastImpactVerticalSpeed() ?? 0,
@@ -136,11 +142,14 @@ export default class CharacterBase implements Poc {
       onEnterGliderBoost: () => this.activeBoardPhysics?.onEnterGliderBoost(),
       onEnterRunningJumpOnAir: () => this.activeStandAlonePhysics?.applyRunningJumpImpulse(),
       weaponRoot,
+      shieldRoot,
       onEnterCrouch: () => this.activeStandAlonePhysics?.notifyCrouchEnter(), // NUEVO
       onExitCrouch: () => this.activeStandAlonePhysics?.notifyCrouchExit(),  // NUEVO
       onEnterCrouchRoll: () => this.activeStandAlonePhysics?.notifyCrouchRollStart(), // NUEVO
       onExitCrouchRoll: () => this.activeStandAlonePhysics?.notifyCrouchRollEnd(),
     });
+
+    this.combat = new CombatRules(this.fsm, this.input);
 
     this._wireJumpAnimationEvent();
     this._wireEquipBoardAnimationEvent();
@@ -155,6 +164,7 @@ export default class CharacterBase implements Poc {
       this.fsm,
       this.characterAnimations,
       this.weaponMuzzle,
+      this.combat,
     );
 
     this.activeStrategy = strategy;
@@ -166,34 +176,12 @@ export default class CharacterBase implements Poc {
     this._bindObservables();
   }
 
-  private _isAimingActive(): boolean {
-    if (this.fsm.getState() === "Jetpack") {
-      return this.fsm.jetpackSubFsm.getState() === "Shooting";
-    }
-    if (this.fsm.getState() === "StandAlone") {
-      const groundState = this.fsm.getActiveSubState();
-      const canAimHere =
-        groundState === "Idle" ||
-        groundState === "Walking" ||
-        groundState === "WalkingBackwards" ||
-        groundState === "Running" ||
-        groundState === "ShootingStrafeLeft" ||
-        groundState === "ShootingStrafeRight" ||
-        groundState === "CrouchIdle" ||            // NUEVO
-        groundState === "CrouchWalking" ||          // NUEVO
-        groundState === "CrouchWalkingBackwards";   // NUEVO
-      return canAimHere && this.input.current.shoot;
-    }
-    if (this.fsm.getState() === "HoverBoard") {
-      return this.input.current.shoot;
-    }
-    return false;
+  private _updateShield(): void {
+    this.shieldRoot?.setEnabled(this.combat.isShielding());
   }
 
   private _updateWeaponVisibility(): void {
-    setTimeout(() => {
-      this.weaponRoot?.setEnabled(this._isAimingActive());
-    }, 3000)
+    this.weaponRoot?.setEnabled(this.combat.isAiming());
   }
 
   private _wireJumpAnimationEvent(): void {
@@ -269,6 +257,7 @@ export default class CharacterBase implements Poc {
       this.activeStrategy?.tick(dt);
       this.fsm.tick();
       this._updateWeaponVisibility();
+      this._updateShield();
       if (this.fsm.getState() === "HoverBoard" && this.input.consumeEquipRequest()) {
         this.fsm.requestUnequipBoard();
       }
@@ -371,6 +360,7 @@ export default class CharacterBase implements Poc {
       this.fsm,
       this.characterAnimations,
       this.weaponMuzzle, // NUEVO
+      this.combat,
       initialGroundDetectedOverride,
     );
 
@@ -471,5 +461,6 @@ export default class CharacterBase implements Poc {
       Object.values(this.characterAnimations).forEach((ag) => ag.dispose());
     }
     this.weaponRoot?.dispose();
+    this.shieldRoot?.dispose();
   }
 }
