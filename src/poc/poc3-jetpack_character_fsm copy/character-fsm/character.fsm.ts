@@ -12,7 +12,8 @@ export type CharacterMainState =
   | "StandAlone"
   | "EquippingJetpack"
   | "Jetpack"
-  | "HoverBoard";
+  | "HoverBoard"
+  | "Dead";
 
 export interface CharacterFsmDeps {
   hasFuel: () => boolean;
@@ -60,6 +61,9 @@ export interface CharacterFsmDeps {
   onExitCrouch: () => void;
   onEnterCrouchRoll: () => void; // NUEVO
   onExitCrouchRoll: () => void;  // NUEVO
+  onEnterHitStun: () => void; // NUEVO — freno mientras dura la reacción al hit
+  onExitHitStun: () => void;  // NUEVO
+  onEnterDead: () => void;    // NUEVO
 }
 
 export class CharacterFsm extends BaseFsm<CharacterMainState> {
@@ -99,6 +103,8 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
       onExitCrouch: this.deps.onExitCrouch,
       onEnterCrouchRoll: this.deps.onEnterCrouchRoll, // NUEVO
       onExitCrouchRoll: this.deps.onExitCrouchRoll,   // NUEVO
+      onEnterHitStun: this.deps.onEnterHitStun,       // NUEVO
+      onExitHitStun: this.deps.onExitHitStun,         // NUEVO
     });
 
     this.jetpackSubFsm = new JetpackFsm({
@@ -128,6 +134,7 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
       StandAlone: {
         EquippingJetpack: true,
         HoverBoard: true, // vía notifyBoardReady(), manual — mismo patrón que Jetpack
+        Dead: true,       // NUEVO — vía notifyDeath(), manual
       },
       EquippingJetpack: {
         Jetpack: true,
@@ -137,7 +144,9 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
       },
       HoverBoard: {
         StandAlone: true, // vía requestUnequipBoard(), manual — mismo criterio que requestUnequipJetpack
+        Dead: true,       // NUEVO — vía notifyDeath(), manual
       },
+      Dead: {}, // NUEVO — terminal
     };
   }
 
@@ -160,6 +169,7 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
    */
   requestEquipment(): void {
     if (this.state !== "StandAlone") return;
+    if (this.standAloneSubFsm.isHitStunned()) return; // NUEVO
 
     if (this.standAloneSubFsm.getState() === "OnAir") {
       this.setState("EquippingJetpack");
@@ -191,9 +201,30 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
   }
 
   requestUnequipBoard(): void {
-    if (this.state === "HoverBoard") {
+    if (this.state === "HoverBoard" && !this.boardSubFsm.isHitStunned()) { // CAMBIADO — sin desequipar durante la reacción al hit
       this.setState("StandAlone");
     }
+  }
+
+  /** NUEVO — StandAlone en suelo y HoverBoard (Hovering/Cruising). Jetpack, onAir y Falling: diferido. */
+  canReceiveHit(): boolean {
+    if (this.state === "StandAlone") return this.standAloneSubFsm.canReceiveHit();
+    if (this.state === "HoverBoard") return this.boardSubFsm.canReceiveHit();
+    return false;
+  }
+
+  /** NUEVO — Hit: sin cambio de estado, sólo reacción (animación + freno). */
+  notifyHit(): void {
+    if (this.state === "StandAlone") this.standAloneSubFsm.notifyHit();
+    else if (this.state === "HoverBoard") this.boardSubFsm.notifyHit();
+  }
+
+  /** NUEVO — Muerte: estado único y global; el sub-FSM activo avisa para que elija el clip. */
+  notifyDeath(): void {
+    if (this.state === "Dead") return;
+    if (this.state === "StandAlone") this.standAloneSubFsm.notifyDeath();
+    else if (this.state === "HoverBoard") this.boardSubFsm.notifyDeath();
+    this.setState("Dead");
   }
 
   getActiveSubState(): StandAloneSubState | OnGroundSubState | OnGroundCrouchedSubState | JetpackSubState | HoveringSubState | FallingSubState | "Loading" {
@@ -226,7 +257,7 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
       return [this.state, mid, this.boardSubFsm.getActiveSubState()];
     }
 
-    return [this.state]; // EquippingJetpack u otro estado sin hijos
+    return [this.state]; // EquippingJetpack, Dead u otro estado sin hijos
   }
 
   protected onEnter(state: CharacterMainState): void {
@@ -236,6 +267,7 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
       this.deps.onEnterStandAlone();
       this.unequipRequested = false;
     }
+    if (state === "Dead") this.deps.onEnterDead(); // NUEVO
   }
 
   protected onExit(_state: CharacterMainState): void { }

@@ -5,10 +5,13 @@ import type { Nullable } from "@babylonjs/core/types";
 import { Quaternion } from "@babylonjs/core/Maths/math.vector";
 import { AnimationEvent, AnimationGroup, FollowCamera, PhysicsShapeType, TransformNode } from "@babylonjs/core";
 import { AssetManager, WeaponBuildResult, type ICharacterAnimations } from "@/services/assets-manager";
+import { EventSubscriber } from "@/services/event-subscriber";
+import { EventManager, GameEvents, type PlayerShootedPayload } from "@/services/event-manager";
 import { Poc } from "../types";
 import { CharacterFsm } from "./character-fsm/character.fsm";
 import { CharacterInput } from "./character.input";
 import { CharacterHud } from "./character.hud";
+import { CharacterHealth } from "./character-health";
 import { buildStandAloneStrategy, type StandAloneStrategyResult } from "./strategies/stand-alone/stand-alone.strategy";
 import { buildJetpackStrategy, type JetpackStrategyResult } from "./strategies/jetpack/jetpack.strategy";
 import type { IVehicleStrategy } from "./strategies/contracts/ivehicle-strategy";
@@ -49,7 +52,7 @@ export const WEAPON_OFFSETS = {
     crouchIdle: { x: -0.1, y: -0.1, z: 0.3 },
 } as const;
 
-export default class CharacterBase implements Poc {
+export default class CharacterBase extends EventSubscriber implements Poc {
   private scene: Scene;
   //private groundAggregates: PhysicsAggregate[];
   private followCamera: FollowCamera | null = null;
@@ -60,6 +63,7 @@ export default class CharacterBase implements Poc {
   private input: CharacterInput;
   private fsm: CharacterFsm;
   private hud: CharacterHud;
+  private health = new CharacterHealth(); // NUEVO
 
   private activeStrategy: IVehicleStrategy | null = null;
   private activeJetpackPhysics: JetpackStrategyResult["physicsController"] | null = null;
@@ -163,9 +167,13 @@ export default class CharacterBase implements Poc {
       onExitCrouch: () => this.activeStandAlonePhysics?.notifyCrouchExit(),  // NUEVO
       onEnterCrouchRoll: () => this.activeStandAlonePhysics?.notifyCrouchRollStart(), // NUEVO
       onExitCrouchRoll: () => this.activeStandAlonePhysics?.notifyCrouchRollEnd(),
+      onEnterHitStun: () => this.activeStandAlonePhysics?.notifyHitStunStart(), // NUEVO
+      onExitHitStun: () => this.activeStandAlonePhysics?.notifyHitStunEnd(),    // NUEVO
+      onEnterDead: () => this._onEnterDead(),                                    // NUEVO
     });
 
     this.combat = new CombatRules(this.fsm, this.input);
+    this.subscribeEvents();
 
     this._wireJumpAnimationEvent();
     this._wireEquipBoardAnimationEvent();
@@ -190,6 +198,32 @@ export default class CharacterBase implements Poc {
     this.hud.mount();
 
     this._bindObservables();
+  }
+
+  protected registerEvents(): void {
+    this.listen(GameEvents.PlayerShooted, (payload) => this._onPlayerShooted(payload));
+  }
+
+  private _onPlayerShooted(_payload: PlayerShootedPayload): void {
+    // Estados sin reacción implementada (jetpack, onAir, landings, rolls, hoverboard por ahora): intocable.
+    if (!this.fsm.canReceiveHit()) return;
+
+    const alive = this.health.loseLife();
+    EventManager.emit(GameEvents.PlayerDamaged, { livesLeft: this.health.lives });
+
+    if (alive) {
+      this.fsm.notifyHit();
+    } else {
+      this.fsm.notifyDeath();
+      EventManager.emit(GameEvents.PlayerDied, {});
+    }
+  }
+
+  private _onEnterDead(): void {
+    this.activeStandAlonePhysics?.notifyDead();
+    this.activeBoardPhysics?.notifyDead();
+    this.weaponRoot?.setEnabled(false);
+    this.shieldRoot?.setEnabled(false);
   }
 
   private _updateShield(): void {
@@ -270,6 +304,15 @@ export default class CharacterBase implements Poc {
   private _bindObservables(): void {
     this.beforePhysicsObserver = this.scene.onBeforePhysicsObservable.add(() => {
       const dt = this.scene.getEngine().getDeltaTime() / 1000;
+
+      // NUEVO — muerto: sin input, disparo ni animación; sólo seguimos tickeando la física para que frene
+      // (en el board, además, para que siga flotando mientras se detiene).
+      if (this.fsm.getState() === "Dead") {
+        this.activeStandAlonePhysics?.tick(dt);
+        this.activeBoardPhysics?.tick(dt);
+        return;
+      }
+
       this.activeStrategy?.tick(dt);
       this.fsm.tick();
       this._updateWeaponVisibility();
@@ -475,6 +518,7 @@ export default class CharacterBase implements Poc {
   }
 
   dispose(): void {
+    this.unsubscribeEvents();
     this.scene?.onBeforePhysicsObservable.remove(this.beforePhysicsObserver);
     this.scene?.onAfterPhysicsObservable.remove(this.afterPhysicsObserver);
     this.hud?.dispose();

@@ -23,6 +23,10 @@ export class StandAloneAnimationController implements IAnimationController {
     this.standAloneFsm.onGroundCrouchedSubFsm.onStateChange(() => this._render(this.standAloneFsm.getActiveSubState())); // NUEVO
     this._render(this.standAloneFsm.getActiveSubState());
 
+    // NUEVO — reacción al hit y muerte (el FSM avisa, el clip lo decide este controller)
+    this.standAloneFsm.onHitReactionObservable.add(({ crouched }) => this._playHitReaction(crouched));
+    this.standAloneFsm.onDeathObservable.add(({ crouched }) => this._playDeath(crouched));
+
     if (this.animations) {
       this.animations.normal_landing.from = 20;
       this.animations.normal_landing.speedRatio = 1.6;
@@ -62,6 +66,44 @@ export class StandAloneAnimationController implements IAnimationController {
     } else {
       resolved.animation.play(resolved.loop);
     }
+  }
+
+  /** NUEVO — reacción al hit: pisa la locomoción hasta que termina el clip, y recién ahí libera el stun. */
+  private _playHitReaction(crouched: boolean): void {
+    const clip = crouched ? this.animations?.hit_reaction_crouched : this.animations?.hit_reaction_standing;
+    if (!clip) {
+      // sin clip no hay a qué esperar: liberamos el stun enseguida
+      this.standAloneFsm.notifyHitReactionComplete();
+      return;
+    }
+
+    this.currentAnimation?.stop();
+    this.currentAnimation = clip;
+    this.isPlayingTransient = true; // _render queda en pausa hasta que termine
+
+    clip.play(false);
+    clip.onAnimationGroupEndObservable.addOnce(() => {
+      this.isPlayingTransient = false;
+      this.standAloneFsm.notifyHitReactionComplete();
+      this._render(this.standAloneFsm.getActiveSubState()); // retoma la locomoción del estado actual
+    });
+  }
+
+  /** NUEVO — muerte: clip terminal, _render queda bloqueado para siempre. */
+  private _playDeath(crouched: boolean): void {
+    const clip = this._deathClip(crouched);
+
+    this.currentAnimation?.stop();
+    this.isPlayingTransient = true; // nunca se resetea: no hay vuelta atrás
+    if (!clip) return;
+
+    this.currentAnimation = clip;
+    clip.play(false);
+  }
+
+  /** NUEVO — único lugar donde viven los nombres de los clips de muerte (ajustar a las keys reales de ICharacterAnimations). */
+  private _deathClip(crouched: boolean): AnimationGroup | undefined {
+    return crouched ? this.animations?.death_crouched : this.animations?.death_standing;
   }
 
   private _resolve(state: ResolvedStandAloneState): { animation: AnimationGroup; loop: boolean; waitForCompletion?: boolean } | null {

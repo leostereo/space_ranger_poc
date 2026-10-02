@@ -1,10 +1,16 @@
 import { TransformNode } from "@babylonjs/core";
+import { Observable } from "@babylonjs/core/Misc/observable";
 import { BaseFsm, TransitionTable } from "../../abstract/base-fsm";
 import { OnGroundFsm, type OnGroundSubState } from "./character.fsm.stand-alone.on-ground";
 import { OnGroundCrouchedFsm, type OnGroundCrouchedSubState } from "./character.fsm.stand-alone.on-ground-crouched";
 import { SHIELD_OFFSETS, WEAPON_OFFSETS } from "../../character.base";
 
 export type StandAloneSubState = "OnGround" | "JumpImpulseStart" | "RunningJumpImpulseStart" | "OnAir" | "Crouch" | "CrouchRollStart"; // CAMBIADO
+
+/** NUEVO — contexto de un impacto/muerte: define qué clip usar. */
+export interface StandAloneImpactContext {
+  crouched: boolean;
+}
 
 export interface StandAloneFsmDeps {
   isGroundDetected: () => boolean;
@@ -30,6 +36,8 @@ export interface StandAloneFsmDeps {
   onExitCrouch: () => void;
   onEnterCrouchRoll: () => void;
   onExitCrouchRoll: () => void;
+  onEnterHitStun: () => void; // NUEVO
+  onExitHitStun: () => void;  // NUEVO
 }
 
 
@@ -39,6 +47,12 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
   readonly onGroundSubFsm: OnGroundFsm;
   readonly onGroundCrouchedSubFsm: OnGroundCrouchedFsm;
   private cameFromRunningJump = false;
+
+  /** NUEVO — el animation controller se suscribe para reproducir el clip de reacción. */
+  readonly onHitReactionObservable = new Observable<StandAloneImpactContext>();
+  /** NUEVO — el animation controller se suscribe para reproducir el clip de muerte. */
+  readonly onDeathObservable = new Observable<StandAloneImpactContext>();
+  private hitStunned = false; // NUEVO
 
   constructor(private deps: StandAloneFsmDeps) {
     super();
@@ -108,14 +122,14 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
   }
 
   requestJump(): void {
-    if (this.state !== "OnGround") return;
+    if (this.state !== "OnGround" || this.hitStunned) return; // CAMBIADO — sin saltar durante la reacción al hit
 
     const isRunning = this.onGroundSubFsm.getState() === "Running";
     this.setState(isRunning ? "RunningJumpImpulseStart" : "JumpImpulseStart");
   }
 
   requestCrouchRoll(): void { // NUEVO
-    if (this.state !== "OnGround") return;
+    if (this.state !== "OnGround" || this.hitStunned) return; // CAMBIADO — sin rodar durante la reacción al hit
     if (this.onGroundSubFsm.getState() !== "Running") return;
     this.setState("CrouchRollStart");
   }
@@ -138,6 +152,49 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
     if (this.state === "RunningJumpImpulseStart") {
       this.setState("OnAir");
     }
+  }
+
+  // ── Hit / muerte ───────────────────────────────────────────────────────
+
+  isHitStunned(): boolean { // NUEVO
+    return this.hitStunned;
+  }
+
+  /** NUEVO — sólo en suelo (de pie o agachado), en estados "limpios", y fuera de un stun en curso. */
+  canReceiveHit(): boolean {
+    if (this.hitStunned) return false;
+    if (this.state === "Crouch") return true;
+    if (this.state === "OnGround") return this._isHitReactableGroundState();
+    return false;
+  }
+
+  /** NUEVO — hit sin cambio de estado: stun (freno) + pedido de animación. */
+  notifyHit(): void {
+    if (!this.canReceiveHit()) return;
+    this.hitStunned = true;
+    this.deps.onEnterHitStun();
+    this.onHitReactionObservable.notifyObservers({ crouched: this.state === "Crouch" });
+  }
+
+  /** NUEVO — llamado por el animation controller al terminar el clip de reacción. */
+  notifyHitReactionComplete(): void {
+    if (!this.hitStunned) return;
+    this.hitStunned = false;
+    this.deps.onExitHitStun();
+  }
+
+  /** NUEVO — llamado por CharacterFsm justo antes de pasar a "Dead". */
+  notifyDeath(): void {
+    this.hitStunned = false;
+    this.onDeathObservable.notifyObservers({ crouched: this.state === "Crouch" });
+  }
+
+  private _isHitReactableGroundState(): boolean { // NUEVO
+    const s = this.onGroundSubFsm.getState();
+    return (
+      s === "Idle" || s === "Walking" || s === "WalkingBackwards" || s === "Running" ||
+      s === "ShootingStrafeLeft" || s === "ShootingStrafeRight"
+    );
   }
 
   private _isLandingInProgress(): boolean {
@@ -200,6 +257,8 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
   }
 
   dispose(): void {
+    this.onHitReactionObservable.clear(); // NUEVO
+    this.onDeathObservable.clear();       // NUEVO
     this.onGroundSubFsm.dispose();
     this.onGroundCrouchedSubFsm.dispose(); // NUEVO
   }

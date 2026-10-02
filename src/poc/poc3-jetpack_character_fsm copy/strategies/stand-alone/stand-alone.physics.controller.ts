@@ -24,6 +24,8 @@ const ROLL_MAX_DURATION_SECONDS = 1.2; // safety net si notifyLandingRollEnd() n
 const CROUCH_ROLL_SPEED = 10; // NUEVO — ajustar a gusto
 const CROUCH_ROLL_DURATION_SECONDS = 2.83;
 const JUMP_WINDUP_DAMPING_RATE = 8; // más alto = frena más rápido
+const HIT_STUN_DAMPING_RATE = 10; // NUEVO — frena rápido pero no en seco, ajustar a gusto
+const DEATH_DAMPING_RATE = 6; // NUEVO — ajustar a gusto
 const RUNNING_JUMP_VERTICAL_IMPULSE = 4; // más bajo que JUMP_IMPULSE (10) — trayectoria más chata
 const RUNNING_JUMP_FORWARD_BOOST = 8;    // más alto que antes (6) — más alcance para cruzar el hueco
 const WALK_BACKWARD_SPEED = 2; // más lento que WALK_SPEED (4) — retroceder es más cauto que avanzar
@@ -46,6 +48,8 @@ export class StandAlonePhysicsController implements IPhysicsController {
   private _lastImpactVerticalSpeed = 0;
   private _lastImpactHorizontalSpeed = 0;
   private _isWindingUpJump = false;
+  private _isHitStunned = false; // NUEVO
+  private _isDead = false; // NUEVO
 
   constructor(
     private scene: Scene,
@@ -84,8 +88,15 @@ export class StandAlonePhysicsController implements IPhysicsController {
       this._lastImpactHorizontalSpeed = Math.sqrt(v.x ** 2 + v.z ** 2);
     }
 
+    // NUEVO — muerte o reacción al hit: frena la velocidad horizontal y corta el giro residual
+    if (this._isDead || this._isHitStunned) {
+      this._applyHorizontalDamping(dt, this._isDead ? DEATH_DAMPING_RATE : HIT_STUN_DAMPING_RATE);
+      this.characterAggregate.body.setAngularVelocity(Vector3.Zero());
+      return;
+    }
+
     if (this._isWindingUpJump) {
-      this._applyJumpWindupDamping(dt);
+      this._applyHorizontalDamping(dt, JUMP_WINDUP_DAMPING_RATE); // CAMBIADO — antes _applyJumpWindupDamping(dt)
       return;
     }
 
@@ -122,9 +133,10 @@ export class StandAlonePhysicsController implements IPhysicsController {
     this._applyMove(input.forward, input.backward, input.cruise);
   }
 
-  private _applyJumpWindupDamping(dt: number): void {
+  /** CAMBIADO — antes _applyJumpWindupDamping: ahora recibe la tasa para reusarlo en windup, hit stun y muerte. */
+  private _applyHorizontalDamping(dt: number, rate: number): void {
     const currentVelocity = this.characterAggregate.body.getLinearVelocity();
-    const dampingFactor = Math.exp(-JUMP_WINDUP_DAMPING_RATE * dt);
+    const dampingFactor = Math.exp(-rate * dt);
 
     this.characterAggregate.body.setLinearVelocity(
       new Vector3(
@@ -315,6 +327,21 @@ export class StandAlonePhysicsController implements IPhysicsController {
 
   notifyJumpWindupEnd(): void {
     this._isWindingUpJump = false;
+  }
+
+  /** NUEVO — empieza el stun de la reacción al hit (freno horizontal). */
+  notifyHitStunStart(): void {
+    this._isHitStunned = true;
+  }
+
+  /** NUEVO — termina el stun, vuelve el control normal. */
+  notifyHitStunEnd(): void {
+    this._isHitStunned = false;
+  }
+
+  /** NUEVO — muerte: frena y ya no responde al input. */
+  notifyDead(): void {
+    this._isDead = true;
   }
 
   dispose(): void { }

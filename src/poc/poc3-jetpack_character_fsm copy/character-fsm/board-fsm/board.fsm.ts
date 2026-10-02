@@ -1,4 +1,5 @@
 // src/poc2-floating_board_fsm/board-fsm/board.fsm.ts
+import { Observable } from "@babylonjs/core/Misc/observable";
 import { BaseFsm, TransitionTable } from "../../abstract/base-fsm";
 import { BoardFsmHovering, type HoveringSubState } from "./board.fsm.hovering";
 import { BoardFsmFalling, type FallingSubState } from "./board.fsm.falling";
@@ -33,6 +34,12 @@ export class BoardFsm extends BaseFsm<BoardMotionState> {
 
   readonly hoveringSubFsm: BoardFsmHovering;
   readonly fallingSubFsm: BoardFsmFalling;
+
+  /** NUEVO — el animation controller se suscribe para reproducir el clip de reacción. */
+  readonly onHitReactionObservable = new Observable<void>();
+  /** NUEVO — el animation controller se suscribe para reproducir el clip de muerte. */
+  readonly onDeathObservable = new Observable<void>();
+  private hitStunned = false; // NUEVO
 
   constructor(private deps: BoardFsmDeps) {
     super();
@@ -75,11 +82,46 @@ export class BoardFsm extends BaseFsm<BoardMotionState> {
 
   /** Único punto de entrada de input para el controller: la FSM decide a qué hija delegar según su propio estado. */
   requestJump(): void {
+    if (this.hitStunned) return; // NUEVO — sin saltar/boostear durante la reacción al hit
+
     if (this.state === "Hovering") {
       this.hoveringSubFsm.requestJump();
     } else {
       this.fallingSubFsm.requestBoost();
     }
+  }
+
+  // ── Hit / muerte ───────────────────────────────────────────────────────
+
+  isHitStunned(): boolean { // NUEVO
+    return this.hitStunned;
+  }
+
+  /** NUEVO — sólo Hovering + Cruising* y fuera de una reacción en curso. Jumping y Falling: diferido. */
+  canReceiveHit(): boolean {
+    if (this.hitStunned) return false;
+    if (this.state !== "Hovering") return false;
+
+    const s = this.hoveringSubFsm.getState();
+    return s === "CruisingIdle" || s === "CruisingFast" || s === "CruisingVeryFast";
+  }
+
+  /** NUEVO — hit sin cambio de estado y sin freno: sólo pedido de animación (el flag bloquea saltar/desequipar mientras dura el clip). */
+  notifyHit(): void {
+    if (!this.canReceiveHit()) return;
+    this.hitStunned = true;
+    this.onHitReactionObservable.notifyObservers();
+  }
+
+  /** NUEVO — llamado por el animation controller al terminar el clip de reacción. */
+  notifyHitReactionComplete(): void {
+    this.hitStunned = false;
+  }
+
+  /** NUEVO — llamado por CharacterFsm justo antes de pasar a "Dead". */
+  notifyDeath(): void {
+    this.hitStunned = false;
+    this.onDeathObservable.notifyObservers();
   }
 
   /** Para el HUD: evita que tenga que conocer hoveringSubFsm/fallingSubFsm por separado. */
@@ -97,6 +139,8 @@ export class BoardFsm extends BaseFsm<BoardMotionState> {
   }
 
   dispose(): void {
+    this.onHitReactionObservable.clear(); // NUEVO
+    this.onDeathObservable.clear();       // NUEVO
     this.hoveringSubFsm.dispose();
     this.fallingSubFsm.dispose();
   }

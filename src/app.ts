@@ -12,6 +12,8 @@ import { pocRegistry } from "./poc/poc-registry";
 import type { Poc } from "./poc/types";
 import { SceneSelector } from "./scene-selector/scene-selector";
 import { AssetManager } from "./services/assets-manager"
+import { PlayerShotDebugEmitter } from "./services/player-shot-debug-emitter";
+import { EventManager } from "./services/event-manager";
 
 class App {
   public engine: Engine | WebGPUEngine;
@@ -23,6 +25,7 @@ class App {
   private activePoc: Poc | null = null;
   private renderLoopBound = false;
   private physicsEnabled = false; // 👈 nuevo: evita re-enablePhysics sobre la misma scene
+  private shotDebugEmitter: PlayerShotDebugEmitter | null = null;
 
   constructor() {
     this.canvas = document.createElement("canvas");
@@ -44,6 +47,9 @@ class App {
     );
 
     this._bindEvent();
+    if (import.meta.env.DEV) {
+      this.shotDebugEmitter = new PlayerShotDebugEmitter();
+    }
     this._startRenderLoop();
 
     const latestPoc = pocRegistry[pocRegistry.length - 1];
@@ -91,6 +97,7 @@ async loadPoc(id: string): Promise<void> {
   private _disposeCurrent(): void {
     this.activePoc?.dispose?.();
     this.activePoc = null;
+    EventManager.clear();
 
     this.scene?.dispose();
     this.scene = null;
@@ -179,6 +186,7 @@ async loadPoc(id: string): Promise<void> {
     window.addEventListener("beforeunload", () => {
       this.activePoc?.dispose?.();
       this.scene?.dispose();
+      this.shotDebugEmitter?.dispose();
       this.engine.dispose();
     });
   }

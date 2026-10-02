@@ -94,6 +94,13 @@ export interface ICharacterAnimations {
     shield_walk_forward: AnimationGroup,
     shield_walk_backwards: AnimationGroup,
 
+    hit_reaction_crouched: AnimationGroup,
+    hit_reaction_standing: AnimationGroup,
+    death_crouched: AnimationGroup,
+    death_standing: AnimationGroup,
+    death_hoverBoard: AnimationGroup,
+    death_onAir: AnimationGroup,
+
 }
 
 export interface MeshInstanceResult {
@@ -158,7 +165,7 @@ export class AssetManager {
             };
 
             // --- RECURSO 2: Modelo GLB Externo ---
-            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver13.glb");
+            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver14.glb");
             tareaGLB.onSuccess = (task) => {
                 // Buscamos el nodo raíz que crea automáticamente Babylon para los GLB
 
@@ -536,7 +543,12 @@ export class AssetManager {
         const shield_walk_forward = find("shield walking forward");
         const shield_walk_backwards = find("shield walking backwards");
 
-
+        const hit_reaction_crouched = find("hit reaction crouched");
+        const hit_reaction_standing = find("hit reaction standing");
+        const death_crouched = find("death from crouched");
+        const death_standing = find("death from standing");
+        const death_hoverBoard = find("death from hoverBoard");
+        const death_onAir = find("death from jetpack");
 
         if (!standing_idle || !cruising_idle || !cruising_forward_idle || !cruising_faster_idle || !cruising_maxVel_idle || !jump_while_running ||
             !standing_to_crouch || !crouch_to_standing || !jump || !normal_landing || !crash_landing || !roll_landing || !falling_idle ||
@@ -544,7 +556,9 @@ export class AssetManager {
             !running_normal || !running_fast || !aiming_jetpack || !crouch_aimming || !idle_aimming || !walking_backwards_aimming ||
             !walking_aimming || !running_aimming || !strafe_right || !strafe_left || !crouch_walk || !crouch_walkbackwards ||
             !crouch_walk_aim || !crouch_walkbackwards_aim || !crouch_idle_aim || !running_roll || !shield_idle ||
-            !shield_idle_crouched || !shield_strafe_left || !shield_strafe_right || !shield_walk_forward || !shield_walk_backwards) {
+            !shield_idle_crouched || !shield_strafe_left || !shield_strafe_right || !shield_walk_forward || !shield_walk_backwards ||
+            !hit_reaction_crouched || !hit_reaction_standing || !death_crouched || !death_standing || !death_hoverBoard ||
+            !death_onAir) {
             console.warn("AssetManager: faltan animaciones de 'character' — revisar nombres de clips en el GLB.");
             return;
         }
@@ -556,7 +570,8 @@ export class AssetManager {
             jump_while_running, crouch_aimming, idle_aimming, walking_aimming, walking_backwards_aimming, running_aimming,
             strafe_right, strafe_left, crouch_walk, crouch_walkbackwards, crouch_walk_aim, crouch_walkbackwards_aim,
             crouch_idle_aim, running_roll, shield_idle, shield_idle_crouched, shield_strafe_left, shield_strafe_right,
-            shield_walk_backwards, shield_walk_forward
+            shield_walk_backwards, shield_walk_forward,death_crouched,death_hoverBoard,death_onAir,death_standing,
+            hit_reaction_crouched,hit_reaction_standing
         };
 
         Object.values(mold).forEach((ag) => {
@@ -622,7 +637,14 @@ export class AssetManager {
             shield_strafe_left: cloneOne(mold.shield_strafe_left),
             shield_strafe_right: cloneOne(mold.shield_strafe_right),
             shield_walk_backwards: cloneOne(mold.shield_walk_backwards),
-            shield_walk_forward: cloneOne(mold.shield_walk_forward)
+            shield_walk_forward: cloneOne(mold.shield_walk_forward),
+
+            death_crouched: cloneOne(mold.death_crouched),
+            death_hoverBoard: cloneOne(mold.death_hoverBoard),
+            death_onAir: cloneOne(mold.death_onAir),
+            death_standing: cloneOne(mold.death_standing),
+            hit_reaction_crouched: cloneOne(mold.hit_reaction_crouched),
+            hit_reaction_standing: cloneOne(mold.hit_reaction_standing)
 
         };
     }

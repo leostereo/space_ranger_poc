@@ -26,6 +26,10 @@ export class HoverBoardAnimationController implements IAnimationController {
     this.boardFsm.hoveringSubFsm.onStateChange(() => this._render());
     this.boardFsm.fallingSubFsm.onStateChange(() => this._render());
 
+    // NUEVO — reacción al hit y muerte (el FSM avisa, el clip lo decide este controller)
+    this.boardFsm.onHitReactionObservable.add(() => this._playHitReaction());
+    this.boardFsm.onDeathObservable.add(() => this._playDeath());
+
     this._render();
   }
 
@@ -71,6 +75,42 @@ export class HoverBoardAnimationController implements IAnimationController {
     } else {
       resolved.animation.play(true);
     }
+  }
+
+  /**
+   * NUEVO — reacción al hit: pisa la locomoción hasta que termina el clip. Sin freno en el board:
+   * la física sigue normal, sólo cambia lo que se ve. Al terminar libera el flag del FSM.
+   */
+  private _playHitReaction(): void {
+    const clip = this.animations?.hit_reaction_crouched;
+    if (!clip) {
+      // sin clip no hay a qué esperar: liberamos la reacción enseguida
+      this.boardFsm.notifyHitReactionComplete();
+      return;
+    }
+
+    this.currentAnimation?.stop();
+    this.currentAnimation = clip;
+    this.isPlayingTransient = true; // _render queda en pausa hasta que termine
+
+    clip.play(false);
+    clip.onAnimationGroupEndObservable.addOnce(() => {
+      this.isPlayingTransient = false;
+      this.boardFsm.notifyHitReactionComplete();
+      this._render(); // retoma la locomoción del estado actual
+    });
+  }
+
+  /** NUEVO — muerte: clip terminal, _render queda bloqueado para siempre. */
+  private _playDeath(): void {
+    const clip = this.animations?.death_hoverBoard;
+
+    this.currentAnimation?.stop();
+    this.isPlayingTransient = true; // nunca se resetea: no hay vuelta atrás
+    if (!clip) return;
+
+    this.currentAnimation = clip;
+    clip.play(false);
   }
 
   private _resolve(

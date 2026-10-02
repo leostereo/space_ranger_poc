@@ -46,6 +46,8 @@ export class HoverBoardPhysicsController {
   private _currentForwardSpeed = 0;
   private _lastGroundNormal = Vector3.Up();
 
+  private _isDead = false; // NUEVO
+
   constructor(
     private scene: Scene,
     private boardMesh: Mesh,
@@ -59,6 +61,16 @@ export class HoverBoardPhysicsController {
     this.fsm = boardFsm;
     this.thruster = new HoverBoardThruster(this.scene, this.boardMesh); // NUEVO
 
+  }
+
+  /**
+   * NUEVO — input efectivo: muerto, el board ignora el control (sin acelerar, girar ni picar)
+   * y el drag que ya existe en _updateForwardForce lo va frenando solo, sin romper el hover.
+   */
+  private _input(): BoardInputState {
+    const input = this.getInput();
+    if (!this._isDead) return input;
+    return { ...input, forward: false, turnLeft: false, turnRight: false, pitchDown: false };
   }
 
   /** Llamar desde el strategy.tick(dt), antes de que CharacterFsm.tick() corra la transición del boardSubFsm. */
@@ -100,7 +112,7 @@ export class HoverBoardPhysicsController {
     this._updateForwardForce();
     this._applyLateralFriction();
     this._updatePitch(dt);
-    this.thruster.update(this.getInput().forward, this._currentForwardSpeed); // NUEVO
+    this.thruster.update(this._input().forward, this._currentForwardSpeed); // CAMBIADO — antes this.getInput().forward
   }
 
   /** Llamar en scene.onAfterPhysicsObservable. Roll y pitch son 100% visuales. */
@@ -130,6 +142,9 @@ export class HoverBoardPhysicsController {
   groundLostElapsed(): number { return this.groundLostTimer; }
   isJumpSettled(): boolean { return this.jumpSettleTimer <= 0; }
   isBoostSettled(): boolean { return this.boostSettleTimer <= 0; }
+
+  /** NUEVO — muerte: el board deja de responder al input y se frena solo con el drag. */
+  notifyDead(): void { this._isDead = true; }
 
   /** Llamado por BoardFsm.onEnterJumping vía deps — aplica el impulso físico. */
   onEnterJumping(): void {
@@ -214,7 +229,7 @@ export class HoverBoardPhysicsController {
     let lerpSpeed = pitchLerpSpeed;
 
     if (macroState === "Falling") {
-      const { pitchDown } = this.getInput();
+      const { pitchDown } = this._input(); // CAMBIADO — antes this.getInput()
       targetPitch = pitchDown ? maxPitchAngle : 0;
     } else if (macroState === "Hovering") {
       targetPitch = this._computeSurfaceAlignPitch(maxPitchAngle);
@@ -254,7 +269,7 @@ export class HoverBoardPhysicsController {
   }
 
   private _updateRollAndYaw(dt: number): void {
-    const { turnLeft, turnRight } = this.getInput();
+    const { turnLeft, turnRight } = this._input(); // CAMBIADO — antes this.getInput()
     const { rollAngleAtLowSpeed, rollAngleAtHighSpeed, rollSpeedRange, rollLerpSpeed, yawFromRollFactor } =
       generalConfig.movement;
 
@@ -284,7 +299,7 @@ export class HoverBoardPhysicsController {
 
     Vector3.TransformNormalToRef(this._forwardReference, this.boardMesh.getWorldMatrix(), this._forwardTemp);
 
-    if (this.getInput().forward) {
+    if (this._input().forward) { // CAMBIADO — antes this.getInput().forward
       this.boardAggregate.body.applyForce(
         this._forwardTemp.scaleInPlace(forwardForce),
         this.boardMesh.getAbsolutePosition(),
