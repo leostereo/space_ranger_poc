@@ -13,6 +13,8 @@ import { generalConfig } from "@/poc/config.general";
 import { BoardInputState } from "@/poc/poc1-floating_board/board-input";
 import { HoverBoardThruster } from "./hover-board.thruster"; // NUEVO
 
+const DEAD_LANDING_DAMPING_RATE = 20; // CAMBIADO (antes 6) — más alto = frena más rápido al tocar el piso, ajustar a gusto
+const DEAD_GROUND_CONTACT_MARGIN = 0.1; // NUEVO — tolerancia sobre la mitad del alto del board para considerar "apoyado"
 
 export class HoverBoardPhysicsController {
   readonly fsm: BoardFsm;
@@ -99,7 +101,7 @@ export class HoverBoardPhysicsController {
     const currentSubState = this.fsm.getActiveSubState();
 
     if (currentMacroState === "Hovering") {
-      this._applyHoverForce();
+      if (!this._isDead) this._applyHoverForce(); // CAMBIADO — muerto: sin hover, cae por gravedad
     } else {
       if (currentSubState === "Diving") {
         this._applyDiveForce();
@@ -113,6 +115,29 @@ export class HoverBoardPhysicsController {
     this._applyLateralFriction();
     this._updatePitch(dt);
     this.thruster.update(this._input().forward, this._currentForwardSpeed); // CAMBIADO — antes this.getInput().forward
+
+    if (this._isDead) this._applyDeadLandingDamping(dt); // NUEVO
+  }
+
+  /**
+   * NUEVO — muerto y apoyado en el piso: sólo damping, sin rebote. Corta cualquier velocidad
+   * vertical hacia arriba (el rebote) y frena la horizontal y el giro. En el aire no hace nada:
+   * cae libre por gravedad.
+   */
+  private _applyDeadLandingDamping(dt: number): void {
+    const contactDistance = generalConfig.board.height * 0.5 + DEAD_GROUND_CONTACT_MARGIN;
+    if (this._lastGroundDistance > contactDistance) return;
+
+    const damping = Math.exp(-DEAD_LANDING_DAMPING_RATE * dt);
+    const velocity = this.boardAggregate.body.getLinearVelocity();
+    const angular = this.boardAggregate.body.getAngularVelocity();
+
+    this.boardAggregate.body.setLinearVelocity(
+      new Vector3(velocity.x * damping, Math.min(velocity.y, 0), velocity.z * damping),
+    );
+    this.boardAggregate.body.setAngularVelocity(
+      new Vector3(angular.x * damping, angular.y * damping, angular.z * damping),
+    );
   }
 
   /** Llamar en scene.onAfterPhysicsObservable. Roll y pitch son 100% visuales. */
@@ -143,7 +168,7 @@ export class HoverBoardPhysicsController {
   isJumpSettled(): boolean { return this.jumpSettleTimer <= 0; }
   isBoostSettled(): boolean { return this.boostSettleTimer <= 0; }
 
-  /** NUEVO — muerte: el board deja de responder al input y se frena solo con el drag. */
+  /** NUEVO — muerte: el board deja de responder al input, pierde el hover (cae por gravedad) y al apoyarse sólo se amortigua. */
   notifyDead(): void { this._isDead = true; }
 
   /** Llamado por BoardFsm.onEnterJumping vía deps — aplica el impulso físico. */

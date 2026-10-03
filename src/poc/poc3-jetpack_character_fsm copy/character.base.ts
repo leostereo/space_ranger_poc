@@ -30,6 +30,17 @@ const WEAPON_HOVERBOARD_YAW_COMPENSATION = Math.PI / 8; // cancela characterMesh
 const RUNNING_JUMP_IMPULSE_FRAME = 10; // placeholder — ajustar al frame real del clip
 const CROUCH_ROLL_COMPLETE_FRAME = 85; // placeholder — ajustar al frame real del clip running_roll
 
+// NUEVO — posición del personaje parentado al board: una sola fuente de verdad para montarse y para morir.
+const BOARD_RIDER_OFFSET_X = 0.05;
+const BOARD_RIDER_OFFSET_Z = -0.25;
+const BOARD_THICKNESS_OFFSET = 0.05;
+/**
+ * Fracción de la altura de la cápsula que se baja el cuerpo al morir sobre el board.
+ * 0 = misma altura que montado; 0.5 = el origen del personaje queda sobre la superficie del board.
+ * Es la única perilla a ajustar: si queda hundido, bajarla; si sigue flotando, subirla.
+ */
+const DEATH_ON_BOARD_DROP_FACTOR = 0.1;
+
 export const WEAPON_OFFSETS = {
   jetpack: { x: -0.1, y: 0.16, z: 0 },
   standAlone: { x: -0.08, y: 0.2, z: 0 },
@@ -222,6 +233,14 @@ export default class CharacterBase extends EventSubscriber implements Poc {
   private _onEnterDead(): void {
     this.activeStandAlonePhysics?.notifyDead();
     this.activeBoardPhysics?.notifyDead();
+
+    // NUEVO — sobre el board, el personaje queda parentado a una altura pensada para ir de pie/agachado;
+    // el clip de muerte lo deja flotando, así que lo bajamos con la misma fórmula del montaje
+    // (el board ya cae solo por física).
+    if (this._activeBoardMesh) {
+      this.characterMesh.position.y = this._boardRiderY(true);
+    }
+
     this.weaponRoot?.setEnabled(false);
     this.shieldRoot?.setEnabled(false);
   }
@@ -459,13 +478,7 @@ export default class CharacterBase extends EventSubscriber implements Poc {
     this.characterMesh.setParent(boardMesh);
     this.characterMesh.rotationQuaternion = null;
 
-    const capsuleHeight = generalConfig.playerConfig.height;
-    const offsetX_Capsule = 0.05;
-    const offsetZ_Capsule = -0.25;
-    const boardThicknessOffset = 0.05;
-    const capsuleYOffset = capsuleHeight / 2 + boardThicknessOffset;
-
-    this.characterMesh.position.set(offsetX_Capsule, capsuleYOffset, offsetZ_Capsule);
+    this.characterMesh.position.set(BOARD_RIDER_OFFSET_X, this._boardRiderY(), BOARD_RIDER_OFFSET_Z); // CAMBIADO — offsets unificados con la muerte
     this.characterMesh.rotation.set(0, -Math.PI / 8, 0);
     this.weaponRoot?.rotation.set(0, WEAPON_HOVERBOARD_YAW_COMPENSATION, 0);
     this.shieldRoot?.rotation.set(0, WEAPON_HOVERBOARD_YAW_COMPENSATION, 0);
@@ -495,6 +508,16 @@ export default class CharacterBase extends EventSubscriber implements Poc {
     this.activeStrategy = strategy;
     this.activeBoardPhysics = physicsController;
     this._activeBoardInputAdapter = new HoverBoardInputAdapter(this.input);
+  }
+
+  /**
+   * NUEVO — altura local (Y) del personaje parentado al board. Misma fórmula que usaba el swap
+   * (mitad de la cápsula + grosor del board). Con dead = true baja una fracción de la cápsula.
+   */
+  private _boardRiderY(dead = false): number {
+    const capsuleHeight = generalConfig.playerConfig.height;
+    const ridingY = capsuleHeight / 2 + BOARD_THICKNESS_OFFSET;
+    return dead ? ridingY - capsuleHeight * DEATH_ON_BOARD_DROP_FACTOR : ridingY;
   }
 
   private _applyWeaponOffset(offset: { x: number; y: number; z: number }): void {

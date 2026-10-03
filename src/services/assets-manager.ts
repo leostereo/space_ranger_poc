@@ -28,6 +28,7 @@ import { Texture, Material, AbstractMesh, AnimationGroup, Scene, AssetsManager, 
 import { GridMaterial } from "@babylonjs/materials/grid/gridMaterial";
 import { generalConfig } from "@/poc/config.general";
 import "@babylonjs/loaders/glTF"; // Obligatorio en Babylon para leer archivos .glb
+import { builder_basic_enemy } from "./builders/build_basic-robot-enemy";
 
 export type MeshAssetKey = "character" | 'character-capsule' | "board" | 'light' | 'followCamera' | 'arcCamera' |
     'ground-basic' | 'ground-grid' | 'batalla del pilar' | 'player_weapon';
@@ -332,6 +333,7 @@ export class AssetManager {
         this._buildWeapons(scene);
         this._buildThrusters(scene);
         this._buildShield(scene)
+        builder_basic_enemy(scene);
     }
 
     private static _buildShield(scene: Scene): void {
