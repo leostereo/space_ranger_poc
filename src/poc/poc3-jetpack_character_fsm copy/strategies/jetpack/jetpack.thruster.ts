@@ -17,6 +17,8 @@ export class JetpackThruster {
   private rightEmitter: ParticleSystem;
   private _leftPosition = new Vector3(); // NUEVO
   private _rightPosition = new Vector3(); // NUEVO
+  private _stopped = false; // NUEVO — después de stop(), update() ya no reactiva la emisión
+  private _disposedEmitters = new Set<ParticleSystem>(); // NUEVO — evita doble dispose (disposeOnStop + dispose())
 
   constructor(
     private scene: Scene,
@@ -51,11 +53,16 @@ export class JetpackThruster {
     ps.maxEmitPower = 3;
     ps.updateSpeed = 0.01;
 
+    // NUEVO — si el sistema se libera solo (disposeOnStop), lo marcamos para no volver a liberarlo en dispose()
+    ps.onDisposeObservable.addOnce(() => this._disposedEmitters.add(ps));
+
     ps.start();
     return ps;
   }
 
   update(isThrusting: boolean, verticalVelocity: number): void {
+    if (this._stopped) return; // NUEVO
+
     // NUEVO — posición real del nozzle cada frame (sigue rotación/traslación del thrusterGroup)
     this._leftPosition.copyFrom(this.thrusterLeftNozzle.getAbsolutePosition());
     this._rightPosition.copyFrom(this.thrusterRightNozzle.getAbsolutePosition());
@@ -78,8 +85,27 @@ export class JetpackThruster {
     }
   }
 
+  /**
+   * NUEVO — corta la emisión (muerte). Las partículas que ya estaban en el aire se apagan solas
+   * (vida máx. 0.3 s) y recién entonces cada sistema se libera (disposeOnStop), sin cortes bruscos.
+   * Es irreversible: update() queda inerte.
+   */
+  stop(): void {
+    if (this._stopped) return;
+    this._stopped = true;
+
+    for (const ps of [this.leftEmitter, this.rightEmitter]) {
+      ps.emitRate = 0;
+      ps.disposeOnStop = true;
+      ps.stop();
+    }
+  }
+
   dispose(): void {
-    this.leftEmitter.dispose(false);
-    this.rightEmitter.dispose(false);
+    for (const ps of [this.leftEmitter, this.rightEmitter]) {
+      if (this._disposedEmitters.has(ps)) continue; // NUEVO — ya liberado por disposeOnStop
+      this._disposedEmitters.add(ps);
+      ps.dispose(false);
+    }
   }
 }

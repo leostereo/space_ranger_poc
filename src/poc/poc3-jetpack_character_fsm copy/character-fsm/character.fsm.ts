@@ -141,6 +141,7 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
       },
       Jetpack: {
         StandAlone: () => !this.deps.hasFuel() || this.unequipRequested,
+        Dead: true, // NUEVO — vía notifyDeath(), manual
       },
       HoverBoard: {
         StandAlone: true, // vía requestUnequipBoard(), manual — mismo criterio que requestUnequipJetpack
@@ -206,10 +207,11 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
     }
   }
 
-  /** NUEVO — StandAlone en suelo y HoverBoard (Hovering/Cruising). Jetpack, onAir y Falling: diferido. */
+  /** NUEVO — StandAlone (suelo y OnAir), HoverBoard (Hovering/Cruising*) y Jetpack. Falling del board: diferido. */
   canReceiveHit(): boolean {
     if (this.state === "StandAlone") return this.standAloneSubFsm.canReceiveHit();
     if (this.state === "HoverBoard") return this.boardSubFsm.canReceiveHit();
+    if (this.state === "Jetpack") return this.jetpackSubFsm.canReceiveHit();
     return false;
   }
 
@@ -224,6 +226,7 @@ export class CharacterFsm extends BaseFsm<CharacterMainState> {
     if (this.state === "Dead") return;
     if (this.state === "StandAlone") this.standAloneSubFsm.notifyDeath();
     else if (this.state === "HoverBoard") this.boardSubFsm.notifyDeath();
+    else if (this.state === "Jetpack") this.jetpackSubFsm.notifyDeath();
     this.setState("Dead");
   }
 

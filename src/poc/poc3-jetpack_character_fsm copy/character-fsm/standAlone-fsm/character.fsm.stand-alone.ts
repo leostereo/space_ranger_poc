@@ -10,6 +10,8 @@ export type StandAloneSubState = "OnGround" | "JumpImpulseStart" | "RunningJumpI
 /** NUEVO — contexto de un impacto/muerte: define qué clip usar. */
 export interface StandAloneImpactContext {
   crouched: boolean;
+  /** NUEVO — true si el impacto/muerte ocurre en el aire (OnAir): define el clip de muerte. */
+  airborne: boolean;
 }
 
 export interface StandAloneFsmDeps {
@@ -52,6 +54,8 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
   readonly onHitReactionObservable = new Observable<StandAloneImpactContext>();
   /** NUEVO — el animation controller se suscribe para reproducir el clip de muerte. */
   readonly onDeathObservable = new Observable<StandAloneImpactContext>();
+  /** NUEVO — el animation controller se suscribe para cambiar el clip cuando quien murió en el aire toca el piso. */
+  readonly onDeadLandingObservable = new Observable<void>();
   private hitStunned = false; // NUEVO
 
   constructor(private deps: StandAloneFsmDeps) {
@@ -160,9 +164,13 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
     return this.hitStunned;
   }
 
-  /** NUEVO — sólo en suelo (de pie o agachado), en estados "limpios", y fuera de un stun en curso. */
+  /**
+   * NUEVO — en suelo (de pie o agachado) en estados "limpios", o en el aire (OnAir), y fuera de un stun en curso.
+   * "Recibir un hit" acá significa que descuenta vida; la reacción visual sólo existe en suelo (ver notifyHit).
+   */
   canReceiveHit(): boolean {
     if (this.hitStunned) return false;
+    if (this.state === "OnAir") return true; // NUEVO
     if (this.state === "Crouch") return true;
     if (this.state === "OnGround") return this._isHitReactableGroundState();
     return false;
@@ -171,9 +179,11 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
   /** NUEVO — hit sin cambio de estado: stun (freno) + pedido de animación. */
   notifyHit(): void {
     if (!this.canReceiveHit()) return;
+    if (this.state === "OnAir") return; // NUEVO — en el aire sólo resta vida: sin clip de reacción ni stun
+
     this.hitStunned = true;
     this.deps.onEnterHitStun();
-    this.onHitReactionObservable.notifyObservers({ crouched: this.state === "Crouch" });
+    this.onHitReactionObservable.notifyObservers({ crouched: this.state === "Crouch", airborne: false });
   }
 
   /** NUEVO — llamado por el animation controller al terminar el clip de reacción. */
@@ -186,7 +196,15 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
   /** NUEVO — llamado por CharacterFsm justo antes de pasar a "Dead". */
   notifyDeath(): void {
     this.hitStunned = false;
-    this.onDeathObservable.notifyObservers({ crouched: this.state === "Crouch" });
+    this.onDeathObservable.notifyObservers({
+      crouched: this.state === "Crouch",
+      airborne: this.state === "OnAir", // NUEVO
+    });
+  }
+
+  /** NUEVO — llamado por el physics controller cuando un personaje muerto en el aire toca el piso. */
+  notifyDeadLanding(): void {
+    this.onDeadLandingObservable.notifyObservers();
   }
 
   private _isHitReactableGroundState(): boolean { // NUEVO
@@ -259,6 +277,7 @@ export class StandAloneFsm extends BaseFsm<StandAloneSubState> {
   dispose(): void {
     this.onHitReactionObservable.clear(); // NUEVO
     this.onDeathObservable.clear();       // NUEVO
+    this.onDeadLandingObservable.clear(); // NUEVO
     this.onGroundSubFsm.dispose();
     this.onGroundCrouchedSubFsm.dispose(); // NUEVO
   }

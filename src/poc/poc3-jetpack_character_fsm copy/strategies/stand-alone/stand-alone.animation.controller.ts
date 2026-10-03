@@ -25,7 +25,8 @@ export class StandAloneAnimationController implements IAnimationController {
 
     // NUEVO — reacción al hit y muerte (el FSM avisa, el clip lo decide este controller)
     this.standAloneFsm.onHitReactionObservable.add(({ crouched }) => this._playHitReaction(crouched));
-    this.standAloneFsm.onDeathObservable.add(({ crouched }) => this._playDeath(crouched));
+    this.standAloneFsm.onDeathObservable.add(({ crouched, airborne }) => this._playDeath(crouched, airborne));
+    this.standAloneFsm.onDeadLandingObservable.add(() => this._playDeadLanding()); // NUEVO
 
     if (this.animations) {
       this.animations.normal_landing.from = 20;
@@ -90,8 +91,8 @@ export class StandAloneAnimationController implements IAnimationController {
   }
 
   /** NUEVO — muerte: clip terminal, _render queda bloqueado para siempre. */
-  private _playDeath(crouched: boolean): void {
-    const clip = this._deathClip(crouched);
+  private _playDeath(crouched: boolean, airborne: boolean): void {
+    const clip = this._deathClip(crouched, airborne);
 
     this.currentAnimation?.stop();
     this.isPlayingTransient = true; // nunca se resetea: no hay vuelta atrás
@@ -101,8 +102,23 @@ export class StandAloneAnimationController implements IAnimationController {
     clip.play(false);
   }
 
+  /**
+   * NUEVO — quien murió en el aire toca el piso: cambia el clip de muerte por el de aterrizaje.
+   * Temporal: usa crash_landing (ya trae from = 20 desde el constructor); reemplazar por un clip más apropiado.
+   * _render sigue bloqueado (isPlayingTransient quedó en true desde _playDeath).
+   */
+  private _playDeadLanding(): void {
+    const clip = this.animations?.death_onAir_landing;
+    if (!clip) return;
+
+    this.currentAnimation?.stop();
+    this.currentAnimation = clip;
+    clip.play(false);
+  }
+
   /** NUEVO — único lugar donde viven los nombres de los clips de muerte (ajustar a las keys reales de ICharacterAnimations). */
-  private _deathClip(crouched: boolean): AnimationGroup | undefined {
+  private _deathClip(crouched: boolean, airborne: boolean): AnimationGroup | undefined {
+    if (airborne) return this.animations?.death_onAir; // NUEVO — mismo clip para onAir y (más adelante) jetpack
     return crouched ? this.animations?.death_crouched : this.animations?.death_standing;
   }
 

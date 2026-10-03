@@ -4,12 +4,14 @@ import { Vector3, Quaternion } from "@babylonjs/core/Maths/math.vector";
 import { Axis } from "@babylonjs/core/Maths/math.axis";
 import { Scalar } from "@babylonjs/core/Maths/math.scalar";
 import { Tools } from "@babylonjs/core/Misc/tools";
+import { Ray } from "@babylonjs/core/Culling/ray"; // NUEVO
 import type { IPhysicsController } from "../contracts/iphysics-controller";
 import type { CharacterInputState } from "../../character.input";
 import type { JetpackSubState } from "../../character-fsm/jetpack-fsm/character.fsm.jetpack";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh"; // NUEVO
 import { JetpackThruster } from "./jetpack.thruster"; // NUEVO
 import { Mesh, TransformNode, type Scene } from "@babylonjs/core";
+import { generalConfig } from "@/poc/config.general"; // NUEVO
 
 
 const CHARACTER_MASS = 70;
@@ -44,6 +46,13 @@ const ON_HORIZONTAL_BRAKE_FACTOR = 4; // mismo criterio que brakingDragFactor/CR
 const SHOOTING_MAX_PITCH_ANGLE = Tools.ToRadians(45);
 const SHOOTING_PITCH_RATE = Tools.ToRadians(90); // rad/s — velocidad de ajuste mientras se sostiene W/S
 
+// ── muerte ── (mismos valores que standAlone, para que el aterrizaje se sienta igual)
+const DEAD_LANDING_DAMPING_RATE = 6; // NUEVO — más alto = frena más rápido al tocar el piso
+const DEAD_GROUND_RAY_MARGIN = 0.15; // NUEVO
+const DEAD_UPWARD_VELOCITY_THRESHOLD = 0.5; // NUEVO — subiendo no cuenta como "tocó el piso"
+const CAPSULE_BOTTOM = generalConfig.playerConfig.capsuleBottomPoint; // NUEVO
+const CAPSULE_STANDING_TOP = generalConfig.playerConfig.capsuleStandingTopPoint; // NUEVO
+
 const THRUSTER_TRANSFORM_ON = { rotation: new Vector3(Tools.ToRadians(90), Tools.ToRadians(-60), 0) };
 const THRUSTER_TRANSFORM_SHOOTING = { rotation: new Vector3(Tools.ToRadians(90), Tools.ToRadians(-50), 0) };
 const THRUSTER_TRANSFORM_CRUISING = { rotation: new Vector3(Tools.ToRadians(180), 0, 0) };
@@ -68,6 +77,12 @@ export class JetpackPhysicsController implements IPhysicsController {
   private _horizontalVelocityTemp = new Vector3(); // nuevo — para _applyOnHorizontalBrake()
   private wasCruisePitching = false;
 
+  // ── muerte ──
+  private _isDead = false; // NUEVO
+  private _groundDetected = false; // NUEVO — sólo se calcula estando muerto
+  private _onDeadLanded: (() => void) | null = null; // NUEVO
+  private _ray = new Ray(Vector3.Zero(), Vector3.Down(), 5); // NUEVO
+
   constructor(
     private scene: Scene,
     private characterAggregate: PhysicsAggregate,
@@ -83,6 +98,12 @@ export class JetpackPhysicsController implements IPhysicsController {
 
   tick(dt: number): void {
     this.elapsedTime += dt;
+
+    // NUEVO — muerto: sin empuje, sin sustentación, sin control. Cae por gravedad y aterriza.
+    if (this._isDead) {
+      this._tickDead(dt);
+      return;
+    }
 
     const { up, forward, backward } = this.getInput();
     if (up && this.fuel > 0) {
@@ -135,6 +156,59 @@ export class JetpackPhysicsController implements IPhysicsController {
     const verticalVelocity = this.characterAggregate.body.getLinearVelocity().y; // NUEVO
     this.thruster.update(up && this.fuel > 0, verticalVelocity); // NUEVO
 
+  }
+
+  /**
+   * NUEVO — muerte: corta empuje, sustentación y control (se deja de compensar la gravedad, así que cae
+   * por su cuenta y mantiene la inercia horizontal que traía). Al tocar el piso avisa una sola vez
+   * (para cambiar el clip) y frena con damping, sin rebote. Los thrusters se apagan.
+   */
+  notifyDead(onLanded?: () => void): void {
+    this._isDead = true;
+    this._groundDetected = false;
+    this._onDeadLanded = onLanded ?? null;
+    this.thruster.stop(); // NUEVO — corta la emisión de partículas (las que quedan se apagan solas)
+  }
+
+  private _tickDead(dt: number): void {
+    const wasGrounded = this._groundDetected;
+    this._updateGroundDetection();
+
+    if (!wasGrounded && this._groundDetected) {
+      this._onDeadLanded?.();
+      this._onDeadLanded = null;
+    }
+
+    const body = this.characterAggregate.body;
+    const velocity = body.getLinearVelocity();
+
+    if (this._groundDetected) {
+      const damping = Math.exp(-DEAD_LANDING_DAMPING_RATE * dt);
+      // Math.min(.., 0): corta cualquier velocidad hacia arriba, así no hay rebote.
+      body.setLinearVelocity(new Vector3(velocity.x * damping, Math.min(velocity.y, 0), velocity.z * damping));
+    }
+
+    body.setAngularVelocity(Vector3.Zero()); // sin giro residual del cruising/turn
+    this._decayCruiseVisuals(dt); // el roll/pitch visual vuelve a 0: el cuerpo cae derecho
+  }
+
+  private _updateGroundDetection(): void {
+    const node = this.characterAggregate.transformNode;
+    const halfHeight = (CAPSULE_STANDING_TOP - CAPSULE_BOTTOM) / 2;
+    const origin = node.getAbsolutePosition();
+
+    this._ray.origin.set(origin.x, origin.y, origin.z);
+    this._ray.length = halfHeight + DEAD_GROUND_RAY_MARGIN;
+
+    const hit = this.scene.pickWithRay(
+      this._ray,
+      (mesh) => mesh.isPickable && mesh !== node && mesh.name !== "playerCapsule" && !mesh.isDescendantOf(node),
+    );
+
+    const verticalVelocity = this.characterAggregate.body.getLinearVelocity().y;
+    const isMovingUpward = verticalVelocity > DEAD_UPWARD_VELOCITY_THRESHOLD;
+
+    this._groundDetected = !!(hit && hit.hit) && !isMovingUpward;
   }
 
   private _updateShootingPitch(dt: number): void {

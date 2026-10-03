@@ -231,8 +231,14 @@ export default class CharacterBase extends EventSubscriber implements Poc {
   }
 
   private _onEnterDead(): void {
-    this.activeStandAlonePhysics?.notifyDead();
+    this.activeStandAlonePhysics?.notifyDead(() => this.fsm.standAloneSubFsm.notifyDeadLanding());
     this.activeBoardPhysics?.notifyDead();
+
+    // NUEVO — jetpack: corta empuje y sustentación (cae por gravedad) y apaga los thrusters visuales.
+    if (this.activeJetpackPhysics) {
+      this.activeJetpackPhysics.notifyDead(() => this.fsm.jetpackSubFsm.notifyDeadLanding());
+      this._setThrustersEnabled(false);
+    }
 
     // NUEVO — sobre el board, el personaje queda parentado a una altura pensada para ir de pie/agachado;
     // el clip de muerte lo deja flotando, así que lo bajamos con la misma fórmula del montaje
@@ -329,6 +335,7 @@ export default class CharacterBase extends EventSubscriber implements Poc {
       if (this.fsm.getState() === "Dead") {
         this.activeStandAlonePhysics?.tick(dt);
         this.activeBoardPhysics?.tick(dt);
+        this.activeJetpackPhysics?.tick(dt); // NUEVO
         return;
       }
 

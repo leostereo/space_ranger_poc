@@ -58,6 +58,7 @@ export interface ICharacterAnimations {
     normal_landing: AnimationGroup;
     crash_landing: AnimationGroup;
     roll_landing: AnimationGroup;
+    death_onAir_landing: AnimationGroup;
 
     floating: AnimationGroup;
     flying: AnimationGroup;
@@ -140,6 +141,7 @@ export class AssetManager {
     private static thrusterResult: ThrusterBuildResult | null = null; // NUEVO
     private static shieldResult: ShieldBuildResult | null = null;
 
+    private static CHARACTER_FILE = 'skater_ver15.glb';
     // Almacén para las animaciones originales de los GLB (crudo, por nombre de clip tal
     // cual viene del archivo — sigue existiendo para getAnimations(), sin cambios).
     private static animationGroups: Record<AnimationAssetKey, AnimationGroup[]> = {
@@ -166,7 +168,7 @@ export class AssetManager {
             };
 
             // --- RECURSO 2: Modelo GLB Externo ---
-            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", "skater_ver14.glb");
+            const tareaGLB = manager.addMeshTask("glb_personaje", "", "model/", this.CHARACTER_FILE);
             tareaGLB.onSuccess = (task) => {
                 // Buscamos el nodo raíz que crea automáticamente Babylon para los GLB
 
@@ -508,6 +510,7 @@ export class AssetManager {
         const normal_landing = find("skate falling to landing");
         const crash_landing = find("flat crash");
         const roll_landing = find("landing to roll");
+        const death_onAir_landing = find("landing from onair death")
 
         const falling_idle = find("falling idle");
         const flying = find("flying");
@@ -560,7 +563,7 @@ export class AssetManager {
             !crouch_walk_aim || !crouch_walkbackwards_aim || !crouch_idle_aim || !running_roll || !shield_idle ||
             !shield_idle_crouched || !shield_strafe_left || !shield_strafe_right || !shield_walk_forward || !shield_walk_backwards ||
             !hit_reaction_crouched || !hit_reaction_standing || !death_crouched || !death_standing || !death_hoverBoard ||
-            !death_onAir) {
+            !death_onAir || !death_onAir_landing) {
             console.warn("AssetManager: faltan animaciones de 'character' — revisar nombres de clips en el GLB.");
             return;
         }
@@ -573,7 +576,7 @@ export class AssetManager {
             strafe_right, strafe_left, crouch_walk, crouch_walkbackwards, crouch_walk_aim, crouch_walkbackwards_aim,
             crouch_idle_aim, running_roll, shield_idle, shield_idle_crouched, shield_strafe_left, shield_strafe_right,
             shield_walk_backwards, shield_walk_forward,death_crouched,death_hoverBoard,death_onAir,death_standing,
-            hit_reaction_crouched,hit_reaction_standing
+            hit_reaction_crouched,hit_reaction_standing,death_onAir_landing
         };
 
         Object.values(mold).forEach((ag) => {
@@ -609,6 +612,7 @@ export class AssetManager {
             normal_landing: cloneOne(mold.normal_landing),
             crash_landing: cloneOne(mold.crash_landing),
             roll_landing: cloneOne(mold.roll_landing),
+            death_onAir_landing: cloneOne(mold.death_onAir_landing),
             floating: cloneOne(mold.floating),
             flying: cloneOne(mold.flying),
             falling_idle: cloneOne(mold.falling_idle),

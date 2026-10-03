@@ -1,12 +1,12 @@
 import type { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import type { Scene } from "@babylonjs/core/scene";
-import { Vector3, Quaternion } from "@babylonjs/core/Maths/math.vector";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Scalar } from "@babylonjs/core/Maths/math.scalar";
 import { Ray } from "@babylonjs/core/Culling/ray";
 import { generalConfig } from "@/poc/config.general";
 import type { IPhysicsController } from "../contracts/iphysics-controller";
 import type { CharacterInputState } from "../../character.input";
-import { Color3, PhysicsShapeCapsule, RayHelper } from "@babylonjs/core";
+import { PhysicsShapeCapsule } from "@babylonjs/core";
 import { OnGroundSubState } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone.on-ground";
 import { OnGroundCrouchedSubState } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone.on-ground-crouched"; // NUEVO
 import { isShieldActive } from "../../utils/combat-rules";
@@ -50,6 +50,8 @@ export class StandAlonePhysicsController implements IPhysicsController {
   private _isWindingUpJump = false;
   private _isHitStunned = false; // NUEVO
   private _isDead = false; // NUEVO
+  private _diedInAir = false; // NUEVO — murió sin tocar el piso: falta avisar el aterrizaje
+  private _onDeadLanded: (() => void) | null = null; // NUEVO
 
   constructor(
     private scene: Scene,
@@ -86,11 +88,25 @@ export class StandAlonePhysicsController implements IPhysicsController {
       const v = this.characterAggregate.body.getLinearVelocity();
       this._lastImpactVerticalSpeed = v.y;
       this._lastImpactHorizontalSpeed = Math.sqrt(v.x ** 2 + v.z ** 2);
+
+      // NUEVO — murió en el aire y recién toca el piso: avisa una sola vez (cambia el clip)
+      if (this._isDead && this._diedInAir) {
+        this._diedInAir = false;
+        this._onDeadLanded?.();
+      }
     }
 
-    // NUEVO — muerte o reacción al hit: frena la velocidad horizontal y corta el giro residual
-    if (this._isDead || this._isHitStunned) {
-      this._applyHorizontalDamping(dt, this._isDead ? DEATH_DAMPING_RATE : HIT_STUN_DAMPING_RATE);
+    // NUEVO — muerte: en el aire sigue su trayectoria (cae por gravedad, sin frenar la horizontal);
+    // apoyado en el piso frena. En ambos casos corta el giro residual.
+    if (this._isDead) {
+      if (this._groundDetected) this._applyHorizontalDamping(dt, DEATH_DAMPING_RATE);
+      this.characterAggregate.body.setAngularVelocity(Vector3.Zero());
+      return;
+    }
+
+    // NUEVO — reacción al hit (sólo en suelo): frena la velocidad horizontal y corta el giro residual
+    if (this._isHitStunned) {
+      this._applyHorizontalDamping(dt, HIT_STUN_DAMPING_RATE);
       this.characterAggregate.body.setAngularVelocity(Vector3.Zero());
       return;
     }
@@ -339,9 +355,14 @@ export class StandAlonePhysicsController implements IPhysicsController {
     this._isHitStunned = false;
   }
 
-  /** NUEVO — muerte: frena y ya no responde al input. */
-  notifyDead(): void {
+  /**
+   * NUEVO — muerte: frena y ya no responde al input.
+   * Si muere en el aire (sin piso detectado), llama a onLanded una sola vez cuando toque el piso.
+   */
+  notifyDead(onLanded?: () => void): void {
     this._isDead = true;
+    this._diedInAir = !this._groundDetected;
+    this._onDeadLanded = onLanded ?? null;
   }
 
   dispose(): void { }
