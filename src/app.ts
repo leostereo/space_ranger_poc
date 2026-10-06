@@ -102,7 +102,7 @@ class App {
 
       window.addEventListener("keydown", (ev) => {
         // Shift+Ctrl+Alt+I
-        if (ev.shiftKey && ev.ctrlKey && ev.altKey && ev.key.toLowerCase() === "i") {
+        if (ev.shiftKey && ev.ctrlKey && ev.altKey) {
           if (this.scene.debugLayer.isVisible()) {
             this.scene.debugLayer.hide();
           } else {

@@ -111,3 +111,8 @@ The root `bp900` template includes:
 - Issues: https://github.com/eldinor/bp900/issues
 
 Based on https://github.com/eldinor/bp800/ which was based on https://github.com/minibao/babylon-vite
+
+### Comandos
+```
+npx repomix ./tu-carpeta && grep -vE "^import |^from " repomix-output.txt > contexto-claude.txt
+```

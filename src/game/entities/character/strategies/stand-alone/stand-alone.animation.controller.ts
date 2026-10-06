@@ -1,0 +1,211 @@
+// stand-alone.animation.controller.ts
+import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
+import type { ICharacterAnimations } from "@/services/assets-manager";
+import type { IAnimationController } from "../contracts/ianimation-controller";
+import type { StandAloneFsm } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone";
+import type { OnGroundSubState } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone.on-ground";
+import { OnGroundCrouchedSubState } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone.on-ground-crouched";
+
+type ResolvedStandAloneState = OnGroundSubState | OnGroundCrouchedSubState | "JumpImpulseStart" | "OnAir" | "RunningJumpImpulseStart" | "CrouchRollStart";
+
+export class StandAloneAnimationController implements IAnimationController {
+  private currentAnimation: AnimationGroup | null = null;
+  private isPlayingTransient = false; // NUEVO
+
+  constructor(
+    private animations: ICharacterAnimations | null,
+    private standAloneFsm: StandAloneFsm,
+    private isAiming: () => boolean,
+    private isShielding: () => boolean, // NUEVO
+  ) {
+    this.standAloneFsm.onStateChange(() => this._render(this.standAloneFsm.getActiveSubState()));
+    this.standAloneFsm.onGroundSubFsm.onStateChange(() => this._render(this.standAloneFsm.getActiveSubState()));
+    this.standAloneFsm.onGroundCrouchedSubFsm.onStateChange(() => this._render(this.standAloneFsm.getActiveSubState())); // NUEVO
+    this._render(this.standAloneFsm.getActiveSubState());
+
+    // NUEVO — reacción al hit y muerte (el FSM avisa, el clip lo decide este controller)
+    this.standAloneFsm.onHitReactionObservable.add(({ crouched }) => this._playHitReaction(crouched));
+    this.standAloneFsm.onDeathObservable.add(({ crouched, airborne }) => this._playDeath(crouched, airborne));
+    this.standAloneFsm.onDeadLandingObservable.add(() => this._playDeadLanding()); // NUEVO
+
+    if (this.animations) {
+      this.animations.normal_landing.from = 20;
+      this.animations.normal_landing.speedRatio = 1.6;
+      this.animations.crash_landing.from = 20;
+      this.animations.roll_landing.from = 10;
+      this.animations.roll_landing.speedRatio = 1.6;
+    }
+  }
+
+  tick(): void {
+    this._render(this.standAloneFsm.getActiveSubState());
+  }
+
+  dispose(): void {
+    this.currentAnimation?.stop();
+  }
+
+  private _render(state: ResolvedStandAloneState): void {
+    if (this.isPlayingTransient) return;
+
+    const resolved = this._resolve(state);
+    if (!resolved || this.currentAnimation === resolved.animation) return;
+
+    this.currentAnimation?.stop();
+    this.currentAnimation = resolved.animation;
+
+    if (resolved.waitForCompletion) {
+      // CAMBIADO: sólo estados marcados explícitamente esperan a que el clip termine
+      // solo — el salto normal, por ejemplo, necesita seguir cortándose apenas se entra
+      // a OnAir (para pasar a falling_idle), no quedarse en la pose de impulso.
+      this.isPlayingTransient = true;
+      resolved.animation.play(false);
+      resolved.animation.onAnimationGroupEndObservable.addOnce(() => {
+        this.isPlayingTransient = false;
+        this._render(this.standAloneFsm.getActiveSubState());
+      });
+    } else {
+      resolved.animation.play(resolved.loop);
+    }
+  }
+
+  /** NUEVO — reacción al hit: pisa la locomoción hasta que termina el clip, y recién ahí libera el stun. */
+  private _playHitReaction(crouched: boolean): void {
+    const clip = crouched ? this.animations?.hit_reaction_crouched : this.animations?.hit_reaction_standing;
+    if (!clip) {
+      // sin clip no hay a qué esperar: liberamos el stun enseguida
+      this.standAloneFsm.notifyHitReactionComplete();
+      return;
+    }
+
+    this.currentAnimation?.stop();
+    this.currentAnimation = clip;
+    this.isPlayingTransient = true; // _render queda en pausa hasta que termine
+
+    clip.play(false);
+    clip.onAnimationGroupEndObservable.addOnce(() => {
+      this.isPlayingTransient = false;
+      this.standAloneFsm.notifyHitReactionComplete();
+      this._render(this.standAloneFsm.getActiveSubState()); // retoma la locomoción del estado actual
+    });
+  }
+
+  /** NUEVO — muerte: clip terminal, _render queda bloqueado para siempre. */
+  private _playDeath(crouched: boolean, airborne: boolean): void {
+    const clip = this._deathClip(crouched, airborne);
+
+    this.currentAnimation?.stop();
+    this.isPlayingTransient = true; // nunca se resetea: no hay vuelta atrás
+    if (!clip) return;
+
+    this.currentAnimation = clip;
+    clip.play(false);
+  }
+
+  /**
+   * NUEVO — quien murió en el aire toca el piso: cambia el clip de muerte por el de aterrizaje.
+   * Temporal: usa crash_landing (ya trae from = 20 desde el constructor); reemplazar por un clip más apropiado.
+   * _render sigue bloqueado (isPlayingTransient quedó en true desde _playDeath).
+   */
+  private _playDeadLanding(): void {
+    const clip = this.animations?.death_onAir_landing;
+    if (!clip) return;
+
+    this.currentAnimation?.stop();
+    this.currentAnimation = clip;
+    clip.play(false);
+  }
+
+  /** NUEVO — único lugar donde viven los nombres de los clips de muerte (ajustar a las keys reales de ICharacterAnimations). */
+  private _deathClip(crouched: boolean, airborne: boolean): AnimationGroup | undefined {
+    if (airborne) return this.animations?.death_onAir; // NUEVO — mismo clip para onAir y (más adelante) jetpack
+    return crouched ? this.animations?.death_crouched : this.animations?.death_standing;
+  }
+
+  private _resolve(state: ResolvedStandAloneState): { animation: AnimationGroup; loop: boolean; waitForCompletion?: boolean } | null {
+    if (!this.animations) return null;
+
+    // NUEVO — el escudo tiene precedencia sobre el apuntado (con shield held, isAiming ya da false,
+    // pero lo dejamos explícito por si cambian las reglas)
+    if (this.isShielding()) {
+      switch (state) {
+        case "Idle":
+          return { animation: this.animations.shield_idle, loop: true };
+        case "Walking":
+          return { animation: this.animations.shield_walk_forward, loop: true };
+        case "WalkingBackwards":
+          return { animation: this.animations.shield_walk_backwards, loop: true };
+        case "ShootingStrafeLeft":
+          return { animation: this.animations.shield_strafe_left, loop: true };
+        case "ShootingStrafeRight":
+          return { animation: this.animations.shield_strafe_right, loop: true };
+        case "CrouchIdle":
+          return { animation: this.animations.shield_idle_crouched, loop: true };
+      }
+    }
+
+    if (this.isAiming()) {
+      if (state === "Idle" && this.animations.idle_aimming) {
+        return { animation: this.animations.idle_aimming, loop: true };
+      }
+      if (state === "Walking" && this.animations.walking_aimming) {
+        return { animation: this.animations.walking_aimming, loop: true };
+      }
+      if (state === "WalkingBackwards" && this.animations.walking_backwards_aimming) {
+        return { animation: this.animations.walking_backwards_aimming, loop: true };
+      }
+      if (state === "Running" && this.animations.running_aimming) {
+        return { animation: this.animations.running_aimming, loop: true };
+      }
+      // NUEVO — sin clips dedicados todavía, cae al switch de abajo (placeholders normales de crouch)
+      if (state === "CrouchIdle" && this.animations.crouch_idle_aim) {
+        return { animation: this.animations.crouch_idle_aim, loop: true };
+      }
+      if (state === "CrouchWalking" && this.animations.crouch_walk_aim) {
+        return { animation: this.animations.crouch_walk_aim, loop: true };
+      }
+      if (state === "CrouchWalkingBackwards" && this.animations.crouch_walkbackwards_aim) {
+        return { animation: this.animations.crouch_walkbackwards_aim, loop: true };
+      }
+    }
+
+    switch (state) {
+      case "Idle":
+        return { animation: this.animations.standing_idle, loop: true };
+      case "Walking":
+        return { animation: this.animations.walking_forward, loop: true };
+      case "WalkingBackwards":
+        return { animation: this.animations.walking_backwards, loop: true };
+      case "Running":
+        return { animation: this.animations.running_normal, loop: true };
+      case "ShootingStrafeLeft":
+        return { animation: this.animations.strafe_left ?? this.animations.walking_forward, loop: true };
+      case "ShootingStrafeRight":
+        return { animation: this.animations.strafe_right ?? this.animations.walking_forward, loop: true };
+      case "EquippingHoverBoardStart":
+        return { animation: this.animations.jump_on_board, loop: false };
+      case "JumpImpulseStart":
+        return { animation: this.animations.jump, loop: false };
+      case "RunningJumpImpulseStart":
+        return { animation: this.animations.jump_while_running, loop: false, waitForCompletion: true };
+      case "OnAir":
+        return { animation: this.animations.falling_idle, loop: true };
+      case "LandingSoft":
+        return { animation: this.animations.normal_landing, loop: false };
+      case "LandingRoll":
+        return { animation: this.animations.roll_landing, loop: false };
+      case "LandingCrash":
+        return { animation: this.animations.crash_landing, loop: false };
+      case "CrouchIdle": 
+        return { animation: this.animations.cruising_maxVel_idle, loop: true };
+      case "CrouchWalking": 
+        return { animation: this.animations.crouch_walk, loop: true };
+      case "CrouchWalkingBackwards": 
+        return { animation: this.animations.crouch_walkbackwards, loop: true };
+      case "CrouchRollStart": // NUEVO
+        return { animation: this.animations.running_roll, loop: false, waitForCompletion: true };
+      default:
+        return null;
+    }
+  }
+}
