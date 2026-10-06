@@ -1,0 +1,154 @@
+.screen-root {
+  --screen-bg: #05070d;
+  --screen-fg: #e8f1ff;
+  --screen-accent: #5cc8ff;
+  --screen-gap: clamp(1.5rem, 6vh, 4rem);
+
+  position: fixed;
+  inset: 0;
+  z-index: 100; /* debajo del DebugHud (1000) */
+  display: flex;
+}
+
+.screen-root[hidden] {
+  display: none;
+}
+
+.screen {
+  flex: 1;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--screen-gap);
+  padding:
+    max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  box-sizing: border-box;
+  background: radial-gradient(ellipse at center, #0d1626 0%, var(--screen-bg) 70%);
+  color: var(--screen-fg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  text-align: center;
+  user-select: none;
+}
+
+.screen__logo {
+  width: min(70vw, 32rem);
+  aspect-ratio: 16 / 9;
+  display: grid;
+  place-items: center;
+  border: 2px dashed color-mix(in srgb, var(--screen-fg) 50%, transparent);
+  border-radius: 0.75rem;
+  font-size: clamp(1.25rem, 4vw, 2.5rem);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+}
+
+.screen__title {
+  margin: 0;
+  font-size: clamp(1.25rem, 4vw, 2rem);
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+}
+
+.screen__prompt {
+  margin: 0;
+  font-size: clamp(0.9rem, 2.5vw, 1.25rem);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--screen-accent);
+  animation: screen-blink 1.4s ease-in-out infinite;
+}
+
+.screen__progress {
+  width: min(70vw, 28rem);
+  height: 0.5rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--screen-fg) 15%, transparent);
+}
+
+.screen__progress-bar {
+  width: 40%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--screen-accent);
+  animation: screen-indeterminate 1.2s ease-in-out infinite;
+}
+
+@keyframes screen-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes screen-indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen__prompt,
+  .screen__progress-bar {
+    animation: none;
+  }
+}
+
+.screen__status {
+  min-height: 1.5em;
+  margin: 0;
+  font-size: clamp(0.8rem, 2vw, 1rem);
+  letter-spacing: 0.1em;
+  opacity: 0.8;
+}
+
+.screen__progress--determinate .screen__progress-bar {
+  width: calc(var(--progress, 0) * 100%);
+  transform: none;
+  animation: none;
+  transition: width 0.2s ease-out;
+}
+
+/* Si el contenido no entra en pantalla (celulares chicos, landscape), la pantalla se desplaza. */
+.screen-root {
+  overflow-y: auto;
+}
+
+.screen__keymap {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: min(92vw, 64rem);
+  max-height: 58dvh;
+  object-fit: contain;
+  border-radius: 0.75rem;
+  box-shadow: 0 0 2rem color-mix(in srgb, var(--screen-accent) 25%, transparent);
+}
+
+/* Celulares en horizontal: se oculta el título para darle el alto a la imagen. */
+@media (orientation: landscape) and (max-height: 32rem) {
+  .screen--controls {
+    gap: 0.75rem;
+  }
+
+  .screen--controls .screen__title {
+    display: none;
+  }
+
+  .screen__keymap {
+    max-height: 62dvh;
+  }
+}
+
+.screen__brief {
+  max-width: min(90vw, 40rem);
+  margin: 0;
+  font-size: clamp(1rem, 2.5vw, 1.25rem);
+  line-height: 1.5;
+  opacity: 0.9;
+}
