@@ -1,7 +1,7 @@
 import type { GameState, GameStateTransitioner } from "../fsm/game-state";
 import type { GameContext } from "../game-context";
-import { createLevelStrategy } from "../levels/level-factory";
-import type { LevelLoader, LevelLoadPhase } from "../levels/level-loader";
+import { createGroundPhysics } from "../levels/ground-physics";
+import { createLevelStrategy } from "../levels/level-factory";import type { LevelLoader, LevelLoadPhase } from "../levels/level-loader";
 import type { LevelRepository } from "../levels/level-repository";
 import type { LevelSession } from "../levels/level-session";
 import { LoadingScreen } from "../screens/loading-screen";
@@ -10,6 +10,7 @@ import type { ScreenManager } from "../ui/screens/screen-manager";
 const PHASE_LABELS: Record<LevelLoadPhase, string> = {
   downloading: "Downloading map",
   optimizing: "Optimizing map",
+  building: "Building map",
 };
 
 /**
@@ -63,8 +64,9 @@ export class LevelSetupState implements GameState {
       this.session.complete(map);
 
       // 3B
-      this.session.setStrategy(createLevelStrategy({ context, definition, scope }));
-    } catch (error) {
+      // 3B
+      createGroundPhysics(map, context.scene, scope);
+      this.session.setStrategy(createLevelStrategy({ context, definition, scope, map }));    } catch (error) {
       if (!this.exited) {
         this.screen.setStatus(`Error: ${error instanceof Error ? error.message : String(error)}`);
       }

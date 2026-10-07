@@ -1,8 +1,9 @@
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
-
+import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { TypedEventEmitter } from "../core/events/typed-event-emitter";
 import type { GameContext } from "../game-context";
 import type { LevelDefinition } from "./level-definition";
+import type { LoadedMap } from "./level-map-factory";
 import type { LevelScope } from "./level-scope";
 
 export type LevelOutcome = "completed" | "failed";
@@ -15,6 +16,7 @@ export interface LevelStrategyDeps {
   readonly context: GameContext;
   readonly definition: LevelDefinition;
   readonly scope: LevelScope;
+  readonly map: LoadedMap;
 }
 
 type Phase = "created" | "playing" | "paused" | "finished" | "disposed";
@@ -32,6 +34,7 @@ export abstract class LevelStrategy {
   protected readonly context: GameContext;
   protected readonly definition: LevelDefinition;
   protected readonly scope: LevelScope;
+  protected readonly map: LoadedMap;
 
   private phase: Phase = "created";
   private pausedAnimationGroups: AnimationGroup[] = [];
@@ -41,6 +44,12 @@ export abstract class LevelStrategy {
     this.context = deps.context;
     this.definition = deps.definition;
     this.scope = deps.scope;
+    this.map = deps.map;
+  }
+
+  /** Dónde debe aparecer el Character (definido por el nivel). */
+  protected get characterSpawn(): Vector3 {
+    return this.definition.spawns.character;
   }
 
   /** Arranque (desde 3B). */

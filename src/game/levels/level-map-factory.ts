@@ -4,8 +4,7 @@ import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { Tools } from "@babylonjs/core/Misc/tools";
 
 import { yieldToBrowser } from "../core/async/yield-to-browser";
-import type { MapDefinition, MapMeshGroup, MapMeshMatcher, MapMeshRole } from "./level-definition";
-import type { LevelScope } from "./level-scope";
+import type { GlbMapSource, MapMeshGroup, MapMeshMatcher, MapMeshRole } from "./level-definition"; import type { LevelScope } from "./level-scope";
 
 /** Nombre del nodo raíz que el loader de glTF crea alrededor de cada GLB. */
 const GLTF_ROOT_NODE_NAME = "__root__";
@@ -15,10 +14,20 @@ const MERGE_DISPOSES_SOURCE = true;
 const MERGE_SUBDIVIDES_WITH_SUBMESHES = false;
 const MERGE_USES_MULTI_MATERIALS = true;
 
-export interface LoadedMap {
+export interface LoadedGlbMap {
   readonly merged: ReadonlyMap<MapMeshRole, Mesh>;
   readonly ground: Mesh;
   /** Mallas del GLB que no pertenecen a ningún grupo ni al suelo y se descartaron. */
+  readonly droppedMeshCount: number;
+}
+
+/** Mapa completo del nivel: la suma de todas sus fuentes (GLB y procedurales). */
+export interface LoadedMap {
+  readonly merged: ReadonlyMap<MapMeshRole, Mesh>;
+  /** Suelo principal: el primero de `grounds`. */
+  readonly ground: Mesh;
+  readonly grounds: readonly Mesh[];
+  readonly proceduralMeshes: readonly Mesh[];
   readonly droppedMeshCount: number;
 }
 
@@ -33,17 +42,17 @@ const matches = (name: string, matcher: MapMeshMatcher): boolean =>
  * Devuelve null si el scope se liberó mientras trabajaba (carga cancelada): en ese caso
  * limpia todo lo importado. Lanza (también limpiando) si el GLB no tiene root o no tiene suelo.
  */
-export async function createLevelMap(
+export async function createGlbMap(
   importedMeshes: readonly AbstractMesh[],
-  map: MapDefinition,
+  map: GlbMapSource,
   scope: LevelScope,
   /** Progreso del procesamiento, de 0 a 1. */
   onProgress?: (fraction: number) => void,
-): Promise<LoadedMap | null> {
+): Promise<LoadedGlbMap | null> {
   const root = importedMeshes.find((mesh) => mesh.name === GLTF_ROOT_NODE_NAME);
   if (!root) {
     importedMeshes.forEach((mesh) => mesh.dispose(false, true));
-    throw new Error(`[createLevelMap] the GLB has no "${GLTF_ROOT_NODE_NAME}" node`);
+    throw new Error(`[createGlbMap] the GLB has no "${GLTF_ROOT_NODE_NAME}" node`);
   }
   const discardImported = (): void => root.dispose(false, true);
 

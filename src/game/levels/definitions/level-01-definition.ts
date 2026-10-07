@@ -11,7 +11,8 @@ export const level01Definition: LevelDefinition = {
   id: "level-01",
   order: 1,
   brief: "TODO: objetivo del nivel",
-  map: {
+  maps: [{
+    kind: "glb",
     modelRootUrl: "maps/",
     modelFile: "topoexport_3D_modeling_batallaDelPilar.glb",
     rootPosition: new Vector3(0, -900, -100),
@@ -24,7 +25,7 @@ export const level01Definition: LevelDefinition = {
       { role: "waterways", name: "merged-waterways", match: { includes: "TPX_Waterways" }, allow32BitIndices: true },
     ],
     ground: { name: "ground", match: { includes: "TPX_Ground" } },
-  },
+  }],
   spawns: {
     character: new Vector3(0, 0, 0), // TODO: coordenadas reales sobre el mapa
     enemies: [], // TODO

@@ -1,4 +1,8 @@
 import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { Scene } from "@babylonjs/core/scene";
+
+import type { LevelScope } from "./level-scope";
 
 /** Tipos de enemigo que un nivel puede pedir. */
 export type EnemyType = "drone";
@@ -39,7 +43,8 @@ export interface MapMeshGroup {
   readonly allow32BitIndices: boolean;
 }
 
-export interface MapDefinition {
+export interface GlbMapSource {
+  readonly kind: "glb";
   readonly modelRootUrl: string;
   readonly modelFile: string;
   /** Se aplica ANTES de fusionar, para que las mallas calculen bien sus coordenadas. */
@@ -50,6 +55,27 @@ export interface MapDefinition {
   readonly ground: { readonly name: string; readonly match: MapMeshMatcher };
 }
 
+export interface ProceduralMapContext {
+  readonly scene: Scene;
+  /** Para registrar lo que no sea una malla (cuerpos de física, observers, etc.). */
+  readonly scope: LevelScope;
+}
+
+export interface ProceduralMapResult {
+  /** Suelo del nivel, si esta fuente aporta uno. */
+  readonly ground?: Mesh;
+  /** Resto de las mallas creadas. */
+  readonly meshes?: readonly Mesh[];
+}
+
+/** Mapa creado por código con primitivas de Babylon. Las mallas que devuelve las adopta el LevelScope. */
+export interface ProceduralMapSource {
+  readonly kind: "procedural";
+  readonly build: (context: ProceduralMapContext) => ProceduralMapResult;
+}
+
+export type LevelMapSource = GlbMapSource | ProceduralMapSource;
+
 /** Datos ESTÁTICOS de un nivel: viven en el código y se versionan con él. */
 export interface LevelDefinition {
   readonly id: string;
@@ -57,7 +83,7 @@ export interface LevelDefinition {
   readonly order: number;
   /** Objetivo del nivel (se muestra en la pausa). */
   readonly brief: string;
-  readonly map: MapDefinition;
+  readonly maps: readonly LevelMapSource[];
   readonly spawns: LevelSpawns;
   readonly waves: readonly WaveDefinition[];
   readonly navigation?: LevelNavigation;
