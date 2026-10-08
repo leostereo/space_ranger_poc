@@ -1,5 +1,4 @@
 import { LevelStrategy, type LevelStrategyDeps } from "../level-strategy";
-import { createLevelViewer } from "../level-viewer-factory";
 
 /**
  * Nivel 1. PLACEHOLDER: todavía no hay Character, enemigos ni HUD (migraciones siguientes),
@@ -7,10 +6,10 @@ import { createLevelViewer } from "../level-viewer-factory";
  * El visor es la cámara placeholder; se reemplaza por la del personaje.
  */
 export class Level01Strategy extends LevelStrategy {
-  constructor(deps: LevelStrategyDeps) {
-    super(deps);
-    createLevelViewer(deps.context.scene, deps.context.canvas, deps.scope);
-  }
+  // constructor(deps: LevelStrategyDeps) {
+  //   super(deps);
+  //   createLevelViewer(deps.context.scene, deps.context.canvas, deps.scope);
+  // }
 
   protected onTick(): void {
     // TODO: Character.update, EnemiesManager.update, HUD.update

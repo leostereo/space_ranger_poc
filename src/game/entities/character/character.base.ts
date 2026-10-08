@@ -9,7 +9,7 @@ import type { AssetRegistry } from "@/game/assets/asset-registry";
 
 import { EventSubscriber } from "@/game/services/event-subscriber";
 import { EventManager, GameEvents, type PlayerShootedPayload } from "@/game/services/event-manager";
-
+import { createCharacterFollowCamera } from "./character.camera";
 
 import { CharacterFsm } from "./character-fsm/character.fsm";
 import { CharacterInput } from "./character.input";
@@ -57,20 +57,19 @@ export const WEAPON_OFFSETS = {
   crouchWalkingBackwards: { x: -0.08, y: 0, z: 0 },
 } as const;
 
-  const SHIELD_HOVERBOARD_OFFSET = { x: -0.05, y: -0.1, z: 0.45 } as const;
-  
-  export const SHIELD_OFFSETS = {
-    idle: { x: -0.1, y: 0.1, z: 0.3 },
-    walking: { x: 0, y: 0.1, z: 0.3 },
-    walkingBackwards: { x: 0, y: 0.1, z: 0.3 },
-    strafe_left: { x: -0.1, y: 0.1, z: 0.3 },
-    strafe_right: { x: -0.1, y: 0.1, z: 0.3 },
-    crouchIdle: { x: -0.1, y: -0.1, z: 0.3 },
+const SHIELD_HOVERBOARD_OFFSET = { x: -0.05, y: -0.1, z: 0.45 } as const;
+
+export const SHIELD_OFFSETS = {
+  idle: { x: -0.1, y: 0.1, z: 0.3 },
+  walking: { x: 0, y: 0.1, z: 0.3 },
+  walkingBackwards: { x: 0, y: 0.1, z: 0.3 },
+  strafe_left: { x: -0.1, y: 0.1, z: 0.3 },
+  strafe_right: { x: -0.1, y: 0.1, z: 0.3 },
+  crouchIdle: { x: -0.1, y: -0.1, z: 0.3 },
 } as const;
 
 export default class CharacterBase extends EventSubscriber {
   private scene: Scene;
-  //private groundAggregates: PhysicsAggregate[];
   private followCamera: FollowCamera | null = null;
   private characterMesh: Mesh;
   private characterAggregate: PhysicsAggregate;
@@ -85,7 +84,6 @@ export default class CharacterBase extends EventSubscriber {
   private activeJetpackPhysics: JetpackStrategyResult["physicsController"] | null = null;
   private activeStandAlonePhysics: StandAloneStrategyResult["physicsController"] | null = null;
 
-  private beforePhysicsObserver: Nullable<Observer<Scene>> = null;
   private afterPhysicsObserver: Nullable<Observer<Scene>> = null;
 
   private _activeBoardMesh: Mesh | null = null;
@@ -93,7 +91,7 @@ export default class CharacterBase extends EventSubscriber {
 
   private activeBoardPhysics: HoverBoardPhysicsController | null = null;
   private _activeBoardInputAdapter: HoverBoardInputAdapter | null = null;
-  
+
   private weaponRoot: TransformNode | null = null;
   private weaponMuzzle: TransformNode | null = null;
 
@@ -143,7 +141,7 @@ export default class CharacterBase extends EventSubscriber {
       this.characterMesh.rotationQuaternion = Quaternion.Identity();
     }
 
-    // TODO: la cámara de seguimiento se define aparte; mientras tanto followCamera queda en null.
+    this.followCamera = createCharacterFollowCamera(scene, this.characterMesh);
     this.input = new CharacterInput();
 
     this.fsm = new CharacterFsm({
@@ -222,6 +220,12 @@ export default class CharacterBase extends EventSubscriber {
     this.hud.mount();
 
     this._bindObservables();
+  }
+
+  activateCamera(): void {
+    if (this.followCamera) {
+      this.scene.activeCamera = this.followCamera;
+    }
   }
 
   protected registerEvents(): void {
@@ -339,34 +343,31 @@ export default class CharacterBase extends EventSubscriber {
     wireOnComplete(this.characterAnimations?.roll_landing, ROLL_LAST_FRAME);
   }
 
+  update(dt: number): void {
+    // Muerto: sin input, disparo ni animación; solo seguimos tickeando la física para que frene
+    // (en el board, además, para que siga flotando mientras se detiene).
+    if (this.fsm.getState() === "Dead") {
+      this.activeStandAlonePhysics?.tick(dt);
+      this.activeBoardPhysics?.tick(dt);
+      this.activeJetpackPhysics?.tick(dt);
+      return;
+    }
+
+    this.activeStrategy?.tick(dt);
+    this.fsm.tick();
+    this._updateWeaponVisibility();
+    this._updateShield();
+    if (this.fsm.getState() === "HoverBoard" && this.input.consumeEquipRequest()) {
+      this.fsm.requestUnequipBoard();
+    }
+  }
+
   private _bindObservables(): void {
-    this.beforePhysicsObserver = this.scene.onBeforePhysicsObservable.add(() => {
-      const dt = this.scene.getEngine().getDeltaTime() / 1000;
-
-      // NUEVO — muerto: sin input, disparo ni animación; sólo seguimos tickeando la física para que frene
-      // (en el board, además, para que siga flotando mientras se detiene).
-      if (this.fsm.getState() === "Dead") {
-        this.activeStandAlonePhysics?.tick(dt);
-        this.activeBoardPhysics?.tick(dt);
-        this.activeJetpackPhysics?.tick(dt); // NUEVO
-        return;
-      }
-
-      this.activeStrategy?.tick(dt);
-      this.fsm.tick();
-      this._updateWeaponVisibility();
-      this._updateShield();
-      if (this.fsm.getState() === "HoverBoard" && this.input.consumeEquipRequest()) {
-        this.fsm.requestUnequipBoard();
-      }
-    });
-
     this.afterPhysicsObserver = this.scene.onAfterPhysicsObservable.add(() => {
       this.activeJetpackPhysics?.applyVisualRoll();
       this.activeBoardPhysics?.applyVisualRoll();
     });
   }
-
   private async _swapToJetpack(): Promise<void> {
     this.activeStandAlonePhysics = null;
     this.activeStrategy?.dispose();
@@ -563,13 +564,14 @@ export default class CharacterBase extends EventSubscriber {
 
   dispose(): void {
     this.unsubscribeEvents();
-    this.scene?.onBeforePhysicsObservable.remove(this.beforePhysicsObserver);
     this.scene?.onAfterPhysicsObservable.remove(this.afterPhysicsObserver);
     this.hud?.dispose();
     this.activeStrategy?.dispose();
     this.fsm?.dispose();
     this.input?.dispose();
     this.characterAggregate?.dispose();
+    this.followCamera?.dispose();
+    this.followCamera = null;
     this.disposeEquipment?.(); // personaje clonado, animaciones, arma, propulsores, escudo y cápsula
     this.disposeEquipment = null;
     this._activeBoardAggregate?.dispose();

@@ -6,7 +6,7 @@ import type CharacterBase from "../entities/character/character.base";
 import type { LevelDefinition } from "./level-definition";
 import type { LoadedMap } from "./level-map-factory";
 import type { LevelScope } from "./level-scope";
-
+import { createLevelLighting } from "./level-lighting";
 export type LevelOutcome = "completed" | "failed";
 
 export interface LevelStrategyEventMap {
@@ -49,6 +49,7 @@ export abstract class LevelStrategy {
     this.scope = deps.scope;
     this.map = deps.map;
     this.character = deps.character;
+    createLevelLighting(this.context.scene, this.scope);
   }
 
   /** Dónde debe aparecer el Character (definido por el nivel). */
@@ -62,6 +63,7 @@ export abstract class LevelStrategy {
       throw new Error(`[LevelStrategy] play() called in phase "${this.phase}"`);
     }
     this.phase = "playing";
+    this.character.activateCamera(); // la cámara del Character manda sobre cualquier otra que arme el nivel
     this.onPlay();
   }
 
@@ -95,7 +97,8 @@ export abstract class LevelStrategy {
     if (this.phase !== "playing") {
       return;
     }
-    this.onTick(deltaTime);
+    this.character.update(deltaTime); // primero las entidades (luego irán EnemiesManager y HUD)
+    this.onTick(deltaTime);    
     if (this.phase !== "playing") {
       return; // onTick pudo terminar el nivel
     }

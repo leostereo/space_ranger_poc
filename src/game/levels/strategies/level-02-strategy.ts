@@ -1,10 +1,9 @@
 import { LevelStrategy, LevelStrategyDeps } from "../level-strategy";
-import { createLevelViewer } from "../level-viewer-factory";
 
 export class Level02Strategy extends LevelStrategy {
   constructor(deps: LevelStrategyDeps) {
     super(deps);
-    createLevelViewer(deps.context.scene, deps.context.canvas, deps.scope);
+    // createLevelViewer(deps.context.scene, deps.context.canvas, deps.scope);
   }
 
   protected override onPlay(): void {

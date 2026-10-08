@@ -89,7 +89,7 @@ export class Game {
       import("./debug/attach-game-debug-hud"),
       import("./debug/attach-level-debug-keys"),
     ]);
-    const detachHud = attachGameDebugHud(this.fsm.events);
+    const detachHud = attachGameDebugHud(this.fsm.events, this.levelSession);
     const detachKeys = attachLevelDebugKeys(this.hotkeys, this.levelSession);
     this.detachDebugTools = () => {
       detachHud();

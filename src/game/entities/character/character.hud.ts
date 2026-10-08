@@ -15,12 +15,15 @@ export class CharacterHud {
   constructor(private fsm: CharacterFsm) { }
 
   mount(): void {
+    if (!import.meta.env.DEV) {
+      return; // HUD de debug: no existe en producción
+    }
     this.container = document.createElement("div");
-    this.container.id = "poc3-character-hud";
+    this.container.id = "character-hud";
     Object.assign(this.container.style, {
       position: "fixed",
-      top: "32px",
-      right: "12px",
+      top: "8px",
+      left: "8px",
       padding: "6px 12px",
       background: "rgba(0, 0, 0, 0.6)",
       color: "#0ff",
@@ -29,8 +32,7 @@ export class CharacterHud {
       borderRadius: "4px",
       zIndex: "1000",
       pointerEvents: "none",
-      textAlign: "right",
-    });
+      textAlign: "left",    });
 
     this.stateLine = document.createElement("div");
     this.container.appendChild(this.stateLine);
