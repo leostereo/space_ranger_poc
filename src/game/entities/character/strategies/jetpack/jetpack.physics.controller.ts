@@ -11,8 +11,8 @@ import type { JetpackSubState } from "../../character-fsm/jetpack-fsm/character.
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh"; // NUEVO
 import { JetpackThruster } from "./jetpack.thruster"; // NUEVO
 import { Mesh, TransformNode, type Scene } from "@babylonjs/core";
-import { generalConfig } from "@/poc/config.general"; // NUEVO
-
+import { CHARACTER_CAPSULE_BOTTOM_POINT, CHARACTER_CAPSULE_STANDING_TOP_POINT } from "../../character.constants";
+import type { Texture } from "@babylonjs/core/Materials/Textures/texture";
 
 const CHARACTER_MASS = 70;
 const GRAVITY = 9.81;
@@ -50,8 +50,8 @@ const SHOOTING_PITCH_RATE = Tools.ToRadians(90); // rad/s — velocidad de ajust
 const DEAD_LANDING_DAMPING_RATE = 6; // NUEVO — más alto = frena más rápido al tocar el piso
 const DEAD_GROUND_RAY_MARGIN = 0.15; // NUEVO
 const DEAD_UPWARD_VELOCITY_THRESHOLD = 0.5; // NUEVO — subiendo no cuenta como "tocó el piso"
-const CAPSULE_BOTTOM = generalConfig.playerConfig.capsuleBottomPoint; // NUEVO
-const CAPSULE_STANDING_TOP = generalConfig.playerConfig.capsuleStandingTopPoint; // NUEVO
+const CAPSULE_BOTTOM = CHARACTER_CAPSULE_BOTTOM_POINT;
+const CAPSULE_STANDING_TOP = CHARACTER_CAPSULE_STANDING_TOP_POINT;
 
 const THRUSTER_TRANSFORM_ON = { rotation: new Vector3(Tools.ToRadians(90), Tools.ToRadians(-60), 0) };
 const THRUSTER_TRANSFORM_SHOOTING = { rotation: new Vector3(Tools.ToRadians(90), Tools.ToRadians(-50), 0) };
@@ -91,9 +91,10 @@ export class JetpackPhysicsController implements IPhysicsController {
     private thrusterGroup: TransformNode,
     thrusterLeftNozzle: TransformNode, // CAMBIADO
     thrusterRightNozzle: TransformNode, // CAMBIADO
+    flareTexture:Texture
   ) {
     this.hoverTargetHeight = this.characterAggregate.transformNode.getAbsolutePosition().y;
-    this.thruster = new JetpackThruster(this.scene, this.characterAggregate.transformNode as AbstractMesh, thrusterLeftNozzle, thrusterRightNozzle); // CAMBIADO
+    this.thruster = new JetpackThruster(this.scene, this.characterAggregate.transformNode as AbstractMesh, thrusterLeftNozzle, thrusterRightNozzle, flareTexture);
   }
 
   tick(dt: number): void {

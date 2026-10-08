@@ -1,5 +1,6 @@
 import type { GameState, GameStateTransitioner } from "../fsm/game-state";
 import type { GameContext } from "../game-context";
+import CharacterBase from "../entities/character/character.base";
 import { createGroundPhysics } from "../levels/ground-physics";
 import { createLevelStrategy } from "../levels/level-factory";import type { LevelLoader, LevelLoadPhase } from "../levels/level-loader";
 import type { LevelRepository } from "../levels/level-repository";
@@ -64,9 +65,16 @@ export class LevelSetupState implements GameState {
       this.session.complete(map);
 
       // 3B
-      // 3B
       createGroundPhysics(map, context.scene, scope);
-      this.session.setStrategy(createLevelStrategy({ context, definition, scope, map }));    } catch (error) {
+      const character = await CharacterBase.create(context.scene, context.assets, definition.spawns.character);
+      if (this.exited) {
+        character.dispose(); // la carga se canceló mientras se construía
+        return;
+      }
+      scope.register(character); // se libera con el nivel, después de los suelos (orden inverso)
+      this.session.setStrategy(createLevelStrategy({ context, definition, scope, map, character }));
+        
+    } catch (error) {
       if (!this.exited) {
         this.screen.setStatus(`Error: ${error instanceof Error ? error.message : String(error)}`);
       }

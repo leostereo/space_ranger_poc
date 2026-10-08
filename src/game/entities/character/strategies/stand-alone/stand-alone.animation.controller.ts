@@ -1,6 +1,6 @@
 // stand-alone.animation.controller.ts
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
-import type { ICharacterAnimations } from "@/services/assets-manager";
+import type { CharacterAnimationSet } from "@/game/assets/animations/character-clip-names";
 import type { IAnimationController } from "../contracts/ianimation-controller";
 import type { StandAloneFsm } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone";
 import type { OnGroundSubState } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone.on-ground";
@@ -13,7 +13,7 @@ export class StandAloneAnimationController implements IAnimationController {
   private isPlayingTransient = false; // NUEVO
 
   constructor(
-    private animations: ICharacterAnimations | null,
+    private animations: CharacterAnimationSet | null,
     private standAloneFsm: StandAloneFsm,
     private isAiming: () => boolean,
     private isShielding: () => boolean, // NUEVO
@@ -145,17 +145,17 @@ export class StandAloneAnimationController implements IAnimationController {
     }
 
     if (this.isAiming()) {
-      if (state === "Idle" && this.animations.idle_aimming) {
-        return { animation: this.animations.idle_aimming, loop: true };
+      if (state === "Idle" && this.animations.idle_aiming) {
+        return { animation: this.animations.idle_aiming, loop: true };
       }
-      if (state === "Walking" && this.animations.walking_aimming) {
-        return { animation: this.animations.walking_aimming, loop: true };
+      if (state === "Walking" && this.animations.walking_aiming) {
+        return { animation: this.animations.walking_aiming, loop: true };
       }
-      if (state === "WalkingBackwards" && this.animations.walking_backwards_aimming) {
-        return { animation: this.animations.walking_backwards_aimming, loop: true };
+      if (state === "WalkingBackwards" && this.animations.walking_backwards_aiming) {
+        return { animation: this.animations.walking_backwards_aiming, loop: true };
       }
-      if (state === "Running" && this.animations.running_aimming) {
-        return { animation: this.animations.running_aimming, loop: true };
+      if (state === "Running" && this.animations.running_aiming) {
+        return { animation: this.animations.running_aiming, loop: true };
       }
       // NUEVO — sin clips dedicados todavía, cae al switch de abajo (placeholders normales de crouch)
       if (state === "CrouchIdle" && this.animations.crouch_idle_aim) {

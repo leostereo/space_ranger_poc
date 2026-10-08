@@ -1,6 +1,6 @@
 // src/poc3-jetpack_character_fsm/strategies/jetpack/jetpack.animation.controller.ts
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
-import type { ICharacterAnimations } from "@/services/assets-manager";
+import type { CharacterAnimationSet } from "@/game/assets/animations/character-clip-names";
 import type { IAnimationController } from "../contracts/ianimation-controller";
 import type { JetpackFsm, JetpackSubState } from "../../character-fsm/jetpack-fsm/character.fsm.jetpack";
 
@@ -10,7 +10,7 @@ export class JetpackAnimationController implements IAnimationController {
   private isDead = false; // NUEVO — una vez muerto, _render queda bloqueado para siempre
 
   constructor(
-    private animations: ICharacterAnimations | null,
+    private animations: CharacterAnimationSet | null,
     private jetpackFsm: JetpackFsm,
   ) {
     this.jetpackFsm.onStateChange((state) => this._render(state));

@@ -1,6 +1,6 @@
 // src/poc3-jetpack_character_fsm/strategies/jetpack/jetpack.strategy.ts
 import type { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
-import type { ICharacterAnimations } from "@/services/assets-manager";
+import type { CharacterAnimationSet } from "@/game/assets/animations/character-clip-names";
 import type { IVehicleStrategy } from "../contracts/ivehicle-strategy";
 import type { CharacterFsm } from "../../character-fsm/character.fsm";
 import type { CharacterInput } from "../../character.input";
@@ -9,6 +9,7 @@ import { JetpackInputController } from "./jetpack.input.controller";
 import { JetpackAnimationController } from "./jetpack.animation.controller";
 import { AbstractMesh, Mesh, Scene, TransformNode } from "@babylonjs/core";
 import { ProjectileWeaponController } from "../weapon/projectile-weapon.controller";
+import type { Texture } from "@babylonjs/core/Materials/Textures/texture";
 
 export interface JetpackStrategyResult {
   strategy: IVehicleStrategy;
@@ -20,11 +21,12 @@ export async function buildJetpackStrategy(
   characterAggregate: PhysicsAggregate,
   input: CharacterInput,
   characterFsm: CharacterFsm,
-  characterAnimations: ICharacterAnimations | null,
+  characterAnimations: CharacterAnimationSet | null,
   weaponMuzzle: TransformNode,
   thrusterGroup: TransformNode,
   thrusterLeftNozzle: TransformNode, // CAMBIADO
   thrusterRightNozzle: TransformNode, // CAMBIADO
+  flareTexture: Texture,
 ): Promise<JetpackStrategyResult> {
   const physics = new JetpackPhysicsController(
     scene,
@@ -34,6 +36,7 @@ export async function buildJetpackStrategy(
     thrusterGroup,
     thrusterLeftNozzle, // CAMBIADO
     thrusterRightNozzle, // CAMBIADO
+    flareTexture,
   );
   const inputController = new JetpackInputController(input, characterFsm);
   const animation = new JetpackAnimationController(characterAnimations, characterFsm.jetpackSubFsm);

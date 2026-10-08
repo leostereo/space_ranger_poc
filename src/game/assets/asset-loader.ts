@@ -6,6 +6,8 @@ import type { Scene } from "@babylonjs/core/scene";
 import { TypedEventEmitter } from "../core/events/typed-event-emitter";
 import { gameConfig } from "../config/game-config";
 import { createCharacterAnimationSet } from "./animations/character-animation-set-factory";
+import { createBoardMaterial } from "./materials/board-material-factory";
+
 import type { AssetRegistry } from "./asset-registry";
 
 const FLARE_TEXTURE_URL = "texture/flare.png";
@@ -106,6 +108,7 @@ export class AssetLoader {
             createCharacterAnimationSet(this.registry.getAnimationGroups("character-model")),
           );
           this.normalizeCharacterScale();
+          this.registry.registerMaterial("board", createBoardMaterial(this.scene));
         } catch (error) {
           reject(error);
           return;

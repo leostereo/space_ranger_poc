@@ -37,12 +37,12 @@ export class Game {
   private detachDebugTools?: () => void;
 
   constructor(scene: Scene, engine: AbstractEngine, canvas: HTMLCanvasElement) {
-    const context: GameContext = { scene, engine, canvas };
+    this.assets = new AssetRegistry();
+    const context: GameContext = { scene, engine, canvas, assets: this.assets };
 
     this.screens = new ScreenManager();
     this.input = new AnyInputService();
     this.hotkeys = new HotkeyService();
-    this.assets = new AssetRegistry();
     this.assetLoader = new AssetLoader(scene, this.assets);
     this.levels = new LevelRepository(LEVEL_DEFINITIONS, createSafeStorage());
     this.levelSession = new LevelSession(scene);

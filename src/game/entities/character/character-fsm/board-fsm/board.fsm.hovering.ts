@@ -1,5 +1,11 @@
-import { generalConfig } from "@/poc/config.general";
 import { BaseFsm, TransitionTable } from "../../abstract/base-fsm";
+
+const SPEED_THRESHOLDS = {
+  idleToFast: 10,
+  fastToIdle: 8,
+  fastToVeryFast: 25,
+  veryFastToFast: 22,
+} as const;
 
 export type HoveringSubState =
   | "CruisingIdle"
@@ -19,8 +25,7 @@ export class BoardFsmHovering extends BaseFsm<HoveringSubState> {
     super();
     this.state = "CruisingIdle";
 
-    const { idleToFast, fastToIdle, fastToVeryFast, veryFastToFast } =
-      generalConfig.cruising.speedThresholds;
+    const { idleToFast, fastToIdle, fastToVeryFast, veryFastToFast } = SPEED_THRESHOLDS;
 
     this.transitions = {
       CruisingIdle: {

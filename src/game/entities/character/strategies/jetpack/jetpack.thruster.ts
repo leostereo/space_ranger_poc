@@ -4,7 +4,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode"; // CAMBIADO
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Scene } from "@babylonjs/core/scene";
-import { AssetManager } from "@/services/assets-manager";
+import type { Texture } from "@babylonjs/core/Materials/Textures/texture";
 
 const DIRECTION = new Vector3(0, -1, 0);
 const MIN_EMIT_RATE = 15;
@@ -25,6 +25,7 @@ export class JetpackThruster {
     private characterMesh: AbstractMesh,
     private thrusterLeftNozzle: TransformNode, // CAMBIADO — guardado como campo
     private thrusterRightNozzle: TransformNode, // CAMBIADO
+    private flareTexture: Texture,
   ) {
     this.leftEmitter = this._createEmitter("jetpackThrusterLeft", this._leftPosition);
     this.rightEmitter = this._createEmitter("jetpackThrusterRight", this._rightPosition);
@@ -32,7 +33,7 @@ export class JetpackThruster {
 
   private _createEmitter(name: string, emitterPosition: Vector3): ParticleSystem { // CAMBIADO — vuelve a Vector3
     const ps = new ParticleSystem(name, 500, this.scene);
-    ps.particleTexture = AssetManager.getTexture("flare");
+    ps.particleTexture = this.flareTexture.clone();
 
     ps.minEmitBox = new Vector3(-0.03, 0, -0.03); // achicado — ya no hace falta compensar offset del root
     ps.maxEmitBox = new Vector3(0.03, 0, 0.03);
@@ -105,7 +106,7 @@ export class JetpackThruster {
     for (const ps of [this.leftEmitter, this.rightEmitter]) {
       if (this._disposedEmitters.has(ps)) continue; // NUEVO — ya liberado por disposeOnStop
       this._disposedEmitters.add(ps);
-      ps.dispose(false);
+      ps.dispose(); // libera también el clon de la textura
     }
   }
 }

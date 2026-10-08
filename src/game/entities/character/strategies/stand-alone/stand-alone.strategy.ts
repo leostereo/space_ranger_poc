@@ -1,7 +1,7 @@
 // src/poc3-jetpack_character_fsm/strategies/stand-alone/stand-alone.strategy.ts
 import type { Scene } from "@babylonjs/core/scene";
 import type { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
-import type { ICharacterAnimations } from "@/services/assets-manager";
+import type { CharacterAnimationSet } from "@/game/assets/animations/character-clip-names";
 import type { IVehicleStrategy } from "../contracts/ivehicle-strategy";
 import type { CharacterFsm } from "../../character-fsm/character.fsm";
 import type { CharacterInput } from "../../character.input";
@@ -28,7 +28,7 @@ export async function buildStandAloneStrategy(
   characterAggregate: PhysicsAggregate,
   input: CharacterInput,
   characterFsm: CharacterFsm,
-  characterAnimations: ICharacterAnimations | null,
+  characterAnimations: CharacterAnimationSet | null,
   weaponMuzzle: TransformNode, // NUEVO — antes del último param opcional
   combat: CombatRules, // NUEVO — antes del último param opcional
   initialGroundDetectedOverride?: boolean,

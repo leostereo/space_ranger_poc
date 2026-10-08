@@ -1,6 +1,6 @@
 // src/poc4-.../strategies/hover-board/hover-board.animation.controller.ts
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
-import type { ICharacterAnimations } from "@/services/assets-manager";
+import type { CharacterAnimationSet } from "@/game/assets/animations/character-clip-names";
 import type { IAnimationController } from "../contracts/ianimation-controller";
 import type { BoardFsm, BoardMotionState } from "../../character-fsm/board-fsm/board.fsm";
 import type { HoveringSubState } from "../../character-fsm/board-fsm/board.fsm.hovering";
@@ -16,7 +16,7 @@ export class HoverBoardAnimationController implements IAnimationController {
   private isPlayingTransient = false; // NUEVO
 
   constructor(
-    private animations: ICharacterAnimations | null,
+    private animations: CharacterAnimationSet | null,
     private boardFsm: BoardFsm,
     private isAiming: () => boolean,
     private isShielding: () => boolean, // NUEVO
@@ -54,8 +54,8 @@ export class HoverBoardAnimationController implements IAnimationController {
     let resolved: { animation: AnimationGroup; loop: boolean } | null;
     if (this.isShielding() && this.animations?.shield_idle_crouched) {
       resolved = { animation: this.animations.shield_idle_crouched, loop: true };
-    } else if (this.isAiming() && this.animations?.crouch_aimming) {
-      resolved = { animation: this.animations.crouch_aimming, loop: true };
+    } else if (this.isAiming() && this.animations?.crouch_aiming) {
+      resolved = { animation: this.animations.crouch_aiming, loop: true };
     } else {
       resolved = this._resolve(macroState, subState);
     }

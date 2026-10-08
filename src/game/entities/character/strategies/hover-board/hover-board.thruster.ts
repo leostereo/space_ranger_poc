@@ -4,7 +4,7 @@ import { Color4 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { Scene } from "@babylonjs/core/scene";
-import { AssetManager } from "@/services/assets-manager";
+import type { Texture } from "@babylonjs/core/Materials/Textures/texture";
 
 // Portado de board.thruster.ts (POC2) — constantes locales en vez de generalConfig.thruster,
 // mismos valores que tenía la sección thruster de POC2.
@@ -22,10 +22,10 @@ export class HoverBoardThruster {
   constructor(
     private scene: Scene,
     private boardMesh: Mesh,
+    private flareTexture: Texture,
   ) {
     this.particleSystem = new ParticleSystem("hoverBoardThruster", 500, scene);
-    this.particleSystem.particleTexture = AssetManager.getTexture("flare");
-
+    this.particleSystem.particleTexture = this.flareTexture.clone(); // clon propio: la compartida no se toca
     this.particleSystem.minEmitBox = new Vector3(-0.15, -0.15, 0);
     this.particleSystem.maxEmitBox = new Vector3(0.15, 0.15, 0);
 
@@ -74,6 +74,6 @@ export class HoverBoardThruster {
   }
 
   dispose(): void {
-    this.particleSystem.dispose(false); // CAMBIADO — no disponer la textura "flare" compartida
+    this.particleSystem.dispose(); // libera el clon de la textura, no la compartida
   }
 }

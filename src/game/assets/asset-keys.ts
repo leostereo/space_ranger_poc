@@ -2,3 +2,4 @@
 export type TextureAssetKey = "flare";
 export type ImageAssetKey = "keymap";
 export type MeshAssetKey = "character-model";
+export type MaterialAssetKey = "board";

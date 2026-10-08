@@ -1,6 +1,7 @@
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { Skeleton } from "@babylonjs/core/Bones/skeleton";
 import type { Texture } from "@babylonjs/core/Materials/Textures/texture";
+import type { Material } from "@babylonjs/core/Materials/material";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 
 import {
@@ -8,8 +9,7 @@ import {
   disposeCharacterAnimationSet,
 } from "./animations/character-animation-set-factory";
 import type { CharacterAnimationSet } from "./animations/character-clip-names";
-import type { ImageAssetKey, MeshAssetKey, TextureAssetKey } from "./asset-keys";
-
+import type { ImageAssetKey, MaterialAssetKey, MeshAssetKey, TextureAssetKey } from "./asset-keys";
 export interface MeshAssetExtras {
   skeleton?: Skeleton;
   /** Clips crudos del GLB, tal cual vienen (parados). */
@@ -28,6 +28,7 @@ export class AssetRegistry {
   private readonly textures = new Map<TextureAssetKey, Texture>();
   private readonly images = new Map<ImageAssetKey, HTMLImageElement>();
   private readonly meshes = new Map<MeshAssetKey, AbstractMesh>();
+  private readonly materials = new Map<MaterialAssetKey, Material>();
   private readonly skeletons = new Map<MeshAssetKey, Skeleton>();
   private readonly animationGroups = new Map<MeshAssetKey, readonly AnimationGroup[]>();
   private characterAnimations: CharacterAnimationSet | null = null;
@@ -50,12 +51,21 @@ export class AssetRegistry {
     this.images.set(key, image);
   }
 
+  registerMaterial(key: MaterialAssetKey, material: Material): void {
+    this.materials.set(key, material);
+  }
+
   registerCharacterAnimations(set: CharacterAnimationSet): void {
     this.characterAnimations = set;
   }
 
   getTexture(key: TextureAssetKey): Texture {
     return this.require(this.textures.get(key), "texture", key);
+  }
+
+  /** Material compartido por todos los que lo usan: no se clona ni se libera desde afuera. */
+  getMaterial(key: MaterialAssetKey): Material {
+    return this.require(this.materials.get(key), "material", key);
   }
 
   /** Imagen ya descargada y decodificable: lista para usar en pantallas HTML. */
@@ -119,10 +129,12 @@ export class AssetRegistry {
     this.skeletons.forEach((skeleton) => skeleton.dispose());
     this.meshes.forEach((mesh) => mesh.dispose(false, true));
     this.textures.forEach((texture) => texture.dispose());
+    this.materials.forEach((material) => material.dispose());
     this.animationGroups.clear();
     this.skeletons.clear();
     this.meshes.clear();
     this.textures.clear();
+    this.materials.clear();
     this.images.clear();
     this.characterAnimations = null; // sus clips son los mismos de animationGroups (ya liberados)
   }

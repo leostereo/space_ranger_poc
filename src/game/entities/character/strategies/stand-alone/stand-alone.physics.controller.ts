@@ -3,8 +3,11 @@ import type { Scene } from "@babylonjs/core/scene";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Scalar } from "@babylonjs/core/Maths/math.scalar";
 import { Ray } from "@babylonjs/core/Culling/ray";
-import { generalConfig } from "@/poc/config.general";
-import type { IPhysicsController } from "../contracts/iphysics-controller";
+import {
+  CHARACTER_CAPSULE_BOTTOM_POINT,
+  CHARACTER_CAPSULE_RADIUS,
+  CHARACTER_CAPSULE_STANDING_TOP_POINT,
+} from "../../character.constants";import type { IPhysicsController } from "../contracts/iphysics-controller";
 import type { CharacterInputState } from "../../character.input";
 import { PhysicsShapeCapsule } from "@babylonjs/core";
 import { OnGroundSubState } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone.on-ground";
@@ -30,10 +33,10 @@ const RUNNING_JUMP_VERTICAL_IMPULSE = 4; // más bajo que JUMP_IMPULSE (10) — 
 const RUNNING_JUMP_FORWARD_BOOST = 8;    // más alto que antes (6) — más alcance para cruzar el hueco
 const WALK_BACKWARD_SPEED = 2; // más lento que WALK_SPEED (4) — retroceder es más cauto que avanzar
 const STRAFE_SPEED = 2.2; // más lento que WALK_SPEED (4) — strafe táctico
-const CAPSULE_RADIUS = generalConfig.playerConfig.capsuleRadius;
-const CAPSULE_BOTTOM = generalConfig.playerConfig.capsuleBottomPoint;
-const CAPSULE_STANDING_TOP = generalConfig.playerConfig.capsuleStandingTopPoint;
-const CAPSULE_CROUCH_TOP = generalConfig.playerConfig.capsuleCrouchTopPoint;
+const CAPSULE_RADIUS = CHARACTER_CAPSULE_RADIUS;
+const CAPSULE_BOTTOM = CHARACTER_CAPSULE_BOTTOM_POINT;
+const CAPSULE_STANDING_TOP = CHARACTER_CAPSULE_STANDING_TOP_POINT;
+const CAPSULE_CROUCH_TOP = 0.1;
 
 
 export class StandAlonePhysicsController implements IPhysicsController {

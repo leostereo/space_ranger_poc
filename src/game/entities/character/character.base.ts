@@ -2,12 +2,15 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { Observer } from "@babylonjs/core/Misc/observable";
 import type { Nullable } from "@babylonjs/core/types";
-import { Quaternion } from "@babylonjs/core/Maths/math.vector";
+import { Quaternion, type Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { AnimationEvent, AnimationGroup, FollowCamera, PhysicsShapeType, TransformNode } from "@babylonjs/core";
-import { AssetManager, WeaponBuildResult, type ICharacterAnimations } from "@/services/assets-manager";
-import { EventSubscriber } from "@/services/event-subscriber";
-import { EventManager, GameEvents, type PlayerShootedPayload } from "@/services/event-manager";
-import { Poc } from "../types";
+import type { CharacterAnimationSet } from "@/game/assets/animations/character-clip-names";
+import type { AssetRegistry } from "@/game/assets/asset-registry";
+
+import { EventSubscriber } from "@/game/services/event-subscriber";
+import { EventManager, GameEvents, type PlayerShootedPayload } from "@/game/services/event-manager";
+
+
 import { CharacterFsm } from "./character-fsm/character.fsm";
 import { CharacterInput } from "./character.input";
 import { CharacterHud } from "./character.hud";
@@ -16,16 +19,18 @@ import { buildStandAloneStrategy, type StandAloneStrategyResult } from "./strate
 import { buildJetpackStrategy, type JetpackStrategyResult } from "./strategies/jetpack/jetpack.strategy";
 import type { IVehicleStrategy } from "./strategies/contracts/ivehicle-strategy";
 import { board_builder } from "./strategies/hover-board/board.builder";
-import { generalConfig } from "../config.general";
+import { CHARACTER_CAPSULE_HEIGHT, CHARACTER_MASS } from "./character.constants";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { HoverBoardPhysicsController } from "./strategies/hover-board/hover-board.physics.controller";
 import { HoverBoardInputAdapter } from "./strategies/hover-board/hover-board.input.adapter";
 import { buildHoverBoardStrategy } from "./strategies/hover-board/hover-board.strategy";
-import { characterAndEquipment_builder, scene_builder } from "./utils/buildUtils";
+import { characterAndEquipment_builder } from "./utils/buildUtils";
 import { CombatRules } from "./utils/combat-rules";
+import type { Texture } from "@babylonjs/core/Materials/Textures/texture";
+import type { Material } from "@babylonjs/core/Materials/material";
 
-const JUMP_IMPULSE_FRAME = 30;
-const EQUIP_BOARD_FRAME = 60; // placeholder — ajustar cuando definan el frame real del clip
+const BOARD_GROUND_COYOTE_TIME_SECONDS = 0.15; // tolerancia antes de considerar que el board perdió el suelo
+const JUMP_IMPULSE_FRAME = 30; const EQUIP_BOARD_FRAME = 60; // placeholder — ajustar cuando definan el frame real del clip
 const WEAPON_HOVERBOARD_YAW_COMPENSATION = Math.PI / 8; // cancela characterMesh.rotation.y = -PI/8 en HoverBoard
 const RUNNING_JUMP_IMPULSE_FRAME = 10; // placeholder — ajustar al frame real del clip
 const CROUCH_ROLL_COMPLETE_FRAME = 85; // placeholder — ajustar al frame real del clip running_roll
@@ -63,13 +68,13 @@ export const WEAPON_OFFSETS = {
     crouchIdle: { x: -0.1, y: -0.1, z: 0.3 },
 } as const;
 
-export default class CharacterBase extends EventSubscriber implements Poc {
+export default class CharacterBase extends EventSubscriber {
   private scene: Scene;
   //private groundAggregates: PhysicsAggregate[];
   private followCamera: FollowCamera | null = null;
   private characterMesh: Mesh;
   private characterAggregate: PhysicsAggregate;
-  private characterAnimations: ICharacterAnimations | null;
+  private characterAnimations: CharacterAnimationSet;
 
   private input: CharacterInput;
   private fsm: CharacterFsm;
@@ -88,9 +93,9 @@ export default class CharacterBase extends EventSubscriber implements Poc {
 
   private activeBoardPhysics: HoverBoardPhysicsController | null = null;
   private _activeBoardInputAdapter: HoverBoardInputAdapter | null = null;
-
-  private weaponRoot: WeaponBuildResult["weaponRoot"] | null = null;
-  private weaponMuzzle: WeaponBuildResult["muzzle"] | null = null;
+  
+  private weaponRoot: TransformNode | null = null;
+  private weaponMuzzle: TransformNode | null = null;
 
   private thrusterGroup: TransformNode | null = null;
   private thrusterLeft: Mesh | null = null;
@@ -100,16 +105,29 @@ export default class CharacterBase extends EventSubscriber implements Poc {
 
   private combat: CombatRules;
   private shieldRoot: TransformNode | null = null;
+  private disposeEquipment: (() => void) | null = null;
+  private flareTexture: Texture;
+  private boardMaterial: Material;
 
-  async build(scene: Scene): Promise<void> {
+  /** Construye el Character listo para jugar. Quien lo crea lo registra en el LevelScope (`scope.register`). */
+  static async create(scene: Scene, registry: AssetRegistry, spawn: Vector3): Promise<CharacterBase> {
+    const character = new CharacterBase();
+    await character.initialize(scene, registry, spawn);
+    return character;
+  }
+
+  private async initialize(scene: Scene, registry: AssetRegistry, spawn: Vector3): Promise<void> {
     this.scene = scene;
-    scene_builder(scene);
 
     const { characterMesh, characterAggregate, characterAnimations, weaponRoot, muzzle,
-      thrusterGroup, thrusterLeft, thrusterRight, thrusterLeftNozzle, thrusterRightNozzle, shieldRoot } = characterAndEquipment_builder(scene); // CAMBIADO
+      thrusterGroup, thrusterLeft, thrusterRight, thrusterLeftNozzle, thrusterRightNozzle, shieldRoot,
+      dispose: disposeEquipment } = characterAndEquipment_builder(scene, registry, spawn);
     this.characterMesh = characterMesh;
     this.characterAggregate = characterAggregate;
     this.characterAnimations = characterAnimations;
+    this.disposeEquipment = disposeEquipment;
+    this.flareTexture = registry.getTexture("flare");
+    this.boardMaterial = registry.getMaterial("board");
     this.weaponRoot = weaponRoot;
     this.weaponMuzzle = muzzle;
     this.thrusterGroup = thrusterGroup;
@@ -125,12 +143,7 @@ export default class CharacterBase extends EventSubscriber implements Poc {
       this.characterMesh.rotationQuaternion = Quaternion.Identity();
     }
 
-    weaponRoot.parent = this.characterMesh;
-    this.weaponRoot = weaponRoot;
-    this.weaponMuzzle = muzzle;
-    this._applyWeaponOffset(WEAPON_OFFSETS.standAlone); // arranca en StandAlone — ver build() más abajo
-
-    this.followCamera = AssetManager.getCamera('follow', false, 'camera') as FollowCamera;
+    // TODO: la cámara de seguimiento se define aparte; mientras tanto followCamera queda en null.
     this.input = new CharacterInput();
 
     this.fsm = new CharacterFsm({
@@ -160,7 +173,7 @@ export default class CharacterBase extends EventSubscriber implements Poc {
       onExitJumpWindup: () => this.activeStandAlonePhysics?.notifyJumpWindupEnd(),
       isBoardGroundDetected: () => this.activeBoardPhysics?.isGroundDetected() ?? false,
       groundLostElapsed: () => this.activeBoardPhysics?.groundLostElapsed() ?? 0,
-      coyoteTime: generalConfig.groundCheck.coyoteTime,
+      coyoteTime: BOARD_GROUND_COYOTE_TIME_SECONDS,
       onEnterHovering: () => this.activeBoardPhysics?.onEnterHovering(),
       onEnterFalling: () => { },
       isJumpSettled: () => this.activeBoardPhysics?.isJumpSettled() ?? true,
@@ -380,6 +393,7 @@ export default class CharacterBase extends EventSubscriber implements Poc {
       this.thrusterGroup,
       this.thrusterLeftNozzle, // CAMBIADO — antes thrusterLeft (mesh), ahora el nozzle
       this.thrusterRightNozzle, // CAMBIADO
+      this.flareTexture,
     );
 
     this.activeStrategy = strategy;
@@ -419,7 +433,7 @@ export default class CharacterBase extends EventSubscriber implements Poc {
       this.characterAggregate = new PhysicsAggregate(
         this.characterMesh,
         PhysicsShapeType.CAPSULE,
-        { mass: 70, restitution: 0 },
+        { mass: CHARACTER_MASS, restitution: 0 },
         this.scene,
       );
 
@@ -470,8 +484,7 @@ export default class CharacterBase extends EventSubscriber implements Poc {
     this.characterAggregate.dispose();
 
     // CAMBIADO: pasamos spawnRotationY directo al builder en vez de setearlo después
-    const { boardMesh, boardAggregate } = board_builder(this.scene, spawnPosition, spawnRotationY);
-
+    const { boardMesh, boardAggregate } = board_builder(this.scene, this.boardMaterial, spawnPosition, spawnRotationY);
     // ELIMINADO: boardMesh.rotationQuaternion = Quaternion.FromEulerAngles(0, spawnRotationY, 0);
     // (ya no hace falta, board_builder lo aplica antes de crear el aggregate)
 
@@ -510,6 +523,7 @@ export default class CharacterBase extends EventSubscriber implements Poc {
       this.characterMesh,
       this.weaponMuzzle,
       this.combat, // NUEVO
+      this.flareTexture,
     );
 
     this.activeStrategy = strategy;
@@ -522,7 +536,7 @@ export default class CharacterBase extends EventSubscriber implements Poc {
    * (mitad de la cápsula + grosor del board). Con dead = true baja una fracción de la cápsula.
    */
   private _boardRiderY(dead = false): number {
-    const capsuleHeight = generalConfig.playerConfig.height;
+    const capsuleHeight = CHARACTER_CAPSULE_HEIGHT;
     const ridingY = capsuleHeight / 2 + BOARD_THICKNESS_OFFSET;
     return dead ? ridingY - capsuleHeight * DEATH_ON_BOARD_DROP_FACTOR : ridingY;
   }
@@ -556,10 +570,11 @@ export default class CharacterBase extends EventSubscriber implements Poc {
     this.fsm?.dispose();
     this.input?.dispose();
     this.characterAggregate?.dispose();
-    if (this.characterAnimations) {
-      Object.values(this.characterAnimations).forEach((ag) => ag.dispose());
-    }
-    this.weaponRoot?.dispose();
-    this.shieldRoot?.dispose();
+    this.disposeEquipment?.(); // personaje clonado, animaciones, arma, propulsores, escudo y cápsula
+    this.disposeEquipment = null;
+    this._activeBoardAggregate?.dispose();
+    this._activeBoardMesh?.dispose();
+    this._activeBoardAggregate = null;
+    this._activeBoardMesh = null;
   }
 }

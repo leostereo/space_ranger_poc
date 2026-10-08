@@ -1,5 +1,4 @@
-const INITIAL_LIVES = 3; // TODO: mover a generalConfig.playerConfig
-
+const INITIAL_LIVES = 3;
 export class CharacterHealth {
   private _lives = INITIAL_LIVES;
 

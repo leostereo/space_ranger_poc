@@ -9,11 +9,12 @@ import { HoverBoardPhysicsController } from "./hover-board.physics.controller";
 import { HoverBoardInputAdapter } from "./hover-board.input.adapter";
 import { HoverBoardInputController } from "./hover-board.input.controller";
 import { HoverBoardAnimationController } from "./hover-board.animation.controller";
-import type { ICharacterAnimations } from "@/services/assets-manager";
+import type { CharacterAnimationSet } from "@/game/assets/animations/character-clip-names";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { ProjectileWeaponController } from "../weapon/projectile-weapon.controller";
 import type { CombatRules } from "../../utils/combat-rules";
+import type { Texture } from "@babylonjs/core/Materials/Textures/texture";
 
 export interface HoverBoardStrategyResult {
     strategy: IVehicleStrategy;
@@ -26,10 +27,11 @@ export async function buildHoverBoardStrategy(
     boardAggregate: PhysicsAggregate,
     input: CharacterInput,
     characterFsm: CharacterFsm,
-    characterAnimations: ICharacterAnimations | null,
+    characterAnimations: CharacterAnimationSet | null,
     characterMesh: AbstractMesh,
     weaponMuzzle: TransformNode,
     combat: CombatRules, // NUEVO
+    flareTexture: Texture,
 ): Promise<HoverBoardStrategyResult> {
     const inputAdapter = new HoverBoardInputAdapter(input);
 
@@ -39,6 +41,7 @@ export async function buildHoverBoardStrategy(
         boardAggregate,
         () => inputAdapter.current,
         characterFsm.boardSubFsm,
+        flareTexture,
     );
     const inputController = new HoverBoardInputController(input, characterFsm);
     const animation = new HoverBoardAnimationController(

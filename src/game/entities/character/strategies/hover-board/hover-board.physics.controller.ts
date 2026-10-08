@@ -9,9 +9,43 @@ import { Tools } from "@babylonjs/core/Misc/tools";
 import { Scalar } from "@babylonjs/core/Maths/math.scalar";
 
 import type { BoardFsm } from "../../character-fsm/board-fsm/board.fsm";
-import { generalConfig } from "@/poc/config.general";
+import { BOARD_HEIGHT, BOARD_MASS } from "./hover-board.constants";
 import { BoardInputState } from "@/poc/poc1-floating_board/board-input";
 import { HoverBoardThruster } from "./hover-board.thruster"; // NUEVO
+import { Texture } from "@babylonjs/core";
+
+const BOOST = {
+  impulse: 10, // por unidad de masa
+  gliderLiftImpulse: 6,
+  gliderPitchKick: 20,
+  gliderDecayFactor: 0.6,
+  jumpSettleDuration: 0.3,
+  gliderSettleDuration: 0.3,
+} as const;
+
+const HOVER = {
+  height: 1.2,
+  springStrength: 60,
+  damping: 20, // 8 oscilaba sin parar (subamortiguado)
+  bobAmplitude: 0.05,
+  bobFrequency: 0.5,
+  hoverEngagementFactor: 2.5,
+} as const;
+
+const MOVEMENT = {
+  rollSpeedRange: { min: 0, max: 30 }, // por debajo de min se usa el giro cerrado; por encima de max, el amplio
+  rollAngleAtLowSpeed: Tools.ToRadians(35),
+  rollAngleAtHighSpeed: Tools.ToRadians(12),
+  rollLerpSpeed: 6,
+  yawFromRollFactor: 1.5,
+  forwardForce: 150, // N, ajustar jugando
+  brakingDragFactor: 0.5,
+  driftGripFactor: 1,
+  maxPitchAngle: 45, // grados
+  pitchLerpSpeed: 5,
+  pitchDiveAcceleration: 12,
+  surfaceAlignLerpSpeed: 6,
+};
 
 const DEAD_LANDING_DAMPING_RATE = 20; // CAMBIADO (antes 6) — más alto = frena más rápido al tocar el piso, ajustar a gusto
 const DEAD_GROUND_CONTACT_MARGIN = 0.1; // NUEVO — tolerancia sobre la mitad del alto del board para considerar "apoyado"
@@ -56,13 +90,13 @@ export class HoverBoardPhysicsController {
     private boardAggregate: PhysicsAggregate,
     private getInput: () => BoardInputState,
     boardFsm: BoardFsm,
+    flareTexture:Texture
   ) {
     if (!this.boardMesh.rotationQuaternion) {
       this.boardMesh.rotationQuaternion = Quaternion.Identity();
     }
     this.fsm = boardFsm;
-    this.thruster = new HoverBoardThruster(this.scene, this.boardMesh); // NUEVO
-
+    this.thruster = new HoverBoardThruster(this.scene, this.boardMesh, flareTexture);
   }
 
   /**
@@ -125,7 +159,7 @@ export class HoverBoardPhysicsController {
    * cae libre por gravedad.
    */
   private _applyDeadLandingDamping(dt: number): void {
-    const contactDistance = generalConfig.board.height * 0.5 + DEAD_GROUND_CONTACT_MARGIN;
+    const contactDistance = BOARD_HEIGHT * 0.5 + DEAD_GROUND_CONTACT_MARGIN;
     if (this._lastGroundDistance > contactDistance) return;
 
     const damping = Math.exp(-DEAD_LANDING_DAMPING_RATE * dt);
@@ -173,16 +207,16 @@ export class HoverBoardPhysicsController {
 
   /** Llamado por BoardFsm.onEnterJumping vía deps — aplica el impulso físico. */
   onEnterJumping(): void {
-    const { jumpSettleDuration, impulse } = generalConfig.boost;
-    const mass = generalConfig.board.mass;
+    const { jumpSettleDuration, impulse } = BOOST;
+    const mass = BOARD_MASS;
     this.boardAggregate.body.applyImpulse(new Vector3(0, mass * impulse, 0), this.boardMesh.getAbsolutePosition());
     this.jumpSettleTimer = jumpSettleDuration;
   }
 
   /** Llamado por BoardFsm.onEnterGliderBoost vía deps. */
   onEnterGliderBoost(): void {
-    const { gliderLiftImpulse, gliderPitchKick, gliderDecayFactor, gliderSettleDuration } = generalConfig.boost;
-    const mass = generalConfig.board.mass;
+    const { gliderLiftImpulse, gliderPitchKick, gliderDecayFactor, gliderSettleDuration } = BOOST;
+    const mass = BOARD_MASS;
 
     const powerMultiplier = Math.pow(gliderDecayFactor, this.glideBoostChain);
     const impulse = mass * gliderLiftImpulse * powerMultiplier;
@@ -199,8 +233,8 @@ export class HoverBoardPhysicsController {
   }
 
   private _updateGroundDetection(): void {
-    const { height, hoverEngagementFactor } = generalConfig.hover;
-    const thicknessOffset = generalConfig.board.height * 0.5 + 0.05;
+    const { height, hoverEngagementFactor } = HOVER;
+    const thicknessOffset = BOARD_HEIGHT * 0.5 + 0.05;
 
     this._raycastOrigin.copyFrom(this.boardMesh.absolutePosition);
     this._ray.origin.set(this._raycastOrigin.x, this._raycastOrigin.y - thicknessOffset, this._raycastOrigin.z);
@@ -225,8 +259,8 @@ export class HoverBoardPhysicsController {
   }
 
   private _applyHoverForce(): void {
-    const { height, springStrength, damping, bobAmplitude, bobFrequency } = generalConfig.hover;
-    const mass = generalConfig.board.mass;
+    const { height, springStrength, damping, bobAmplitude, bobFrequency } = HOVER;
+    const mass = BOARD_MASS;
 
     const angularFrequency = bobFrequency * 2 * Math.PI;
     const dynamicTargetHeight = height + bobAmplitude * Math.sin(this.elapsedTime * angularFrequency);
@@ -247,7 +281,7 @@ export class HoverBoardPhysicsController {
 
   private _updatePitch(dt: number): void {
     const macroState = this.fsm.getState();
-    const { maxPitchAngle: maxPitchAngleDeg, pitchLerpSpeed, surfaceAlignLerpSpeed } = generalConfig.movement;
+    const { maxPitchAngle: maxPitchAngleDeg, pitchLerpSpeed, surfaceAlignLerpSpeed } = MOVEMENT;
     const maxPitchAngle = Tools.ToRadians(maxPitchAngleDeg);
 
     let targetPitch = 0;
@@ -281,9 +315,9 @@ export class HoverBoardPhysicsController {
   }
 
   private _applyDiveForce(): void {
-    const { maxPitchAngle: maxPitchAngleDeg, pitchDiveAcceleration } = generalConfig.movement;
+    const { maxPitchAngle: maxPitchAngleDeg, pitchDiveAcceleration } = MOVEMENT;
     const maxPitchAngle = Tools.ToRadians(maxPitchAngleDeg);
-    const mass = generalConfig.board.mass;
+    const mass = BOARD_MASS;
 
     if (this.pitchAngle <= 0.001) return;
 
@@ -296,7 +330,7 @@ export class HoverBoardPhysicsController {
   private _updateRollAndYaw(dt: number): void {
     const { turnLeft, turnRight } = this._input(); // CAMBIADO — antes this.getInput()
     const { rollAngleAtLowSpeed, rollAngleAtHighSpeed, rollSpeedRange, rollLerpSpeed, yawFromRollFactor } =
-      generalConfig.movement;
+      MOVEMENT;
 
     const speedT = Scalar.Clamp(
       (this.forwardSpeedTelemetry - rollSpeedRange.min) / (rollSpeedRange.max - rollSpeedRange.min),
@@ -319,8 +353,8 @@ export class HoverBoardPhysicsController {
   }
 
   private _updateForwardForce(): void {
-    const { forwardForce, brakingDragFactor } = generalConfig.movement;
-    const mass = generalConfig.board.mass;
+    const { forwardForce, brakingDragFactor } = MOVEMENT;
+    const mass = BOARD_MASS;
 
     Vector3.TransformNormalToRef(this._forwardReference, this.boardMesh.getWorldMatrix(), this._forwardTemp);
 
@@ -348,8 +382,8 @@ export class HoverBoardPhysicsController {
   }
 
   private _applyLateralFriction(): void {
-    const { driftGripFactor } = generalConfig.movement;
-    const mass = generalConfig.board.mass;
+    const { driftGripFactor } = MOVEMENT;
+    const mass = BOARD_MASS;
 
     this.boardAggregate.body.getLinearVelocityToRef(this._velocityTemp);
     Vector3.TransformNormalToRef(this._rightReference, this.boardMesh.getWorldMatrix(), this._rightTemp);
@@ -363,7 +397,7 @@ export class HoverBoardPhysicsController {
   }
 
   private _applyGlidingLiftForce(): void {
-    const mass = generalConfig.board.mass;
+    const mass = BOARD_MASS;
     const glideFactor = 0.08;
 
     this.boardAggregate.body.getLinearVelocityToRef(this._velocityTemp);

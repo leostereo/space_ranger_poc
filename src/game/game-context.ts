@@ -1,6 +1,6 @@
 import type { AbstractEngine } from "@babylonjs/core/Engines/abstractEngine";
 import type { Scene } from "@babylonjs/core/scene";
-
+import type { AssetRegistry } from "./assets/asset-registry";
 /**
  * Dependencias compartidas que reciben los estados de la GameFsm.
  * Mantenerlo chico y de solo lectura: si empieza a crecer, inyectar
@@ -10,4 +10,5 @@ export interface GameContext {
   readonly scene: Scene;
   readonly engine: AbstractEngine;
   readonly canvas: HTMLCanvasElement;
+  readonly assets: AssetRegistry;
 }
