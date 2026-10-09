@@ -26,6 +26,5 @@
         }
     },
     "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue", "templates/**/*.ts", "templates/**/*.tsx", "templates/**/*.d.ts", "tests/**/*.ts", "tests/**/*.tsx", "src/**/*.d.ts", "**/*.ts", "**/*.glsl", "**/*.vue"],
-    "exclude": ["node_modules", "tests/server/**/*.ts", "dist", "**/*.js" , "src/game/setup/backup-*", "src/poc/*copy"]
-
+    "exclude": ["node_modules", "tests/server/**/*.ts", "dist", "**/*.js"]
 }
