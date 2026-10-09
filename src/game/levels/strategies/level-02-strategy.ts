@@ -15,7 +15,7 @@ export class Level02Strategy extends LevelStrategy {
   }
 
   protected checkWin(): boolean {
-    return false; // TODO: todas las oleadas eliminadas
+    return this.enemies.aliveCount === 0; // todos los blancos destruidos
   }
 
   protected checkLose(): boolean {

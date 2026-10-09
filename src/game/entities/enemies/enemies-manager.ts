@@ -20,6 +20,17 @@ export class EnemiesManager extends EventSubscriber {
     return this.enemies.length;
   }
 
+  /** Cuántos siguen vivos (los destruidos quedan registrados hasta liberar el nivel). */
+  get aliveCount(): number {
+    let alive = 0;
+    for (const enemy of this.enemies) {
+      if (enemy.isAlive) {
+        alive++;
+      }
+    }
+    return alive;
+  }
+
   /** Registra un enemigo. Si el manager ya fue liberado, lo libera de inmediato. */
   add<T extends Enemy>(enemy: T): T {
     if (this.disposed) {

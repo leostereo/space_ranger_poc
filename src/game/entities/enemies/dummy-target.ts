@@ -17,17 +17,19 @@ const DUMMY_DEPTH = 0.2;
 const DUMMY_MASS = 0; // estático: no se mueve ni cae
 const DUMMY_FRICTION = 0.5;
 const DUMMY_RESTITUTION = 0;
+const DUMMY_HEALTH = 3; // con daño 1 por proyectil: 3 disparos
 
 const HIT_FLASH_DURATION = 0.12; // segundos
 const HIT_FLASH_COLOR = Color3.White();
 const HIT_FLASH_ALPHA = 0.6;
 
-/** Blanco de práctica: un rectángulo estático que recibe impactos, los cuenta y destella. No actúa. */
+/** Blanco de práctica: un rectángulo estático que recibe impactos, destella y se destruye al quedarse sin vida. */
 export class DummyTarget extends EnemyBase {
   readonly mesh: Mesh;
   private readonly aggregate: PhysicsAggregate;
-  private hitCount = 0;
+  private health = DUMMY_HEALTH;
   private flashRemaining = 0;
+  private released = false;
 
   /** `spawn` es la base del blanco (a ras de suelo): el centro queda media altura más arriba. */
   constructor(id: string, spawn: Vector3, deps: EnemyDeps) {
@@ -48,21 +50,22 @@ export class DummyTarget extends EnemyBase {
     );
   }
 
-  get hits(): number {
-    return this.hitCount;
-  }
-
   ownsMesh(mesh: AbstractMesh): boolean {
     return mesh === this.mesh;
   }
 
   protected onHit(hit: ProjectileHitPayload): void {
-    this.hitCount++;
+    this.health -= hit.damage;
+    if (import.meta.env.DEV) {
+      console.info(`[DummyTarget] ${this.id}: vida ${Math.max(this.health, 0)}/${DUMMY_HEALTH}`);
+    }
+
+    if (this.health <= 0) {
+      this.destroy();
+      return;
+    }
     this.flashRemaining = HIT_FLASH_DURATION;
     this.mesh.renderOverlay = true;
-    if (import.meta.env.DEV) {
-            console.info(`[DummyTarget] ${this.id}: impacto ${this.hitCount} (daño ${hit.damage})`);
-    }
   }
 
   protected onUpdate(deltaTime: number): void {
@@ -75,7 +78,20 @@ export class DummyTarget extends EnemyBase {
     }
   }
 
+  protected onDestroyed(): void {
+    this.release();
+  }
+
   protected onDispose(): void {
+    this.release();
+  }
+
+  /** Suelta cuerpo y mesh una sola vez (puede llamarse al morir y de nuevo al liberar el nivel). */
+  private release(): void {
+    if (this.released) {
+      return;
+    }
+    this.released = true;
     this.aggregate.dispose();
     this.mesh.dispose(); // el material es compartido: no se libera acá
   }

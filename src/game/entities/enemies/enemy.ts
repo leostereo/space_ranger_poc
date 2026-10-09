@@ -1,12 +1,14 @@
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 
-import type { EnemyType } from "../../levels/level-definition";
 import type { ProjectileHitPayload } from "@/game/services/event-manager";
+import type { EnemyType } from "../../levels/level-definition";
 
 /** Contrato de todo enemigo: lo único que el EnemiesManager sabe de ellos. */
 export interface Enemy {
   readonly id: string;
   readonly type: EnemyType;
+  /** false cuando fue destruido o liberado. */
+  readonly isAlive: boolean;
   /** ¿Esta malla pertenece a este enemigo? Sirve para resolver a quién alcanzó un proyectil. */
   ownsMesh(mesh: AbstractMesh): boolean;
   update(deltaTime: number): void;
@@ -25,6 +27,7 @@ export interface Enemy {
 export abstract class EnemyBase implements Enemy {
   protected paused = false;
   protected isGameOver = false;
+  private destroyed = false;
   private disposed = false;
 
   constructor(
@@ -32,17 +35,21 @@ export abstract class EnemyBase implements Enemy {
     readonly type: EnemyType,
   ) {}
 
+  get isAlive(): boolean {
+    return !this.destroyed && !this.disposed;
+  }
+
   abstract ownsMesh(mesh: AbstractMesh): boolean;
 
   update(deltaTime: number): void {
-    if (this.paused || this.isGameOver || this.disposed) {
+    if (this.paused || this.isGameOver || !this.isAlive) {
       return;
     }
     this.onUpdate(deltaTime);
   }
 
   takeHit(hit: ProjectileHitPayload): void {
-    if (this.isGameOver || this.disposed) {
+    if (this.isGameOver || !this.isAlive) {
       return;
     }
     this.onHit(hit);
@@ -80,10 +87,21 @@ export abstract class EnemyBase implements Enemy {
     this.onDispose();
   }
 
+  /** Lo llama el propio enemigo cuando muere: deja de contar como vivo y suelta sus recursos. */
+  protected destroy(): void {
+    if (!this.isAlive) {
+      return;
+    }
+    this.destroyed = true;
+    this.onDestroyed();
+  }
+
   protected abstract onUpdate(deltaTime: number): void;
   protected onHit(_hit: ProjectileHitPayload): void {}
   protected onPause(): void {}
   protected onResume(): void {}
   protected onGameOver(): void {}
+  /** El enemigo murió: soltar mesh, cuerpo físico, etc. El manager lo libera igual al terminar el nivel. */
+  protected onDestroyed(): void {}
   protected abstract onDispose(): void;
 }

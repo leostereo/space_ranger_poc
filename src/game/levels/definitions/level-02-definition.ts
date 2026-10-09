@@ -12,8 +12,8 @@ const SPAWN_HEIGHT_MARGIN = 0.5; // el personaje aparece apenas sobre la platafo
 export const level02Definition: LevelDefinition = {
   id: "level-02",
   order: 2,
-  brief: "TODO: objetivo del nivel 2",
-  maps: [
+  brief: "Destroy the 3 practice targets (3 hits each).",
+    maps: [
     buildGround({ width: GROUND_WIDTH, depth: GROUND_DEPTH }),
     buildLandingGround({ position: LANDING_POSITION }),
   ],
