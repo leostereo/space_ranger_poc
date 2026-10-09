@@ -116,3 +116,14 @@ Based on https://github.com/eldinor/bp800/ which was based on https://github.com
 ```
 npx repomix ./tu-carpeta && grep -vE "^import |^from " repomix-output.txt > contexto-claude.txt
 ```
+
+Manejo de eventos:
+EventManager:
+src\game\services\event-manager.ts
+TypedEventEmitter
+src\game\core\events\typed-event-emitter.ts
+
+
+Disparo:  arma → EventManager.emit(ProjectileHit) → EnemiesManager → enemy.takeHit()
+Juego:    strategy.finish → strategy.events("levelFinished") → PlayingState
+                          → fsm.transitionTo → fsm.events → DebugHud

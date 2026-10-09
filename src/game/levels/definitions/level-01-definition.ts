@@ -28,7 +28,7 @@ export const level01Definition: LevelDefinition = {
   }],
   spawns: {
     character: new Vector3(0, 0, 0), // TODO: coordenadas reales sobre el mapa
-    enemies: [], // TODO
+    enemies: {}, // TODO
     items: [],
     other: [],
   },

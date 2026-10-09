@@ -8,9 +8,10 @@ import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { IWeaponController } from "../contracts/iweapon-controller";
-
+import { EventManager, GameEvents } from "@/game/services/event-manager";
 export interface ProjectileWeaponConfig {
     fireRate: number;
+    damage: number; // daño por proyectil
     projectileSpeed: number;
     projectileLifetime: number;
     projectileRadius: number;
@@ -28,6 +29,7 @@ export interface ProjectileWeaponConfig {
 
 export const DEFAULT_PROJECTILE_WEAPON_CONFIG: ProjectileWeaponConfig = {
     fireRate: 6,
+    damage: 1,
     projectileSpeed: 60,
     projectileLifetime: 2,
     projectileRadius: 0.02,
@@ -234,9 +236,16 @@ export class ProjectileWeaponController implements IWeaponController {
             );
 
             if (hit?.hit) {
-                // TODO: placeholder — acá eventualmente un Observable<HitInfo> propio.
-                console.log(`${entry.mesh.name} impactó contra`, hit.pickedMesh?.name);
-                this._triggerImpact(hit.pickedPoint ?? entry.mesh.position); // NUEVO — fallback por si pickedPoint viene null
+                const point = hit.pickedPoint ?? entry.mesh.position; // fallback por si pickedPoint viene null
+                this._triggerImpact(point);
+                if (hit.pickedMesh) {
+                    EventManager.emit(GameEvents.ProjectileHit, {
+                        mesh: hit.pickedMesh,
+                        point: point.clone(),
+                        direction: entry.direction.clone(),
+                        damage: this.config.damage,
+                    });
+                }
                 this._deactivate(entry);
                 continue;
             }
@@ -252,8 +261,9 @@ export class ProjectileWeaponController implements IWeaponController {
     }
 
     dispose(): void {
-        this.pool.forEach((entry) => entry.mesh.dispose());
-        this.flashMesh.dispose();
-        this.impactPool.forEach((entry) => entry.mesh.dispose()); // NUEVO
+        // true: libera también el material (cada grupo comparte uno propio de este controller)
+        this.pool.forEach((entry) => entry.mesh.dispose(false, true));
+        this.flashMesh.dispose(false, true);
+        this.impactPool.forEach((entry) => entry.mesh.dispose(false, true));
     }
 }

@@ -8,7 +8,7 @@ import type { LoadedMap } from "./level-map-factory";
 import type { LevelScope } from "./level-scope";
 import { createLevelLighting } from "./level-lighting";
 export type LevelOutcome = "completed" | "failed";
-
+import type { EnemiesManager } from "../entities/enemies/enemies-manager";
 export interface LevelStrategyEventMap {
   levelFinished: { outcome: LevelOutcome };
 }
@@ -19,6 +19,7 @@ export interface LevelStrategyDeps {
   readonly scope: LevelScope;
   readonly map: LoadedMap;
   readonly character: CharacterBase;
+  readonly enemies: EnemiesManager;
 }
 
 type Phase = "created" | "playing" | "paused" | "finished" | "disposed";
@@ -38,6 +39,7 @@ export abstract class LevelStrategy {
   protected readonly scope: LevelScope;
   protected readonly map: LoadedMap;
   protected readonly character: CharacterBase;
+  protected readonly enemies: EnemiesManager;
 
   private phase: Phase = "created";
   private pausedAnimationGroups: AnimationGroup[] = [];
@@ -49,6 +51,7 @@ export abstract class LevelStrategy {
     this.scope = deps.scope;
     this.map = deps.map;
     this.character = deps.character;
+    this.enemies = deps.enemies;
     createLevelLighting(this.context.scene, this.scope);
   }
 
@@ -78,6 +81,7 @@ export abstract class LevelStrategy {
     scene.physicsEnabled = false;
     this.pausedAnimationGroups = scene.animationGroups.filter((group) => group.isPlaying);
     this.pausedAnimationGroups.forEach((group) => group.pause());
+    this.enemies.pause();
     this.onPause();
   }
 
@@ -89,6 +93,7 @@ export abstract class LevelStrategy {
     this.context.scene.physicsEnabled = this.physicsWasEnabled;
     this.pausedAnimationGroups.forEach((group) => group.restart()); // retoma desde donde quedó
     this.pausedAnimationGroups = [];
+    this.enemies.resume();
     this.onResume();
   }
 
@@ -97,7 +102,8 @@ export abstract class LevelStrategy {
     if (this.phase !== "playing") {
       return;
     }
-    this.character.update(deltaTime); // primero las entidades (luego irán EnemiesManager y HUD)
+    this.character.update(deltaTime);
+    this.enemies.update(deltaTime);
     this.onTick(deltaTime);    
     if (this.phase !== "playing") {
       return; // onTick pudo terminar el nivel
@@ -141,6 +147,9 @@ export abstract class LevelStrategy {
       return;
     }
     this.phase = "finished";
+    if (outcome === "failed") {
+      this.enemies.gameOver();
+    }
     this.events.emit("levelFinished", { outcome });
   }
 }

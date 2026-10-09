@@ -1,10 +1,12 @@
 import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 
 /** Nombres de eventos centralizados: nada de strings sueltos por el código. */
 export const GameEvents = {
   PlayerShooted: "player_shooted",
   PlayerDamaged: "player_damaged",
   PlayerDied: "player_died",
+  ProjectileHit: "projectile_hit",
 } as const;
 
 export interface PlayerShootedPayload {
@@ -18,11 +20,21 @@ export interface PlayerDamagedPayload {
   livesLeft: number;
 }
 
+/** Un proyectil alcanzó una malla. Quién la posee (enemigo, escenario) lo resuelve el que escucha. */
+export interface ProjectileHitPayload {
+  mesh: AbstractMesh;
+  point: Vector3;
+  direction: Vector3;
+  damage: number;
+  sourceId?: string;
+}
+
 /** Mapa evento -> payload. Para sumar un evento nuevo: una entrada acá y otra en GameEvents. */
 export interface GameEventMap {
   [GameEvents.PlayerShooted]: PlayerShootedPayload;
   [GameEvents.PlayerDamaged]: PlayerDamagedPayload;
   [GameEvents.PlayerDied]: Record<string, never>;
+  [GameEvents.ProjectileHit]: ProjectileHitPayload;
 }
 
 export type GameEventName = keyof GameEventMap;

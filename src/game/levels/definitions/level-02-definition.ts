@@ -19,7 +19,9 @@ export const level02Definition: LevelDefinition = {
   ],
   spawns: {
     character: LANDING_POSITION.add(new Vector3(0, SPAWN_HEIGHT_MARGIN, 0)),
-    enemies: [],
+    enemies: {
+      dummyTarget: [new Vector3(0, 0, 0), new Vector3(-2, 0, 10), new Vector3(2, 0, 20)],
+    },
     items: [],
     other: [],
   },

@@ -7,6 +7,7 @@ import type { LevelRepository } from "../levels/level-repository";
 import type { LevelSession } from "../levels/level-session";
 import { LoadingScreen } from "../screens/loading-screen";
 import type { ScreenManager } from "../ui/screens/screen-manager";
+import { createEnemiesManager } from "../entities/enemies/enemy-factory";
 
 const PHASE_LABELS: Record<LevelLoadPhase, string> = {
   downloading: "Downloading map",
@@ -72,7 +73,10 @@ export class LevelSetupState implements GameState {
         return;
       }
       scope.register(character); // se libera con el nivel, después de los suelos (orden inverso)
-      this.session.setStrategy(createLevelStrategy({ context, definition, scope, map, character }));
+      const enemies = scope.register(
+        createEnemiesManager(definition.spawns.enemies, { scene: context.scene, registry: context.assets }),
+      );
+      this.session.setStrategy(createLevelStrategy({ context, definition, scope, map, character, enemies }));
         
     } catch (error) {
       if (!this.exited) {
