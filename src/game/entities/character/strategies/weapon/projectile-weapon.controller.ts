@@ -27,6 +27,13 @@ export interface ProjectileWeaponConfig {
     impactPoolSize: number;
 }
 
+export interface ProjectileWeaponOptions {
+    /** Identifica quién dispara; viaja en el evento de impacto. */
+    sourceId?: string;
+    /** Mallas que cuentan como blanco aunque no sean pickable (ej: el Character, que no lo es a propósito). */
+    isExtraTarget?: (mesh: AbstractMesh) => boolean;
+}
+
 export const DEFAULT_PROJECTILE_WEAPON_CONFIG: ProjectileWeaponConfig = {
     fireRate: 6,
     damage: 1,
@@ -74,6 +81,7 @@ export class ProjectileWeaponController implements IWeaponController {
         private shouldFire: () => boolean,
         private excludeMeshes: AbstractMesh[],
         private config: ProjectileWeaponConfig = DEFAULT_PROJECTILE_WEAPON_CONFIG,
+        private options: ProjectileWeaponOptions = {},
     ) {
         this.fireInterval = 1 / this.config.fireRate;
         this.cooldownElapsed = this.fireInterval; // arranca listo para disparar de entrada
@@ -232,7 +240,9 @@ export class ProjectileWeaponController implements IWeaponController {
 
             const hit = this.scene.pickWithRay(
                 this._ray,
-                (mesh) => mesh.isPickable && !this.excludeMeshes.includes(mesh),
+                (mesh) =>
+                    !this.excludeMeshes.includes(mesh) &&
+                    (mesh.isPickable || (this.options.isExtraTarget?.(mesh) ?? false)),
             );
 
             if (hit?.hit) {
@@ -244,7 +254,7 @@ export class ProjectileWeaponController implements IWeaponController {
                         point: point.clone(),
                         direction: entry.direction.clone(),
                         damage: this.config.damage,
-                    });
+                        sourceId: this.options.sourceId,                    });
                 }
                 this._deactivate(entry);
                 continue;

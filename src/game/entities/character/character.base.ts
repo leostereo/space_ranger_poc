@@ -6,9 +6,9 @@ import { Quaternion, type Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { AnimationEvent, AnimationGroup, FollowCamera, PhysicsShapeType, TransformNode } from "@babylonjs/core";
 import type { CharacterAnimationSet } from "@/game/assets/animations/character-clip-names";
 import type { AssetRegistry } from "@/game/assets/asset-registry";
-
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { EventSubscriber } from "@/game/services/event-subscriber";
-import { EventManager, GameEvents, type PlayerShootedPayload } from "@/game/services/event-manager";
+import { EventManager, GameEvents, type PlayerShootedPayload, type ProjectileHitPayload } from "@/game/services/event-manager";
 import { createCharacterFollowCamera } from "./character.camera";
 
 import { CharacterFsm } from "./character-fsm/character.fsm";
@@ -228,8 +228,26 @@ export default class CharacterBase extends EventSubscriber {
     }
   }
 
+  /** ¿Esta malla es de la cápsula del Character o de su board? Los enemigos lo usan para saber si lo alcanzaron. */
+  isPlayerMesh(mesh: AbstractMesh): boolean {
+    const board = this._activeBoardMesh;
+    return mesh === this.characterMesh || (board !== null && (mesh === board || mesh.parent === board));
+  }
+
+  /** ¿Murió? La animación de muerte sigue corriendo: la strategy decide cuándo termina el nivel. */
+  get isDead(): boolean {
+    return this.fsm.getState() === "Dead";
+  }
+
   protected registerEvents(): void {
     this.listen(GameEvents.PlayerShooted, (payload) => this._onPlayerShooted(payload));
+    this.listen(GameEvents.ProjectileHit, (hit) => this._onProjectileHit(hit));
+  }
+
+  /** Un proyectil alcanzó al Character (o a su board): se traduce al evento de daño que ya maneja. */
+  private _onProjectileHit(hit: ProjectileHitPayload): void {
+    if (!this.isPlayerMesh(hit.mesh)) return;
+    this._onPlayerShooted({ damage: hit.damage, hitPoint: hit.point, direction: hit.direction, sourceId: hit.sourceId });
   }
 
   private _onPlayerShooted(_payload: PlayerShootedPayload): void {

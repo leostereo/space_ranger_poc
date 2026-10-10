@@ -5,10 +5,19 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { LevelScope } from "./level-scope";
 
 /** Tipos de enemigo que un nivel puede pedir. */
-export type EnemyType = "drone" | "dummyTarget";
+export type EnemyType = "drone" | "dummyTarget" | "staticDrone";
 
 /** Posiciones de aparición por categoría de enemigo. Cada posición es la base del enemigo (a ras de suelo). */
-export type EnemySpawns = Partial<Record<EnemyType, readonly Vector3[]>>;
+/** Dónde y hacia dónde aparece un enemigo. */
+export interface EnemySpawn {
+  /** Base del enemigo: a ras de suelo (o de la plataforma donde se apoya). */
+  readonly position: Vector3;
+  /** Hacia dónde mira. Solo importa a los que apuntan; por defecto, +Z. */
+  readonly forward?: Vector3;
+}
+
+/** Spawns por categoría de enemigo. */
+export type EnemySpawns = Partial<Record<EnemyType, readonly EnemySpawn[]>>;
 export interface WaveDefinition {
   /** Número de oleada (1, 2, 3...). */
   readonly wave: number;

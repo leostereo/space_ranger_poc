@@ -74,8 +74,11 @@ export class LevelSetupState implements GameState {
       }
       scope.register(character); // se libera con el nivel, después de los suelos (orden inverso)
       const enemies = scope.register(
-        createEnemiesManager(definition.spawns.enemies, { scene: context.scene, registry: context.assets }),
-      );
+        createEnemiesManager(definition.spawns.enemies, {
+          scene: context.scene,
+          registry: context.assets,
+          isPlayerMesh: (mesh) => character.isPlayerMesh(mesh),
+        }),);
       this.session.setStrategy(createLevelStrategy({ context, definition, scope, map, character, enemies }));
         
     } catch (error) {

@@ -1,6 +1,7 @@
 import { Level01Strategy } from "./strategies/level-01-strategy";
 import type { LevelStrategy, LevelStrategyDeps } from "./level-strategy";
 import { Level02Strategy } from "./strategies/level-02-strategy";
+import { Level03Strategy } from "./strategies/level-03-strategy";
 
 type StrategyBuilder = (deps: LevelStrategyDeps) => LevelStrategy;
 
@@ -8,7 +9,7 @@ type StrategyBuilder = (deps: LevelStrategyDeps) => LevelStrategy;
 const STRATEGY_BUILDERS: Readonly<Record<string, StrategyBuilder>> = {
   "level-01": (deps) => new Level01Strategy(deps),
   "level-02": (deps) => new Level02Strategy(deps),
-};
+  "level-03": (deps) => new Level03Strategy(deps),};
 
 /** Estado 3B: arma el strategy del nivel (y, a futuro, Character, EnemiesManager y HUD que se le inyectan). */
 export function createLevelStrategy(deps: LevelStrategyDeps): LevelStrategy {

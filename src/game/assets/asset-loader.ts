@@ -8,6 +8,7 @@ import { gameConfig } from "../config/game-config";
 import { createCharacterAnimationSet } from "./animations/character-animation-set-factory";
 import { createBoardMaterial } from "./materials/board-material-factory";
 import { createDummyTargetMaterial } from "./materials/dummy-target-material-factory";
+import { createStaticDroneAccentMaterial, createStaticDroneBodyMaterial } from "./materials/static-drone-materials-factory";
 
 import type { AssetRegistry } from "./asset-registry";
 
@@ -111,6 +112,8 @@ export class AssetLoader {
           this.normalizeCharacterScale();
           this.registry.registerMaterial("board", createBoardMaterial(this.scene));
           this.registry.registerMaterial("dummy-target", createDummyTargetMaterial(this.scene));
+          this.registry.registerMaterial("static-drone-body", createStaticDroneBodyMaterial(this.scene));
+          this.registry.registerMaterial("static-drone-accent", createStaticDroneAccentMaterial(this.scene));
         } catch (error) {
           reject(error);
           return;
