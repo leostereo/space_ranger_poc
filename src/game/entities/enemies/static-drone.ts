@@ -1,5 +1,5 @@
-import { Color3 } from "@babylonjs/core/Maths/math.color";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import "@babylonjs/core/Rendering/outlineRenderer"; // habilita renderOverlay en los meshes
+import { Color3 } from "@babylonjs/core/Maths/math.color"; import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Material } from "@babylonjs/core/Materials/material";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
@@ -9,6 +9,7 @@ import { CreateTorus } from "@babylonjs/core/Meshes/Builders/torusBuilder";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 
+import type { ProjectileHitPayload } from "@/game/services/event-manager";
 import type { EnemySpawn } from "../../levels/level-definition";
 
 import { EnemyBase } from "./enemy";
@@ -38,8 +39,12 @@ const CANNON_LENGTH = 0.3;
 const CANNON_TESSELLATION = 12;
 const CANNON_PIVOT_Y = -BODY_HEIGHT / 2 - (DOME_DIAMETER / 2) * 0.5; // dentro de la semiesfera
 
-const FIRE_INTERVAL_SECONDS = 3;
-const WEAPON_CONFIG: ProjectileWeaponConfig = {
+const DRONE_HEALTH = 3; // con daño 1 por proyectil: 3 disparos
+const HIT_FLASH_DURATION = 0.12; // segundos
+const HIT_FLASH_COLOR = Color3.White();
+const HIT_FLASH_ALPHA = 0.6;
+
+const FIRE_INTERVAL_SECONDS = 3; const WEAPON_CONFIG: ProjectileWeaponConfig = {
   ...DEFAULT_PROJECTILE_WEAPON_CONFIG,
   fireRate: 1 / FIRE_INTERVAL_SECONDS,
   projectileSpeed: 10, // lento: se puede esquivar
@@ -64,6 +69,9 @@ export class StaticDrone extends EnemyBase {
   private readonly root: TransformNode;
   private readonly meshes: Mesh[] = [];
   private readonly weapon: ProjectileWeaponController;
+  private health = DRONE_HEALTH;
+  private flashRemaining = 0;
+  private released = false;
 
   constructor(id: string, spawn: EnemySpawn, deps: EnemyDeps) {
     super(id, "staticDrone");
@@ -130,19 +138,60 @@ export class StaticDrone extends EnemyBase {
   ownsMesh(mesh: AbstractMesh): boolean {
     return this.meshes.some((own) => own === mesh);
   }
+  protected onHit(hit: ProjectileHitPayload): void {
+    this.health -= hit.damage;
+    if (import.meta.env.DEV) {
+      console.info(`[StaticDrone] ${this.id}: vida ${Math.max(this.health, 0)}/${DRONE_HEALTH}`);
+    }
+
+    if (this.health <= 0) {
+      this.destroy();
+      return;
+    }
+    this.flashRemaining = HIT_FLASH_DURATION;
+    this.setFlash(true);
+  }
 
   protected onUpdate(deltaTime: number): void {
     this.weapon.tick(deltaTime);
+
+    if (this.flashRemaining > 0) {
+      this.flashRemaining -= deltaTime;
+      if (this.flashRemaining <= 0) {
+        this.setFlash(false);
+      }
+    }
+  }
+
+  protected onDestroyed(): void {
+    this.release();
   }
 
   protected onDispose(): void {
+    this.release();
+  }
+
+  /** Suelta arma y mallas una sola vez (puede llamarse al morir y de nuevo al liberar el nivel). */
+  private release(): void {
+    if (this.released) {
+      return;
+    }
+    this.released = true;
     this.weapon.dispose(); // primero: el fogonazo es hijo del muzzle
     this.root.dispose(false, false); // los materiales son compartidos: no se liberan acá
+  }
+
+  private setFlash(on: boolean): void {
+    for (const mesh of this.meshes) {
+      mesh.renderOverlay = on;
+    }
   }
 
   private attach(mesh: Mesh, material: Material, parent: TransformNode = this.root): Mesh {
     mesh.parent = parent;
     mesh.material = material;
+    mesh.overlayColor = HIT_FLASH_COLOR;
+    mesh.overlayAlpha = HIT_FLASH_ALPHA;
     this.meshes.push(mesh);
     return mesh;
   }

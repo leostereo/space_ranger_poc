@@ -2,8 +2,7 @@ import { LevelStrategy } from "../level-strategy";
 
 const DEATH_TO_GAME_OVER_DELAY_SECONDS = 2.5; // deja ver la animación de muerte antes de la pantalla de derrota
 
-/** Nivel de prueba de la muerte: no se gana, solo se puede perder (los drones te tienen que matar). */
-export class Level03Strategy extends LevelStrategy {
+/** Se gana destruyendo todos los drones; se pierde unos segundos después de que el personaje muere. */export class Level03Strategy extends LevelStrategy {
   private secondsDead = 0;
 
   protected onTick(deltaTime: number): void {
@@ -13,7 +12,7 @@ export class Level03Strategy extends LevelStrategy {
   }
 
   protected checkWin(): boolean {
-    return false;
+    return this.enemies.aliveCount === 0; // todos los drones destruidos
   }
 
   protected checkLose(): boolean {

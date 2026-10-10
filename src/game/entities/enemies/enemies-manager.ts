@@ -99,6 +99,9 @@ export class EnemiesManager extends EventSubscriber {
     if (this.paused || this.disposed) {
       return;
     }
+    if (hit.sourceId !== undefined) {
+      return; // disparo de otro enemigo: sin fuego amigo
+    }
     this.enemies.find((enemy) => enemy.ownsMesh(hit.mesh))?.takeHit(hit);
   }
 }

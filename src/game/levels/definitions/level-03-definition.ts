@@ -19,7 +19,7 @@ const aimAtLanding = (position: Vector3): EnemySpawn => ({
 export const level03Definition: LevelDefinition = {
   id: "level-03",
   order: 3,
-  brief: "Test level: let the static drones shoot you down.",
+  brief: "Destroy the 3 static drones (or let them shoot you down).",
   maps: [
     buildGround({ width: GROUND_WIDTH, depth: GROUND_DEPTH }), // primero: es el suelo principal
     buildLandingGround({ position: LANDING_POSITION }),

@@ -212,7 +212,7 @@ Pasos:
 
 Enemigos existentes:
 - **`DummyTarget`** (`dummyTarget`): caja estática de 1,2 × 2 × 0,2 con cuerpo físico `BOX` (masa 0) y `isPickable = true`. Vida 3; cada impacto descuenta el daño del proyectil y destella (`renderOverlay`); a 0 se destruye. `spawn.position` es la base.
-- **`StaticDrone`** (`staticDrone`): flota a `HOVER_HEIGHT = 0.7` m sobre `spawn.position`, no se mueve. Cuerpo rectangular, 4 hélices (torus) a los costados, semiesfera inferior y cañón. Gira en yaw hacia `forward` y el cañón se inclina para apuntar exacto. Dispara cada 3 s con un `ProjectileWeaponController` (proyectiles lentos, 10 m/s). Hoy sin física ni vida.
+- **`StaticDrone`** (`staticDrone`): flota a `HOVER_HEIGHT = 0.7` m sobre `spawn.position`, no se mueve. Cuerpo rectangular, 4 hélices (torus) a los costados, semiesfera inferior y cañón. Gira en yaw hacia `forward` y el cañón se inclina para apuntar exacto. Dispara cada 3 s con un `ProjectileWeaponController` (proyectiles lentos, 10 m/s). Vida 3: destella al recibir daño y a 0 se destruye (suelta mallas y arma). Hoy sin física.
 
 ## 9. Assets y materiales compartidos
 
@@ -277,7 +277,7 @@ ProjectileWeaponController (raycast por paso, scene.pickWithRay)
 |---|---|---|
 | `level-01` | Mapa GLB (Batalla del Pilar, fusionado por grupos), sin enemigos | Placeholder: `checkWin/checkLose` en `false` (se pasa con las teclas de debug). El suelo GLB aún no tiene la física correcta. |
 | `level-02` | Suelo 10×60 + landing 3×3 en z = −31,5; 3 `dummyTarget` | Gana al destruir los 3 (`enemies.aliveCount === 0`). |
-| `level-03` | Mismo layout; 3 `staticDrone` apuntando en horizontal al landing, con desfase de disparo | No se gana; pierde 2,5 s después de que el personaje muere (deja ver la animación). Sirve para probar la muerte. |
+| `level-03` | Mismo layout; 3 `staticDrone` apuntando en horizontal al landing, con desfase de disparo | Gana al destruir los 3 drones (`enemies.aliveCount === 0`); pierde 2,5 s después de que el personaje muere (deja ver la animación). |
 
 ## 15. Convenciones
 
@@ -297,7 +297,8 @@ ProjectileWeaponController (raycast por paso, scene.pickWithRay)
 ## 16. Pendientes y limitaciones conocidas
 
 - Nivel 1: física `MESH` para el suelo del GLB y cuerpo para los edificios; reglas reales de victoria/derrota.
-- `StaticDrone`: sin física, sin flotación/pitch/roll y sin vida (más adelante).
+- `StaticDrone`: sin física ni flotación/pitch/roll (más adelante).
+- Fuego amigo: el `EnemiesManager` ignora los impactos con `sourceId` (disparos de otros enemigos); solo cuentan los del jugador.
 - Oleadas (`waves`), `items`, `other` y `navigation` están definidos en los tipos pero no se usan.
 - `EnemyType "drone"` no tiene builder.
 - Dos mecanismos de eventos conviviendo; idea pendiente: que el bus estático sea el general del juego y que sea una instancia creada por `Game` y pasada por `GameContext`.
