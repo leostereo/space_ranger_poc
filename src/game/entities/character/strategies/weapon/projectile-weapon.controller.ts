@@ -102,7 +102,7 @@ export class ProjectileWeaponController implements IWeaponController {
                 { diameter: this.config.projectileRadius * 2, height: this.config.projectileLength, tessellation: 8 },
                 this.scene,
             );
-            mesh.rotation.x = Math.PI / 2;
+            // La orientación se resuelve al disparar, con lookAt (ver _fireOne).
             mesh.material = material;
             mesh.position.copyFrom(PARK_POSITION);
             mesh.isPickable = false;
@@ -207,7 +207,8 @@ export class ProjectileWeaponController implements IWeaponController {
 
         free.mesh.position.copyFrom(origin);
         free.direction.copyFrom(direction);
-        free.mesh.lookAt(origin.add(direction));
+        // El cilindro nace con su eje largo en Y: la corrección de pitch de 90° lo alinea con el forward.
+        free.mesh.lookAt(origin.add(direction), 0, Math.PI / 2);
         free.elapsed = 0;
         free.isActive = true;
         free.mesh.setEnabled(true);
