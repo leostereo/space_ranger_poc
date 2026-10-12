@@ -2,18 +2,22 @@ import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { Scene } from "@babylonjs/core/scene";
 
+import type { PatrolRegion } from "../navigation/patrol-region";
 import type { LevelScope } from "./level-scope";
 
 /** Tipos de enemigo que un nivel puede pedir. */
-export type EnemyType = "drone" | "dummyTarget" | "staticDrone";
+export type EnemyType = "drone" | "dummyTarget" | "staticDrone" | "sentinelDrone";
 
-/** Posiciones de aparición por categoría de enemigo. Cada posición es la base del enemigo (a ras de suelo). */
 /** Dónde y hacia dónde aparece un enemigo. */
 export interface EnemySpawn {
   /** Base del enemigo: a ras de suelo (o de la plataforma donde se apoya). */
   readonly position: Vector3;
   /** Hacia dónde mira. Solo importa a los que apuntan; por defecto, +Z. */
   readonly forward?: Vector3;
+  /** Segundos que espera antes del primer disparo (para desfasar enemigos que disparan a la vez). Por defecto, 0. */
+  readonly fireDelaySeconds?: number;
+  /** Región (volumen y/o plano) donde patrulla; solo la usan los enemigos que se mueven por puntos. */
+  readonly patrol?: PatrolRegion;
 }
 
 /** Spawns por categoría de enemigo. */

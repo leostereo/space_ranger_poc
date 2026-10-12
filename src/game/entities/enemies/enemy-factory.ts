@@ -6,6 +6,8 @@ import type { EnemySpawn, EnemySpawns, EnemyType } from "../../levels/level-defi
 import { DummyTarget } from "./dummy-target";
 import type { Enemy } from "./enemy";
 import { EnemiesManager } from "./enemies-manager";
+import type { NavigationService } from "../../navigation/navigation-service";
+import { SentinelDrone } from "./sentinel/sentinel-drone";
 import { StaticDrone } from "./static-drone";
 
 export interface EnemyDeps {
@@ -13,6 +15,8 @@ export interface EnemyDeps {
   readonly registry: AssetRegistry;
   /** ¿Esta malla es del jugador (o de su board)? Los enemigos que disparan lo usan para saber si lo alcanzaron. */
   readonly isPlayerMesh: (mesh: AbstractMesh) => boolean;
+  /** Puntos navegables para los enemigos que se mueven solos. */
+  readonly navigation: NavigationService;
 }
 
 type EnemyBuilder = (spawn: EnemySpawn, id: string, deps: EnemyDeps) => Enemy;
@@ -21,6 +25,7 @@ type EnemyBuilder = (spawn: EnemySpawn, id: string, deps: EnemyDeps) => Enemy;
 const ENEMY_BUILDERS: Readonly<Partial<Record<EnemyType, EnemyBuilder>>> = {
   dummyTarget: (spawn, id, deps) => new DummyTarget(id, spawn.position, deps),
   staticDrone: (spawn, id, deps) => new StaticDrone(id, spawn, deps),
+  sentinelDrone: (spawn, id, deps) => new SentinelDrone(id, spawn, deps),
 };
 
 /** Crea todos los enemigos que pide el nivel (por categoría) y los deja registrados en un EnemiesManager. */

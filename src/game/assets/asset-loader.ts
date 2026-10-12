@@ -8,8 +8,8 @@ import { gameConfig } from "../config/game-config";
 import { createCharacterAnimationSet } from "./animations/character-animation-set-factory";
 import { createBoardMaterial } from "./materials/board-material-factory";
 import { createDummyTargetMaterial } from "./materials/dummy-target-material-factory";
+import { createSentinelDroneAccentMaterial } from "./materials/sentinel-drone-material-factory";
 import { createStaticDroneAccentMaterial, createStaticDroneBodyMaterial } from "./materials/static-drone-materials-factory";
-
 import type { AssetRegistry } from "./asset-registry";
 
 const FLARE_TEXTURE_URL = "texture/flare.png";
@@ -114,6 +114,7 @@ export class AssetLoader {
           this.registry.registerMaterial("dummy-target", createDummyTargetMaterial(this.scene));
           this.registry.registerMaterial("static-drone-body", createStaticDroneBodyMaterial(this.scene));
           this.registry.registerMaterial("static-drone-accent", createStaticDroneAccentMaterial(this.scene));
+          this.registry.registerMaterial("sentinel-drone-accent", createSentinelDroneAccentMaterial(this.scene));
         } catch (error) {
           reject(error);
           return;

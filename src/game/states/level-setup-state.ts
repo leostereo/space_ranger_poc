@@ -8,7 +8,7 @@ import type { LevelSession } from "../levels/level-session";
 import { LoadingScreen } from "../screens/loading-screen";
 import type { ScreenManager } from "../ui/screens/screen-manager";
 import { createEnemiesManager } from "../entities/enemies/enemy-factory";
-
+import { VolumePointSampler } from "../navigation/volume-point-sampler";
 const PHASE_LABELS: Record<LevelLoadPhase, string> = {
   downloading: "Downloading map",
   optimizing: "Optimizing map",
@@ -73,12 +73,15 @@ export class LevelSetupState implements GameState {
         return;
       }
       scope.register(character); // se libera con el nivel, después de los suelos (orden inverso)
+      const navigation = scope.register(new VolumePointSampler()); // luego: servicio con navmesh real
       const enemies = scope.register(
         createEnemiesManager(definition.spawns.enemies, {
           scene: context.scene,
           registry: context.assets,
           isPlayerMesh: (mesh) => character.isPlayerMesh(mesh),
-        }),);
+          navigation,
+        }),
+      );
       this.session.setStrategy(createLevelStrategy({ context, definition, scope, map, character, enemies }));
         
     } catch (error) {

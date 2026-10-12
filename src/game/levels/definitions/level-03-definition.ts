@@ -11,9 +11,10 @@ const LANDING_POSITION = new Vector3(0, 0, -(GROUND_DEPTH / 2 + LANDING_GROUND_S
 const SPAWN_HEIGHT_MARGIN = 0.5; // el personaje aparece apenas sobre la plataforma y cae
 
 /** Un dron en `position` que mira en horizontal hacia el landing. */
-const aimAtLanding = (position: Vector3): EnemySpawn => ({
+const aimAtLanding = (position: Vector3, fireDelaySeconds: number): EnemySpawn => ({
   position,
   forward: new Vector3(LANDING_POSITION.x - position.x, 0, LANDING_POSITION.z - position.z).normalize(),
+  fireDelaySeconds,
 });
 
 export const level03Definition: LevelDefinition = {
@@ -28,9 +29,9 @@ export const level03Definition: LevelDefinition = {
     character: LANDING_POSITION.add(new Vector3(0, SPAWN_HEIGHT_MARGIN, 0)),
     enemies: {
       staticDrone: [
-        aimAtLanding(new Vector3(0, 0, 8)),
-        aimAtLanding(new Vector3(-3, 0, 14)),
-        aimAtLanding(new Vector3(3, 0, 14)),
+        aimAtLanding(new Vector3(0, 0, 8), 0),
+        aimAtLanding(new Vector3(-3, 0, 14), 1),
+        aimAtLanding(new Vector3(3, 0, 14), 2),
       ],
     },
     items: [],
