@@ -43,6 +43,10 @@ export interface DroneOptions {
   readonly accentMaterial: MaterialAssetKey;
   /** true: el cañón se inclina para apuntar exacto al forward. false: dispara en horizontal. */
   readonly pitchToForward: boolean;
+  /** true: `spawn.position` es el centro del dron (vuela en un volumen). false (por defecto): es la base y se suma DRONE_HOVER_HEIGHT. */
+  readonly spawnAtExactPosition?: boolean;
+  /** false: el dron no dispara. Por defecto, true. */
+  readonly armed?: boolean;
 }
 
 const resolveForward = (forward: Vector3 | undefined): Vector3 =>
@@ -62,11 +66,15 @@ export abstract class DroneBase extends EnemyBase {
   private health = DRONE_HEALTH;
   private flashRemaining = 0;
   private released = false;
+  private readonly armed: boolean;
 
   constructor(id: string, type: EnemyType, spawn: EnemySpawn, deps: EnemyDeps, options: DroneOptions) {
     super(id, type);
+    this.armed = options.armed ?? true;
 
-    const position = new Vector3(spawn.position.x, spawn.position.y + DRONE_HOVER_HEIGHT, spawn.position.z);
+    const position = options.spawnAtExactPosition
+      ? spawn.position.clone()
+      : new Vector3(spawn.position.x, spawn.position.y + DRONE_HOVER_HEIGHT, spawn.position.z);
     const model = buildDroneModel(
       deps.scene,
       id,
@@ -106,7 +114,9 @@ export abstract class DroneBase extends EnemyBase {
 
   protected onUpdate(deltaTime: number): void {
     this.onThink(deltaTime);
-    this.weapon.tick(deltaTime);
+    if (this.armed) {
+      this.weapon.tick(deltaTime);
+    }
 
     if (this.flashRemaining > 0) {
       this.flashRemaining -= deltaTime;

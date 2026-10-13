@@ -31,7 +31,10 @@ type Phase = "created" | "playing" | "paused" | "finished" | "disposed";
  * No conoce la FSM: avisa con el evento `levelFinished` y el estado `playing` decide la transición.
  * Los recursos de nivel los libera el LevelScope; acá se libera lo propio de la partida.
  */
+
+
 export abstract class LevelStrategy {
+  readonly DEATH_TO_GAME_OVER_DELAY_SECONDS = 2.5; // deja ver la animación de muerte antes de la pantalla de derrota
   readonly events = new TypedEventEmitter<LevelStrategyEventMap>();
 
   protected readonly context: GameContext;

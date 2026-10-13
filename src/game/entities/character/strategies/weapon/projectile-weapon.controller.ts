@@ -32,6 +32,8 @@ export interface ProjectileWeaponOptions {
     sourceId?: string;
     /** Mallas que cuentan como blanco aunque no sean pickable (ej: el Character, que no lo es a propósito). */
     isExtraTarget?: (mesh: AbstractMesh) => boolean;
+    /** Segundos que espera antes del primer disparo (para desfasar varias armas). Por defecto, 0. */
+    initialDelaySeconds?: number;
 }
 
 export const DEFAULT_PROJECTILE_WEAPON_CONFIG: ProjectileWeaponConfig = {
@@ -84,7 +86,8 @@ export class ProjectileWeaponController implements IWeaponController {
         private options: ProjectileWeaponOptions = {},
     ) {
         this.fireInterval = 1 / this.config.fireRate;
-        this.cooldownElapsed = this.fireInterval; // arranca listo para disparar de entrada
+        // Arranca listo para disparar de entrada, salvo que se pida un retraso inicial.
+        this.cooldownElapsed = this.fireInterval - (this.options.initialDelaySeconds ?? 0);
         this._buildPool();
         this._buildFlash();
         this._buildImpactPool();

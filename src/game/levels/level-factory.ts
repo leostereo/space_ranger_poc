@@ -3,6 +3,7 @@ import type { LevelStrategy, LevelStrategyDeps } from "./level-strategy";
 import { Level02Strategy } from "./strategies/level-02-strategy";
 import { Level03Strategy } from "./strategies/level-03-strategy";
 import { Level04Strategy } from "./strategies/level-04-strategy";
+import { Level05Strategy } from "./strategies/level-05-strategy";
 
 type StrategyBuilder = (deps: LevelStrategyDeps) => LevelStrategy;
 
@@ -12,6 +13,7 @@ const STRATEGY_BUILDERS: Readonly<Record<string, StrategyBuilder>> = {
   "level-02": (deps) => new Level02Strategy(deps),
   "level-03": (deps) => new Level03Strategy(deps),
   "level-04": (deps) => new Level04Strategy(deps),
+  "level-05": (deps) => new Level05Strategy(deps),
 }
   ;
 
