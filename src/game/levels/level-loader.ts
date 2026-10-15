@@ -4,7 +4,7 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { Scene } from "@babylonjs/core/scene";
 
 import { TypedEventEmitter } from "../core/events/typed-event-emitter";
-import type { GlbMapSource, LevelDefinition, MapMeshRole } from "./level-definition";
+import type { GlbMapSource, LevelDefinition, MapMeshRole, StaticShape, StaticSolid } from "./level-definition";
 import { createGlbMap, type LoadedGlbMap, type LoadedMap } from "./level-map-factory";
 import type { LevelScope } from "./level-scope";
 import { createProceduralMap } from "./procedural-map-factory";
@@ -41,6 +41,8 @@ export class LevelLoader {
 
     const merged = new Map<MapMeshRole, Mesh>();
     const grounds: Mesh[] = [];
+    const groundShapes = new Map<Mesh, StaticShape>();
+    const solids: StaticSolid[] = [];
     const proceduralMeshes: Mesh[] = [];
     let droppedMeshCount = 0;
 
@@ -74,8 +76,10 @@ export class LevelLoader {
         }
         if (built.ground) {
           grounds.push(built.ground);
+          groundShapes.set(built.ground, built.groundShape);
         }
         proceduralMeshes.push(...built.meshes);
+        solids.push(...built.solids);
         report("building", 1);
       }
     }
@@ -90,7 +94,7 @@ export class LevelLoader {
       mergedGroups: merged.size,
       droppedMeshes: droppedMeshCount,
     });
-    return { merged, ground: grounds[0], grounds, proceduralMeshes, droppedMeshCount };
+    return { merged, ground: grounds[0], grounds, groundShapes, solids, proceduralMeshes, droppedMeshCount };
   }
 
   private async loadGlb(

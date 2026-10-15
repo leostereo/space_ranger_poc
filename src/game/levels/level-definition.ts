@@ -75,11 +75,24 @@ export interface ProceduralMapContext {
   readonly scope: LevelScope;
 }
 
+/** Forma del cuerpo físico estático: "box" sirve para planos; "mesh" sigue la geometría (curvas, relieve). */
+export type StaticShape = "box" | "mesh";
+
+/** Malla que además de verse debe colisionar (cuerpo estático). */
+export interface StaticSolid {
+  readonly mesh: Mesh;
+  readonly shape: StaticShape;
+}
+
 export interface ProceduralMapResult {
   /** Suelo del nivel, si esta fuente aporta uno. */
   readonly ground?: Mesh;
-  /** Resto de las mallas creadas. */
+  /** Forma del cuerpo físico del suelo. Por defecto "box". */
+  readonly groundShape?: StaticShape;
+  /** Resto de las mallas creadas (sin física). */
   readonly meshes?: readonly Mesh[];
+  /** Mallas que no son suelo pero deben colisionar (paredes, túneles, etc.). */
+  readonly solids?: readonly StaticSolid[];
 }
 
 /** Mapa creado por código con primitivas de Babylon. Las mallas que devuelve las adopta el LevelScope. */

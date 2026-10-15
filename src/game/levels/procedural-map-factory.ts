@@ -1,12 +1,14 @@
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { Scene } from "@babylonjs/core/scene";
 
-import type { ProceduralMapSource } from "./level-definition";
+import type { ProceduralMapSource, StaticShape, StaticSolid } from "./level-definition";
 import type { LevelScope } from "./level-scope";
 
 export interface LoadedProceduralMap {
   readonly meshes: readonly Mesh[];
   readonly ground: Mesh | null;
+  readonly groundShape: StaticShape;
+  readonly solids: readonly StaticSolid[];
 }
 
 /**
@@ -22,11 +24,12 @@ export function createProceduralMap(
     return null;
   }
 
-  const { ground = null, meshes = [] } = source.build({ scene, scope });
+  const { ground = null, groundShape = "box", meshes = [], solids = [] } = source.build({ scene, scope });
   if (ground) {
     scope.adopt(ground);
   }
   meshes.forEach((mesh) => scope.adopt(mesh));
+  solids.forEach((solid) => scope.adopt(solid.mesh));
 
-  return { meshes, ground };
+  return { meshes, ground, groundShape, solids };
 }

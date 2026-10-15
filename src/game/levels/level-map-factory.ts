@@ -4,7 +4,8 @@ import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { Tools } from "@babylonjs/core/Misc/tools";
 
 import { yieldToBrowser } from "../core/async/yield-to-browser";
-import type { GlbMapSource, MapMeshGroup, MapMeshMatcher, MapMeshRole } from "./level-definition"; import type { LevelScope } from "./level-scope";
+import type { GlbMapSource, MapMeshGroup, MapMeshMatcher, MapMeshRole, StaticShape, StaticSolid } from "./level-definition";
+import type { LevelScope } from "./level-scope";
 
 /** Nombre del nodo raíz que el loader de glTF crea alrededor de cada GLB. */
 const GLTF_ROOT_NODE_NAME = "__root__";
@@ -27,6 +28,10 @@ export interface LoadedMap {
   /** Suelo principal: el primero de `grounds`. */
   readonly ground: Mesh;
   readonly grounds: readonly Mesh[];
+  /** Forma del cuerpo físico de cada suelo; los que no figuran usan "box". */
+  readonly groundShapes: ReadonlyMap<Mesh, StaticShape>;
+  /** Mallas que no son suelo pero deben colisionar. */
+  readonly solids: readonly StaticSolid[];
   readonly proceduralMeshes: readonly Mesh[];
   readonly droppedMeshCount: number;
 }
