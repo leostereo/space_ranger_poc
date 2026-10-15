@@ -16,20 +16,27 @@ const SHAPE_TYPES: Record<StaticShape, PhysicsShapeType> = {
   mesh: PhysicsShapeType.MESH,
 };
 
-/** Crea el cuerpo físico estático de los suelos y de las mallas sólidas del nivel. Se liberan con el scope. */
-export function createGroundPhysics(map: LoadedMap, scene: Scene, scope: LevelScope): void {
+/**
+ * Crea el cuerpo físico estático de los suelos y de las mallas sólidas del nivel. Se liberan con el scope.
+ * Devuelve el cuerpo de cada malla, por si la strategy necesita luego destruirlo o volverlo dinámico.
+ */
+export function createGroundPhysics(map: LoadedMap, scene: Scene, scope: LevelScope): ReadonlyMap<Mesh, PhysicsAggregate> {
+  const bodies = new Map<Mesh, PhysicsAggregate>();
   if (!scene.isPhysicsEnabled()) {
     console.warn("[createGroundPhysics] the scene has no physics engine enabled: grounds have no body");
-    return;
+    return bodies;
   }
 
   const addBody = (mesh: Mesh, shape: StaticShape): void => {
-    scope.register(
-      new PhysicsAggregate(
-        mesh,
-        SHAPE_TYPES[shape],
-        { mass: STATIC_MASS, friction: STATIC_FRICTION, restitution: STATIC_RESTITUTION },
-        scene,
+    bodies.set(
+      mesh,
+      scope.register(
+        new PhysicsAggregate(
+          mesh,
+          SHAPE_TYPES[shape],
+          { mass: STATIC_MASS, friction: STATIC_FRICTION, restitution: STATIC_RESTITUTION },
+          scene,
+        ),
       ),
     );
   };
@@ -40,4 +47,5 @@ export function createGroundPhysics(map: LoadedMap, scene: Scene, scope: LevelSc
   for (const solid of map.solids) {
     addBody(solid.mesh, solid.shape);
   }
+  return bodies;
 }

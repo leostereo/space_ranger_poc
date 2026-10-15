@@ -3,6 +3,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Scalar } from "@babylonjs/core/Maths/math.scalar";
 import { Ray } from "@babylonjs/core/Culling/ray";
+import type { PickingInfo } from "@babylonjs/core/Collisions/pickingInfo";
 import {
   CHARACTER_CAPSULE_BOTTOM_POINT,
   CHARACTER_CAPSULE_RADIUS,
@@ -20,7 +21,11 @@ const TURN_SPEED = Math.PI;
 const GROUND_FRICTION = 0.8;
 const GROUND_RESTITUTION = 0;
 const GROUND_RAY_MARGIN = 0.15;
+const MIN_WALKABLE_NORMAL_Y = 0.5; // cos(60°): más empinado que esto no se sigue la pendiente
+const GROUND_STICK_SPEED = 0.5; // pequeño empuje hacia el suelo para no despegarse en bajadas y cambios de pendiente (0 = apagado)
+const GROUND_NORMAL_SMOOTHING = 0.3; // 0 a 1: cuánto sigue la normal nueva (suaviza los saltos entre triángulos)
 const UPWARD_VELOCITY_THRESHOLD = 0.5;
+const GROUND_COYOTE_TIME_SECONDS = 0.15 // tolerancia si el rayo falla un instante (bordes de triángulos, microrrebotes)
 const JUMP_IMPULSE = 10;
 const ROLL_INITIAL_SPEED = 8; // m/s, ajustar a gusto
 const ROLL_MAX_DURATION_SECONDS = 1.2; // safety net si notifyLandingRollEnd() nunca llega
@@ -41,6 +46,8 @@ const CAPSULE_CROUCH_TOP = 0.1;
 
 export class StandAlonePhysicsController implements IPhysicsController {
   private _groundDetected = true;
+  private _groundGraceRemaining = 0; // cuánto falta para dar por perdido el suelo cuando el rayo falla
+  private _groundNormal = Vector3.Up(); // normal del suelo bajo el personaje (suavizada)
   private _isCrouched = false; // NUEVO
   private _ray = new Ray(Vector3.Zero(), Vector3.Down(), 5);
   private _isRolling = false;
@@ -85,7 +92,7 @@ export class StandAlonePhysicsController implements IPhysicsController {
 
   tick(dt: number): void {
     const wasGrounded = this._groundDetected;
-    this._updateGroundDetection();
+    this._updateGroundDetection(dt);
 
     if (!wasGrounded && this._groundDetected) {
       const v = this.characterAggregate.body.getLinearVelocity();
@@ -210,8 +217,12 @@ export class StandAlonePhysicsController implements IPhysicsController {
     const isMovingBackwardOnly = backward && !forward;
     const speed = isMovingBackwardOnly ? WALK_BACKWARD_SPEED : (cruise ? RUN_SPEED : WALK_SPEED);
 
+    const velocityX = facing.x * speed;
+    const velocityZ = facing.z * speed;
     this.characterAggregate.body.setLinearVelocity(
-      new Vector3(facing.x * speed, verticalVelocity, facing.z * speed),
+      this._groundDetected
+        ? this._followGround(velocityX, velocityZ)
+        : new Vector3(velocityX, verticalVelocity, velocityZ),
     );
   }
 
@@ -224,14 +235,20 @@ export class StandAlonePhysicsController implements IPhysicsController {
     const right = this.characterAggregate.transformNode.right.scale(dirSign);
 
     this.characterAggregate.body.setAngularVelocity(Vector3.Zero()); // NUEVO — sin esto, el giro residual de _applyTurn() sigue girando indefinidamente
+    const strafeX = right.x * STRAFE_SPEED;
+    const strafeZ = right.z * STRAFE_SPEED;
     this.characterAggregate.body.setLinearVelocity(
-      new Vector3(right.x * STRAFE_SPEED, verticalVelocity, right.z * STRAFE_SPEED),
+      this._groundDetected
+        ? this._followGround(strafeX, strafeZ)
+        : new Vector3(strafeX, verticalVelocity, strafeZ),
     );
   }
 
   /** Suma un boost horizontal extra en la dirección hacia donde mira el personaje,
    * ENCIMA de la velocidad de carrera que ya trae (no la pisa como applyJumpImpulse). */
   applyRunningJumpImpulse(): void {
+    this._groundDetected = false; // salto explícito
+    this._groundGraceRemaining = 0;
     const currentVelocity = this.characterAggregate.body.getLinearVelocity();
     const forward = this.characterAggregate.transformNode.forward;
 
@@ -244,11 +261,44 @@ export class StandAlonePhysicsController implements IPhysicsController {
     );
   }
 
+  /** Normal de la cara del suelo (mirando hacia arriba), suavizada entre frames. */
+  private _updateGroundNormal(hit: PickingInfo): void {
+    // Normal de la cara: las de los vértices se promedian en los bordes de la malla y quedan inclinadas.
+    const normal = hit.getNormal(true, false);
+    if (!normal) {
+      return;
+    }
+    if (normal.y < 0) {
+      normal.scaleInPlace(-1); // algunas mallas tienen las caras al revés
+    }
+    Vector3.LerpToRef(this._groundNormal, normal, GROUND_NORMAL_SMOOTHING, this._groundNormal);
+    this._groundNormal.normalize();
+  }
+
+  /**
+   * Velocidad apoyado: conserva la componente horizontal y suma la vertical que deja el movimiento
+   * sobre el plano del suelo (en una bajada es negativa, así el personaje acompaña la pendiente).
+   */
+  private _followGround(horizontalX: number, horizontalZ: number): Vector3 {
+    const normal = this._groundNormal;
+    if (normal.y < MIN_WALKABLE_NORMAL_Y) {
+      return new Vector3(horizontalX, 0, horizontalZ);
+    }
+    const slopeY = -(normal.x * horizontalX + normal.z * horizontalZ) / normal.y;
+    return new Vector3(horizontalX, slopeY - GROUND_STICK_SPEED, horizontalZ);
+  }
+
   isGroundDetected(): boolean {
     return this._groundDetected;
   }
 
   applyJumpImpulse(): void {
+    // Entrar a OnAir también ocurre al perder el suelo sin saltar (borde, rebote): ahí no hay impulso.
+    if (!this._groundDetected) {
+      return;
+    }
+    this._groundDetected = false; // salto explícito: deja de estar apoyado (subir una rampa no cuenta como salto)
+    this._groundGraceRemaining = 0;
     const currentVelocity = this.characterAggregate.body.getLinearVelocity();
     this.characterAggregate.body.setLinearVelocity(
       new Vector3(currentVelocity.x, JUMP_IMPULSE, currentVelocity.z),
@@ -288,7 +338,7 @@ export class StandAlonePhysicsController implements IPhysicsController {
     this._isRolling = false;
   }
 
-  private _updateGroundDetection(): void {
+  private _updateGroundDetection(dt: number): void {
     const topY = this._isCrouched ? CAPSULE_CROUCH_TOP : CAPSULE_STANDING_TOP; // CAMBIADO
     const halfHeight = (topY - CAPSULE_BOTTOM) / 2; // CAMBIADO
     const rayLength = halfHeight + GROUND_RAY_MARGIN; // CAMBIADO — antes: generalConfig.playerConfig.height / 2 + GROUND_RAY_MARGIN
@@ -308,7 +358,30 @@ export class StandAlonePhysicsController implements IPhysicsController {
     const isMovingUpward = verticalVelocity > UPWARD_VELOCITY_THRESHOLD;
 
     //console.log(hit?.distance, hit?.pickedMesh?.name, hit?.hit, verticalVelocity, isMovingUpward)
-    this._groundDetected = !!(hit && hit.hit) && !isMovingUpward;
+    const rayHit = !!(hit && hit.hit);
+    if (hit && rayHit) {
+      this._updateGroundNormal(hit);
+    }
+
+    if (this._groundDetected) {
+      // Apoyado: sigue apoyado mientras el rayo toque el suelo, aunque suba (rampas).
+      // Si el rayo falla un instante se tolera GROUND_COYOTE_TIME_SECONDS antes de darlo por perdido.
+      if (rayHit) {
+        this._groundGraceRemaining = GROUND_COYOTE_TIME_SECONDS;
+      } else {
+        this._groundGraceRemaining -= dt;
+        if (this._groundGraceRemaining <= 0) {
+          this._groundDetected = false;
+        }
+      }
+      return;
+    }
+
+    // En el aire: toca el piso solo si el rayo lo ve y no está subiendo (si no, es el tramo ascendente de un salto).
+    if (rayHit && !isMovingUpward) {
+      this._groundDetected = true;
+      this._groundGraceRemaining = GROUND_COYOTE_TIME_SECONDS;
+    }
   }
 
   /** Llamado al entrar a Crouch (StandAloneFsm.onEnter). */

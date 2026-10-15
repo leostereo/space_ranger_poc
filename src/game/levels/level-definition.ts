@@ -78,10 +78,15 @@ export interface ProceduralMapContext {
 /** Forma del cuerpo físico estático: "box" sirve para planos; "mesh" sigue la geometría (curvas, relieve). */
 export type StaticShape = "box" | "mesh";
 
+/** Para qué se reserva un bloque sólido; lo usará la strategy del nivel (ej: destruirlo o hacerlo caer). */
+export type SolidKind = "breakable" | "falling";
+
 /** Malla que además de verse debe colisionar (cuerpo estático). */
 export interface StaticSolid {
   readonly mesh: Mesh;
   readonly shape: StaticShape;
+  /** Bloque especial; sin valor = bloque común. */
+  readonly kind?: SolidKind;
 }
 
 export interface ProceduralMapResult {
