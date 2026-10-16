@@ -228,10 +228,19 @@ export default class CharacterBase extends EventSubscriber {
     }
   }
 
-  /** ¿Esta malla es de la cápsula del Character o de su board? Los enemigos lo usan para saber si lo alcanzaron. */
+  /** ¿Esta malla es del Character: su cápsula, su board o su escudo activo? Los enemigos lo usan para saber si lo alcanzaron. */
   isPlayerMesh(mesh: AbstractMesh): boolean {
     const board = this._activeBoardMesh;
-    return mesh === this.characterMesh || (board !== null && (mesh === board || mesh.parent === board));
+    return (
+      mesh === this.characterMesh ||
+      (board !== null && (mesh === board || mesh.parent === board)) ||
+      this._isShieldMesh(mesh)
+    );
+  }
+
+  /** El escudo solo cuenta como blanco mientras está activo (desactivado, sus mallas ni se ven ni protegen). */
+  private _isShieldMesh(mesh: AbstractMesh): boolean {
+    return this.shieldRoot !== null && mesh.parent === this.shieldRoot && mesh.isEnabled();
   }
 
   /** ¿Murió? La animación de muerte sigue corriendo: la strategy decide cuándo termina el nivel. */
@@ -247,6 +256,7 @@ export default class CharacterBase extends EventSubscriber {
   /** Un proyectil alcanzó al Character (o a su board): se traduce al evento de daño que ya maneja. */
   private _onProjectileHit(hit: ProjectileHitPayload): void {
     if (!this.isPlayerMesh(hit.mesh)) return;
+    if (this._isShieldMesh(hit.mesh)) return; // el escudo absorbe el impacto: sin daño
     this._onPlayerShooted({ damage: hit.damage, hitPoint: hit.point, direction: hit.direction, sourceId: hit.sourceId });
   }
 
