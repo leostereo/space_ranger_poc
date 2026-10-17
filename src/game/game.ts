@@ -21,11 +21,18 @@ import { PausedState } from "./states/paused-state";
 import { PlayingState } from "./states/playing-state";
 import { SplashState } from "./states/splash-state";
 import { ScreenManager } from "./ui/screens/screen-manager";
+import { DEFAULT_KEY_BINDINGS } from "./core/input/input-bindings";
+import { InputHub } from "./core/input/input-hub";
+import { KeyboardSource } from "./core/input/keyboard-source";
+import { GamepadSource } from "./core/input/gamepad-source";
+import { DEFAULT_GAMEPAD_BINDINGS } from "./core/input/gamepad-bindings";
 
 /** Raíz de composición del juego: arma el contexto, los servicios, la GameFsm y sus estados. */
 export class Game {
   private readonly screens: ScreenManager;
   private readonly input: AnyInputService;
+  private readonly inputHub: InputHub;
+  private readonly gamepad: GamepadSource;
   private readonly hotkeys: HotkeyService;
   private readonly assets: AssetRegistry;
   private readonly assetLoader: AssetLoader;
@@ -38,11 +45,16 @@ export class Game {
 
   constructor(scene: Scene, engine: AbstractEngine, canvas: HTMLCanvasElement) {
     this.assets = new AssetRegistry();
-    const context: GameContext = { scene, engine, canvas, assets: this.assets };
-
+    this.gamepad = new GamepadSource(DEFAULT_GAMEPAD_BINDINGS);
+    this.inputHub = new InputHub([new KeyboardSource(DEFAULT_KEY_BINDINGS), this.gamepad]);
+    const context: GameContext = { scene, engine, canvas, assets: this.assets, input: this.inputHub };
     this.screens = new ScreenManager();
     this.input = new AnyInputService();
     this.hotkeys = new HotkeyService();
+
+    // Gamepad: cualquier botón avanza pantallas; el botón de pausa equivale a Esc.
+    this.gamepad.onAnyButton(() => this.input.notify());
+    this.gamepad.onActionPressed("pause", () => this.hotkeys.trigger("Escape"));
     this.assetLoader = new AssetLoader(scene, this.assets);
     this.levels = new LevelRepository(LEVEL_DEFINITIONS, createSafeStorage());
     this.levelSession = new LevelSession(scene);
@@ -69,6 +81,7 @@ export class Game {
   }
 
   update(deltaTime: number): void {
+    this.inputHub.update(); // primero: el resto del frame ve la entrada ya leída
     this.fsm.update(deltaTime);
   }
 
@@ -81,6 +94,7 @@ export class Game {
     this.assets.dispose();
     this.hotkeys.dispose();
     this.input.dispose();
+    this.inputHub.dispose();
     this.screens.dispose();
   }
 

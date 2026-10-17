@@ -1,3 +1,5 @@
+import type { InputHub } from "@/game/core/input/input-hub";
+
 export interface CharacterInputState {
   forward: boolean;  // W
   backward: boolean; // S
@@ -10,6 +12,10 @@ export interface CharacterInputState {
   shield: boolean;   // "/" — mantenido en OnGround (Idle/Walking/WalkingBackwards/Strafe, CrouchIdle) levanta el escudo
 }
 
+/**
+ * Estado de entrada del personaje, armado en cada frame a partir del InputHub (teclado y, más adelante,
+ * gamepad). Ya no escucha la ventana: el hub es el único que conoce los dispositivos.
+ */
 export class CharacterInput {
   private state: CharacterInputState = {
     forward: false,
@@ -24,20 +30,36 @@ export class CharacterInput {
   };
 
   /**
-   * Único flag para Ctrl: no distingue jetpack/board, eso lo decide
+   * Único flag para equipar (L): no distingue jetpack/board, eso lo decide
    * CharacterFsm.requestEquipment() según el sub-estado activo.
    */
   private equipRequested = false;
   private jumpRequested = false;
   private crouchRollRequested = false;
 
-  constructor() {
-    window.addEventListener("keydown", this._onKeyDown);
-    window.addEventListener("keyup", this._onKeyUp);
-  }
+  constructor(private readonly hub: InputHub) {}
 
   get current(): CharacterInputState {
     return this.state;
+  }
+
+  /** Copia la entrada del hub. Se llama una vez por frame, antes de que corran las strategies. */
+  update(): void {
+    const { hub, state } = this;
+    state.forward = hub.isHeld("moveForward");
+    state.backward = hub.isHeld("moveBackward");
+    state.left = hub.isHeld("turnLeft");
+    state.right = hub.isHeld("turnRight");
+    state.up = hub.isHeld("jump");
+    state.cruise = hub.isHeld("cruise");
+    state.shoot = hub.isHeld("shoot");
+    state.crouch = hub.isHeld("crouch");
+    state.shield = hub.isHeld("shield");
+
+    // Pedidos puntuales: se consumen una sola vez.
+    if (hub.wasPressed("jump")) this.jumpRequested = true;
+    if (hub.wasPressed("crouch")) this.crouchRollRequested = true; // edge trigger
+    if (hub.wasReleased("equip")) this.equipRequested = true; // se pide al SOLTAR la tecla, como antes
   }
 
   consumeEquipRequest(): boolean {
@@ -59,57 +81,6 @@ export class CharacterInput {
   }
 
   dispose(): void {
-    window.removeEventListener("keydown", this._onKeyDown);
-    window.removeEventListener("keyup", this._onKeyUp);
+    // Sin listeners propios: el InputHub es de todo el juego y lo libera Game.
   }
-
-  private _onKeyDown = (ev: KeyboardEvent): void => {
-    switch (ev.code) {
-      case "KeyW": this.state.forward = true; break;
-      case "KeyS": this.state.backward = true; break;
-      case "KeyA": this.state.left = true; break;
-      case "KeyD": this.state.right = true; break;
-      case "Space": this.state.up = true; this.jumpRequested = true; break;
-      case "ShiftLeft":
-      case "ShiftRight":
-        this.state.cruise = true;
-        break;
-      case "Comma": // CAMBIADO — antes "Slash", ahora "," dispara
-        this.state.shoot = true;
-        break;
-      case "Period":
-        this.state.crouch = true;
-        this.crouchRollRequested = true; // NUEVO — edge trigger, consumido una sola vez
-        break;
-      case "Slash":
-        this.state.shield = true;
-        break;
-    }
-  };
-
-  private _onKeyUp = (ev: KeyboardEvent): void => {
-    switch (ev.code) {
-      case "KeyW": this.state.forward = false; break;
-      case "KeyS": this.state.backward = false; break;
-      case "KeyA": this.state.left = false; break;
-      case "KeyD": this.state.right = false; break;
-      case "Space": this.state.up = false; break;
-      case "ShiftLeft":
-      case "ShiftRight":
-        this.state.cruise = false;
-        break;
-      case "Comma": // CAMBIADO — antes "Slash"
-        this.state.shoot = false;
-        break;
-      case "Period": // sin cambios
-        this.state.crouch = false;
-        break;
-      case "KeyL": 
-        this.equipRequested = true;
-        break;
-      case "Slash":
-        this.state.shield = false;
-        break;
-    }
-  };
 }

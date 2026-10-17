@@ -38,6 +38,7 @@ export class LevelSetupState implements GameState {
   ) {}
 
   async enter(context: GameContext): Promise<void> {
+    const pad = navigator.getGamepads().find(Boolean); console.log(pad?.id, pad?.mapping, pad?.buttons.length, pad?.axes.length)
     this.exited = false;
     this.ready = false;
 
@@ -67,7 +68,7 @@ export class LevelSetupState implements GameState {
 
       // 3B
       createGroundPhysics(map, context.scene, scope);
-      const character = await CharacterBase.create(context.scene, context.assets, definition.spawns.character);
+      const character = await CharacterBase.create(context.scene, context.assets, definition.spawns.character, context.input);
       if (this.exited) {
         character.dispose(); // la carga se canceló mientras se construía
         return;

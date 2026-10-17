@@ -28,6 +28,7 @@ import { characterAndEquipment_builder } from "./utils/buildUtils";
 import { CombatRules } from "./utils/combat-rules";
 import type { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import type { Material } from "@babylonjs/core/Materials/material";
+import type { InputHub } from "@/game/core/input/input-hub";
 
 const BOARD_GROUND_COYOTE_TIME_SECONDS = 0.15; // tolerancia antes de considerar que el board perdió el suelo
 const JUMP_IMPULSE_FRAME = 30; const EQUIP_BOARD_FRAME = 60; // placeholder — ajustar cuando definan el frame real del clip
@@ -108,13 +109,13 @@ export default class CharacterBase extends EventSubscriber {
   private boardMaterial: Material;
 
   /** Construye el Character listo para jugar. Quien lo crea lo registra en el LevelScope (`scope.register`). */
-  static async create(scene: Scene, registry: AssetRegistry, spawn: Vector3): Promise<CharacterBase> {
+  static async create(scene: Scene, registry: AssetRegistry, spawn: Vector3, inputHub: InputHub): Promise<CharacterBase> {
     const character = new CharacterBase();
-    await character.initialize(scene, registry, spawn);
+    await character.initialize(scene, registry, spawn, inputHub);
     return character;
   }
 
-  private async initialize(scene: Scene, registry: AssetRegistry, spawn: Vector3): Promise<void> {
+  private async initialize(scene: Scene, registry: AssetRegistry, spawn: Vector3, inputHub: InputHub): Promise<void> {
     this.scene = scene;
 
     const { characterMesh, characterAggregate, characterAnimations, weaponRoot, muzzle,
@@ -142,8 +143,7 @@ export default class CharacterBase extends EventSubscriber {
     }
 
     this.followCamera = createCharacterFollowCamera(scene, this.characterMesh);
-    this.input = new CharacterInput();
-
+    this.input = new CharacterInput(inputHub);
     this.fsm = new CharacterFsm({
       hasFuel: () => this.activeJetpackPhysics?.hasFuel() ?? true,
       onEnterEquippingJetpack: () => this._swapToJetpack(),
@@ -372,6 +372,7 @@ export default class CharacterBase extends EventSubscriber {
   }
 
   update(dt: number): void {
+    this.input.update(); // toma la entrada del hub, una vez por frame
     // Muerto: sin input, disparo ni animación; solo seguimos tickeando la física para que frene
     // (en el board, además, para que siga flotando mientras se detiene).
     if (this.fsm.getState() === "Dead") {

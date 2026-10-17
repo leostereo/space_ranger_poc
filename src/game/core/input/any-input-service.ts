@@ -32,6 +32,11 @@ export class AnyInputService {
     this.target.addEventListener("pointerdown", this.handlePointerDown);
   }
 
+  /** Entrada que no viene de la ventana (ej: un botón del gamepad): cuenta igual que una tecla. */
+  notify(): void {
+    this.flush();
+  }
+
   /** Ejecuta `listener` en la próxima entrada. Devuelve la función para cancelar. */
   onNextInput(listener: InputListener): () => void {
     this.pending.add(listener);

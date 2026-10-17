@@ -32,8 +32,22 @@ export class HotkeyService {
     this.target.addEventListener("keydown", this.handleKeyDown);
   }
 
-  /** Devuelve la función para desuscribir. */
-  onHotkey(code: string, listener: HotkeyListener): () => void {
+  /** Dispara los atajos de `code` sin que haya habido una tecla (ej: el botón de pausa del gamepad = Escape). */
+  trigger(code: string): void {
+    const listeners = this.bindings.get(code);
+    if (!listeners) {
+      return;
+    }
+    for (const listener of [...listeners]) {
+      try {
+        listener();
+      } catch (error) {
+        console.error(`[HotkeyService] listener failed for "${code}"`, error);
+      }
+    }
+  }
+
+  /** Devuelve la función para desuscribir. */  onHotkey(code: string, listener: HotkeyListener): () => void {
     const listeners = this.bindings.get(code) ?? new Set<HotkeyListener>();
     listeners.add(listener);
     this.bindings.set(code, listeners);
