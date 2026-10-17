@@ -17,7 +17,10 @@ import { isShieldActive } from "../../utils/combat-rules";
 
 const WALK_SPEED = 4;
 const RUN_SPEED = 7;
-const TURN_SPEED = Math.PI;
+const TURN_SPEED = Math.PI; // velocidad máxima de giro (rad/s)
+const TURN_SPEED_MIN_FACTOR = 0.2; // un toque corto arranca al 20% de la velocidad máxima: gira muy poco
+const TURN_RAMP_SECONDS = 0.4; // tiempo manteniendo la tecla hasta llegar a la velocidad máxima
+const AIM_TURN_FACTOR = 0.4; // al disparar, el giro máximo baja a este porcentaje (puntería fina)
 const GROUND_FRICTION = 0.8;
 const GROUND_RESTITUTION = 0;
 const GROUND_RAY_MARGIN = 0.15;
@@ -58,6 +61,8 @@ export class StandAlonePhysicsController implements IPhysicsController {
   private _lastImpactVerticalSpeed = 0;
   private _lastImpactHorizontalSpeed = 0;
   private _isWindingUpJump = false;
+  private _turnHeldSeconds = 0; // cuánto lleva sostenido el giro actual (para la rampa de velocidad)
+  private _lastTurnDirection = 0;
   private _isHitStunned = false; // NUEVO
   private _isDead = false; // NUEVO
   private _diedInAir = false; // NUEVO — murió sin tocar el piso: falta avisar el aterrizaje
@@ -155,7 +160,7 @@ export class StandAlonePhysicsController implements IPhysicsController {
     }
 
     // flujo normal (sin escudo)
-    this._applyTurn(input.left, input.right);
+    this._applyTurn(input.left, input.right, dt, input.shoot);
     this._applyMove(input.forward, input.backward, input.cruise);
   }
 
@@ -193,9 +198,26 @@ export class StandAlonePhysicsController implements IPhysicsController {
     }
   }
 
-  private _applyTurn(left: boolean, right: boolean): void {
+  /**
+   * Giro con rampa: arranca lento y acelera mientras se mantiene la tecla, así un toque corto da un ajuste fino
+   * y mantener apretado sigue girando rápido. Al disparar el máximo baja (puntería fina).
+   */
+  private _applyTurn(left: boolean, right: boolean, dt: number, aiming: boolean): void {
     const turnDir = (right ? 1 : 0) - (left ? 1 : 0);
-    this.characterAggregate.body.setAngularVelocity(new Vector3(0, turnDir * TURN_SPEED, 0));
+
+    if (turnDir === 0 || turnDir !== this._lastTurnDirection) {
+      this._turnHeldSeconds = 0; // soltó o cambió de sentido: vuelve a arrancar lento
+    }
+    this._lastTurnDirection = turnDir;
+    if (turnDir !== 0) {
+      this._turnHeldSeconds += dt;
+    }
+
+    const ramp = Math.min(this._turnHeldSeconds / TURN_RAMP_SECONDS, 1);
+    const maxSpeed = aiming ? TURN_SPEED * AIM_TURN_FACTOR : TURN_SPEED;
+    const speed = Scalar.Lerp(maxSpeed * TURN_SPEED_MIN_FACTOR, maxSpeed, ramp);
+
+    this.characterAggregate.body.setAngularVelocity(new Vector3(0, turnDir * speed, 0));
   }
 
   private _applyMove(forward: boolean, backward: boolean, cruise: boolean): void {

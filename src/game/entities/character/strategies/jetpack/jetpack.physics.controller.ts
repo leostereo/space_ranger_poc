@@ -28,7 +28,10 @@ const BOB_AMPLITUDE = 0.15;
 const BOB_FREQUENCY = 0.5;
 
 // ── giro en "On" — yaw puro, sin roll ──
-const TURN_SPEED = 2.5;
+const TURN_SPEED = 2.5; // velocidad máxima de giro (rad/s)
+const TURN_SPEED_MIN_FACTOR = 0.2; // un toque corto arranca al 20% de la velocidad máxima
+const TURN_RAMP_SECONDS = 0.4; // tiempo manteniendo la tecla hasta llegar a la velocidad máxima
+const AIM_TURN_FACTOR = 0.4; // al disparar, el giro máximo baja a este porcentaje (puntería fina)
 const TURN_DAMPING = 10;
 
 // ── cruising ──
@@ -44,7 +47,10 @@ const MAX_HOVER_CATCH_SPEED = 4; // m/s — tope de velocidad vertical que se le
 const ON_HORIZONTAL_BRAKE_FACTOR = 4; // mismo criterio que brakingDragFactor/CRUISE_LATERAL_GRIP — a ojo, ajustar sintiendo el frenado
 //shoot
 const SHOOTING_MAX_PITCH_ANGLE = Tools.ToRadians(45);
-const SHOOTING_PITCH_RATE = Tools.ToRadians(90); // rad/s — velocidad de ajuste mientras se sostiene W/S
+const SHOOTING_PITCH_RATE = Tools.ToRadians(90); // rad/s — velocidad máxima de ajuste mientras se sostiene W/S
+const SHOOTING_PITCH_MIN_FACTOR = 0.2; // un toque corto arranca al 20% de esa velocidad
+const SHOOTING_PITCH_RAMP_SECONDS = 0.4; // tiempo manteniendo W/S hasta llegar a la velocidad máxima
+
 
 // ── muerte ── (mismos valores que standAlone, para que el aterrizaje se sienta igual)
 const DEAD_LANDING_DAMPING_RATE = 6; // NUEVO — más alto = frena más rápido al tocar el piso
@@ -66,7 +72,12 @@ export class JetpackPhysicsController implements IPhysicsController {
   // Visual (roll/pitch) — aplicado en applyVisualRoll(), llamado desde
   // onAfterPhysicsObservable en character.base.ts, nunca en tick().
   private rollAngle = 0;
-  private pitchAngle = 0;
+    private pitchAngle = 0;
+  // Rampas de puntería: cuánto lleva sostenido el giro / la inclinación actual.
+  private _turnHeldSeconds = 0;
+  private _lastTurnDirection = 0;
+  private _pitchHeldSeconds = 0;
+  private _lastPitchDirection = 0;
 
   // Vectores reutilizados, mismo criterio anti-GC que board.controller.ts (poc2).
   private _forwardReference = Vector3.Forward();
@@ -149,7 +160,7 @@ export class JetpackPhysicsController implements IPhysicsController {
       this._applyCruiseSteering(dt);
       this._applyCruiseLateralFriction();
     } else {
-      this._applyTurn(dt); // también cubre Shooting: A/D siguen siendo yaw puro, igual que "On"
+      this._applyTurn(dt, subState === "Shooting");
       this._decayVisuals(dt, subState); // CAMBIADO — antes _decayCruiseVisuals(dt), ver abajo
       this._applyOnHorizontalBrake();
     }
@@ -215,8 +226,18 @@ export class JetpackPhysicsController implements IPhysicsController {
   private _updateShootingPitch(dt: number): void {
     const { forward, backward } = this.getInput();
 
-  if (forward) this.pitchAngle -= SHOOTING_PITCH_RATE * dt;
-  if (backward) this.pitchAngle += SHOOTING_PITCH_RATE * dt;
+    // Rampa: un toque corto da un ajuste fino; mantener apretado sube la velocidad hasta SHOOTING_PITCH_RATE.
+    const pitchDirection = (backward ? 1 : 0) - (forward ? 1 : 0);
+    if (pitchDirection === 0 || pitchDirection !== this._lastPitchDirection) {
+      this._pitchHeldSeconds = 0;
+    }
+    this._lastPitchDirection = pitchDirection;
+    if (pitchDirection !== 0) {
+      this._pitchHeldSeconds += dt;
+      const ramp = Math.min(this._pitchHeldSeconds / SHOOTING_PITCH_RAMP_SECONDS, 1);
+      const rate = Scalar.Lerp(SHOOTING_PITCH_RATE * SHOOTING_PITCH_MIN_FACTOR, SHOOTING_PITCH_RATE, ramp);
+      this.pitchAngle += pitchDirection * rate * dt;
+    }
 
   this.pitchAngle = Scalar.Clamp(this.pitchAngle, -SHOOTING_MAX_PITCH_ANGLE, SHOOTING_MAX_PITCH_ANGLE);
 }
@@ -228,10 +249,14 @@ export class JetpackPhysicsController implements IPhysicsController {
 
   notifyShootingEnter(): void {
     this.pitchAngle = 0;
+    this._pitchHeldSeconds = 0;
+    this._lastPitchDirection = 0;
   }
 
   notifyShootingExit(): void {
     this.pitchAngle = 0;
+    this._pitchHeldSeconds = 0;
+    this._lastPitchDirection = 0;
   }
 
   /** Compensación de gravedad pura — separada del spring del hover para poder desactivar
@@ -336,10 +361,21 @@ export class JetpackPhysicsController implements IPhysicsController {
 
   /** Giro de "On": velocidad angular directa en Y, sin roll. x/z forzados a 0 cada tick
    * para garantizar cero roll/pitch pase lo que pase con el resto de las fuerzas. */
-  private _applyTurn(dt: number): void {
+  private _applyTurn(dt: number, aiming: boolean): void {
     const { left, right } = this.getInput();
     const turnDirection = (left ? -1 : 0) + (right ? 1 : 0); // A = -Y, D = +Y (left-handed, ver nota giro invertido)
-    const targetAngularVelocity = turnDirection * TURN_SPEED;
+
+    // Rampa: arranca lento y acelera mientras se mantiene la tecla; al disparar el máximo baja (puntería fina).
+    if (turnDirection === 0 || turnDirection !== this._lastTurnDirection) {
+      this._turnHeldSeconds = 0;
+    }
+    this._lastTurnDirection = turnDirection;
+    if (turnDirection !== 0) {
+      this._turnHeldSeconds += dt;
+    }
+    const ramp = Math.min(this._turnHeldSeconds / TURN_RAMP_SECONDS, 1);
+    const maxSpeed = aiming ? TURN_SPEED * AIM_TURN_FACTOR : TURN_SPEED;
+    const targetAngularVelocity = turnDirection * Scalar.Lerp(maxSpeed * TURN_SPEED_MIN_FACTOR, maxSpeed, ramp);
 
     const currentYawVelocity = this.characterAggregate.body.getAngularVelocity().y;
     const smoothedY = Scalar.Lerp(
