@@ -127,3 +127,27 @@ src\game\core\events\typed-event-emitter.ts
 Disparo:  arma → EventManager.emit(ProjectileHit) → EnemiesManager → enemy.takeHit()
 Juego:    strategy.finish → strategy.events("levelFinished") → PlayingState
                           → fsm.transitionTo → fsm.events → DebugHud
+
+
+pendientes:
+scenario: 
+spawn area.
+Tramo tunel:
+     mas ancho , curvas mas abiertas , ideal board.
+     meter dumies para probar disparo con.
+     meter cortes para probar salto.
+     interrumpir con otros tramos hacia arriba (para ir con jetpack)
+     interrumpir hacia abajo
+plataforma recta.
+    para poner drones estaticos.
+    poner box para cubrirse.
+tramo puente
+    interrumpir para probar salto
+    box para esconderse/cubrirse.
+    custodiado por flying drones.
+    
+
+drones mas grandes.
+caminar inclinado con el shield, idem shoting.
+tamaño capsuila dinamica en crouch
+angulo vertical en stand alone

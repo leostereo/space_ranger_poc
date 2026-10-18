@@ -13,7 +13,7 @@ import type { ProjectileHitPayload } from "@/game/services/event-manager";
 
 import { EnemyBase } from "../enemy";
 import type { EnemyDeps } from "../enemy-factory";
-import { buildDroneModel, DRONE_HOVER_HEIGHT } from "./drone-model";
+import { buildDroneModelV2, DRONE_HOVER_HEIGHT } from "./drone-modelV2";
 import { DEFAULT_PROJECTILE_WEAPON_CONFIG, ProjectileWeaponConfig, ProjectileWeaponController } from "../../character/strategies/weapon/projectile-weapon.controller";
 
 const DRONE_HEALTH = 3; // con daño 1 por proyectil: 3 disparos
@@ -75,7 +75,7 @@ export abstract class DroneBase extends EnemyBase {
     const position = options.spawnAtExactPosition
       ? spawn.position.clone()
       : new Vector3(spawn.position.x, spawn.position.y + DRONE_HOVER_HEIGHT, spawn.position.z);
-    const model = buildDroneModel(
+    const model = buildDroneModelV2(
       deps.scene,
       id,
       {
