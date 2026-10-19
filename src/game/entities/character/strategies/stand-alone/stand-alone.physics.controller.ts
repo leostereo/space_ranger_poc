@@ -149,13 +149,8 @@ export class StandAlonePhysicsController implements IPhysicsController {
     // NUEVO — bloque del escudo (el que preguntás)
     if (isShieldActive(subState, input)) {
       const strafeDir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-      const canStrafeNow = !input.forward && !input.backward && subState !== "CrouchIdle";
-      if (strafeDir !== 0 && canStrafeNow) {
-        this._applyStrafe(strafeDir as -1 | 1);
-        return;
-      }
-      this.characterAggregate.body.setAngularVelocity(Vector3.Zero());
-      this._applyMove(input.forward, input.backward, false);
+      const canStrafeNow = subState !== "CrouchIdle";
+      this._applyShieldMove(input.forward, input.backward, canStrafeNow ? (strafeDir as -1 | 0 | 1) : 0);
       return;
     }
 
@@ -245,6 +240,39 @@ export class StandAlonePhysicsController implements IPhysicsController {
       this._groundDetected
         ? this._followGround(velocityX, velocityZ)
         : new Vector3(velocityX, verticalVelocity, velocityZ),
+    );
+  }
+
+    /** Movimiento con escudo: adelante/atrás y strafe se pueden combinar (diagonal). El escudo no gira. */
+  private _applyShieldMove(forward: boolean, backward: boolean, strafeDir: -1 | 0 | 1): void {
+    this.characterAggregate.body.setAngularVelocity(Vector3.Zero());
+    const dirSign = (forward ? 1 : 0) - (backward ? 1 : 0);
+
+    // Un solo eje (o quieto): se usan los caminos que ya existían.
+    if (strafeDir === 0) {
+      this._applyMove(forward, backward, false);
+      return;
+    }
+    if (dirSign === 0) {
+      this._applyStrafe(strafeDir as -1 | 1);
+      return;
+    }
+
+    // Diagonal: suma de las dos componentes, sin pasar la velocidad del eje más rápido.
+    const node = this.characterAggregate.transformNode;
+    const forwardSpeed = dirSign > 0 ? WALK_SPEED : WALK_BACKWARD_SPEED;
+    const velocity = node.forward.scale(dirSign * forwardSpeed).add(node.right.scale(strafeDir * STRAFE_SPEED));
+    velocity.y = 0;
+    const maxSpeed = Math.max(forwardSpeed, STRAFE_SPEED);
+    if (velocity.length() > maxSpeed) {
+      velocity.scaleInPlace(maxSpeed / velocity.length());
+    }
+
+    const currentVelocity = this.characterAggregate.body.getLinearVelocity();
+    this.characterAggregate.body.setLinearVelocity(
+      this._groundDetected
+        ? this._followGround(velocity.x, velocity.z)
+        : new Vector3(velocity.x, currentVelocity.y, velocity.z),
     );
   }
 
