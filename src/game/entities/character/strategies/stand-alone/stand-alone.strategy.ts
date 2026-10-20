@@ -12,6 +12,8 @@ import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { ProjectileWeaponController } from "../weapon/projectile-weapon.controller";
 import type { CombatRules } from "../../utils/combat-rules";
+import { Mesh } from "@babylonjs/core";
+import { StandAloneAimController } from "./stand-alone-aim.controller";
 
 export interface StandAloneStrategyResult {
   strategy: IVehicleStrategy;
@@ -29,8 +31,10 @@ export async function buildStandAloneStrategy(
   input: CharacterInput,
   characterFsm: CharacterFsm,
   characterAnimations: CharacterAnimationSet | null,
+  weaponRoot: TransformNode,
   weaponMuzzle: TransformNode, // NUEVO — antes del último param opcional
   combat: CombatRules, // NUEVO — antes del último param opcional
+  characterMesh: Mesh,
   initialGroundDetectedOverride?: boolean,
 
 ): Promise<StandAloneStrategyResult> {
@@ -54,11 +58,24 @@ export async function buildStandAloneStrategy(
     [characterAggregate.transformNode as AbstractMesh],
   );
 
+  const aim = new StandAloneAimController({
+    scene,
+    input: input,
+    fsm: characterFsm,
+    combat: combat,
+    weaponRoot,
+    muzzle: weaponMuzzle,
+    isAimClipPlaying: () =>
+      !!(characterAnimations?.idle_aiming?.isPlaying || characterAnimations?.crouch_idle_aim?.isPlaying),
+    characterMesh
+  });
+
   const strategy: IVehicleStrategy = {
     physics,
     input: inputController,
     animation,
     tick(dt: number) {
+      aim.update(dt); // NUEVO
       inputController.tick();
       physics.tick(dt);
       animation.tick();
@@ -68,7 +85,9 @@ export async function buildStandAloneStrategy(
       physics.dispose();
       inputController.dispose();
       animation.dispose();
-      weapon.dispose(); // NUEVO
+      weapon.dispose(); 
+      aim?.dispose();
+      // aim = null;
     },
   };
 

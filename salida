@@ -1,0 +1,132 @@
+diff --git a/src/game/entities/character/character.base.ts b/src/game/entities/character/character.base.ts
+index f811ed3..6943013 100644
+--- a/src/game/entities/character/character.base.ts
++++ b/src/game/entities/character/character.base.ts
+@@ -29,6 +29,9 @@ import { CombatRules } from "./utils/combat-rules";
+ import type { Texture } from "@babylonjs/core/Materials/Textures/texture";
+ import type { Material } from "@babylonjs/core/Materials/material";
+ import type { InputHub } from "@/game/core/input/input-hub";
++import { AimController } from "./utils/aim.controller";
++
++const AIM_BONE_NAME = "player:__root__.Armature.mixamorig:Hips.mixamorig:Spine"; // TODO: nombre real del hueso que ya manipulás en aim_idle
+ 
+ const BOARD_GROUND_COYOTE_TIME_SECONDS = 0.15; // tolerancia antes de considerar que el board perdió el suelo
+ const JUMP_IMPULSE_FRAME = 30; const EQUIP_BOARD_FRAME = 60; // placeholder — ajustar cuando definan el frame real del clip
+@@ -195,8 +198,19 @@ export default class CharacterBase extends EventSubscriber {
+     });
+ 
+     this.combat = new CombatRules(this.fsm, this.input);
+-    this.subscribeEvents();
++    // this.aim = new AimController({
++    //   scene,
++    //   input: this.input,
++    //   fsm: this.fsm,
++    //   combat: this.combat,
++    //   weaponRoot,
++    //   muzzle,
++    //   bone: this._findAimBone(),
++    //   isAimClipPlaying: () =>
++    //     !!(this.characterAnimations?.idle_aiming?.isPlaying || this.characterAnimations?.crouch_idle_aim?.isPlaying),
++    // });
+ 
++    this.subscribeEvents();
+     this._wireJumpAnimationEvent();
+     this._wireEquipBoardAnimationEvent();
+     this._wireLandingAnimationEvents();
+@@ -209,8 +223,10 @@ export default class CharacterBase extends EventSubscriber {
+       this.input,
+       this.fsm,
+       this.characterAnimations,
++      this.weaponRoot,
+       this.weaponMuzzle,
+       this.combat,
++      this.characterMesh
+     );
+ 
+     this.activeStrategy = strategy;
+@@ -238,6 +254,14 @@ export default class CharacterBase extends EventSubscriber {
+     );
+   }
+ 
++  private _findAimBone(): TransformNode | null {
++    const bone = this.characterMesh.getChildTransformNodes(false, (node) => node.name.endsWith(AIM_BONE_NAME))[0] ?? null;
++    if (!bone) {
++      console.warn(`CharacterBase: no se encontró el hueso de apuntado "${AIM_BONE_NAME}"; solo se inclinará el arma.`);
++    }
++    return bone;
++  }
++
+   /** El escudo solo cuenta como blanco mientras está activo (desactivado, sus mallas ni se ven ni protegen). */
+   private _isShieldMesh(mesh: AbstractMesh): boolean {
+     return this.shieldRoot !== null && mesh.parent === this.shieldRoot && mesh.isEnabled();
+@@ -490,8 +514,10 @@ export default class CharacterBase extends EventSubscriber {
+       this.input,
+       this.fsm,
+       this.characterAnimations,
++      this.weaponRoot!,
+       this.weaponMuzzle, // NUEVO
+       this.combat,
++      this.characterMesh,
+       initialGroundDetectedOverride,
+     );
+ 
+diff --git a/src/game/entities/character/strategies/stand-alone/stand-alone.strategy.ts b/src/game/entities/character/strategies/stand-alone/stand-alone.strategy.ts
+index a092547..caa0191 100644
+--- a/src/game/entities/character/strategies/stand-alone/stand-alone.strategy.ts
++++ b/src/game/entities/character/strategies/stand-alone/stand-alone.strategy.ts
+@@ -12,6 +12,8 @@ import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+ import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+ import { ProjectileWeaponController } from "../weapon/projectile-weapon.controller";
+ import type { CombatRules } from "../../utils/combat-rules";
++import { Mesh } from "@babylonjs/core";
++import { StandAloneAimController } from "./stand-alone-aim.controller";
+ 
+ export interface StandAloneStrategyResult {
+   strategy: IVehicleStrategy;
+@@ -29,8 +31,10 @@ export async function buildStandAloneStrategy(
+   input: CharacterInput,
+   characterFsm: CharacterFsm,
+   characterAnimations: CharacterAnimationSet | null,
++  weaponRoot: TransformNode,
+   weaponMuzzle: TransformNode, // NUEVO — antes del último param opcional
+   combat: CombatRules, // NUEVO — antes del último param opcional
++  characterMesh: Mesh,
+   initialGroundDetectedOverride?: boolean,
+ 
+ ): Promise<StandAloneStrategyResult> {
+@@ -54,6 +58,18 @@ export async function buildStandAloneStrategy(
+     [characterAggregate.transformNode as AbstractMesh],
+   );
+ 
++  const aim = new StandAloneAimController({
++    scene,
++    input: input,
++    fsm: characterFsm,
++    combat: combat,
++    weaponRoot,
++    muzzle: weaponMuzzle,
++    isAimClipPlaying: () =>
++      !!(characterAnimations?.idle_aiming?.isPlaying || characterAnimations?.crouch_idle_aim?.isPlaying),
++    characterMesh
++  });
++
+   const strategy: IVehicleStrategy = {
+     physics,
+     input: inputController,
+@@ -63,12 +79,15 @@ export async function buildStandAloneStrategy(
+       physics.tick(dt);
+       animation.tick();
+       weapon.tick(dt); // NUEVO
++      aim.update(dt); // NUEVO
+     },
+     dispose() {
+       physics.dispose();
+       inputController.dispose();
+       animation.dispose();
+-      weapon.dispose(); // NUEVO
++      weapon.dispose(); 
++      aim?.dispose();
++      // aim = null;
+     },
+   };
+ 
