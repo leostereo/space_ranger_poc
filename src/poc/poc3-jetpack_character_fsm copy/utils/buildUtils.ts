@@ -2,7 +2,7 @@
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType } from "@babylonjs/core/Physics/v2/IPhysicsEnginePlugin";
-import { Axis, Quaternion, Space, TransformNode } from "@babylonjs/core";
+import { Axis, Color3, CubeTexture, Quaternion, Space, StandardMaterial, Texture, TransformNode } from "@babylonjs/core";
 import type { Scene } from "@babylonjs/core/scene";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { generalConfig } from "@/poc/config.general";
@@ -26,10 +26,49 @@ export function scene_builder(scene: Scene) {
   const light = AssetManager.getLight("main", false, "light");
   light.setEnabled(true);
 
+
+  
+  
+  createSkyBox(scene);
   createPlatforms(scene);
   addMapAggregate(scene);
 
   //return [groundAggregate];
+
+}
+
+const createSkyBox = (scene:Scene) => {
+// 1. Crear el cubo contenedor del universo
+// NOTA: Usamos un tamaño de 10000.0 para que el espacio se sienta gigantesco
+const skybox = MeshBuilder.CreateBox("spaceSkybox", { size: 1000 }, scene);
+
+// 2. Crear y configurar el material del cielo
+const skyboxMaterial = new StandardMaterial("spaceSkyboxMaterial", scene);
+
+// OBLIGATORIO: Desactivar el descarte de caras traseras para poder ver el cubo desde ADENTRO
+skyboxMaterial.backFaceCulling = false;
+
+// 3. Cargar tus 6 imágenes apuntando al nombre base (asumiendo que las guardaste en la carpeta 'textures/space/')
+// Si tus imágenes son .png, añade el parámetro de extensión al final: 
+// new BABYLON.CubeTexture("textures/space/espacio", scene, ["_px.png", "_py.png", "_pz.png", "_nx.png", "_ny.png", "_nz.png"]);
+skyboxMaterial.reflectionTexture = new CubeTexture(
+    "images/skybox/space", 
+    scene, 
+    ["_px.png", "_py.png", "_pz.png", "_nx.png", "_ny.png", "_nz.png"],true
+);
+console.log(skyboxMaterial.reflectionTexture);
+skyboxMaterial.reflectionTexture.coordinatesMode = Texture.SKYBOX_MODE;
+
+// 4. Asegurar que las luces del juego no alteren el fondo del espacio (mantener el negro profundo)
+skyboxMaterial.diffuseColor = new Color3(0, 0, 0);
+skyboxMaterial.specularColor = new Color3(0, 0, 0);
+
+// Asignar el material al cubo
+skybox.material = skyboxMaterial;
+
+// 5. EFECTO INFINITO: El skybox se moverá junto con la cámara/nave del jugador
+skybox.infiniteDistance = true;
+
 }
 
 const platformsData = [
