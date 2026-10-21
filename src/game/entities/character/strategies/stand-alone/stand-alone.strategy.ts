@@ -65,9 +65,7 @@ export async function buildStandAloneStrategy(
     combat: combat,
     weaponRoot,
     muzzle: weaponMuzzle,
-    isAimClipPlaying: () =>
-      !!(characterAnimations?.idle_aiming?.isPlaying || characterAnimations?.crouch_idle_aim?.isPlaying),
-    characterMesh
+    isAimClipPlaying: () => !!(characterAnimations?.idle_aiming?.isPlaying || characterAnimations?.crouch_idle_aim?.isPlaying)
   });
 
   const strategy: IVehicleStrategy = {

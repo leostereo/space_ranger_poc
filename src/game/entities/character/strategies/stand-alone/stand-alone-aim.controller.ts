@@ -53,7 +53,7 @@ export interface AimControllerDeps {
     weaponRoot: TransformNode;
     muzzle: TransformNode;
     /** Hueso del modelo que se rota sobre el clip de apuntado (null = solo se inclina el arma). */
-    bone: TransformNode | null;
+    // bone: TransformNode | null;
     /** true mientras suena un clip de apuntado sobre el que corresponde rotar el hueso. */
     isAimClipPlaying: () => boolean;
 }
@@ -82,10 +82,11 @@ export class StandAloneAimController {
     private _appliedOffsetZ = 0;
     private _lastWrittenZ = 0;
     private _afterAnimations: Nullable<Observer<Scene>>;
+    private bone : TransformNode | null = null;
 
     constructor(private deps: AimControllerDeps) {
 
-        this.deps.bone = this.deps.scene.getTransformNodeByName("mixamorig:Spine");
+        this.bone = this.deps.scene.getTransformNodeByName("mixamorig:Spine");
 
         if (!deps.muzzle.isDescendantOf(deps.weaponRoot)) {
             console.warn("AimController: el muzzle no cuelga de weaponRoot; el proyectil no seguirá la inclinación del arma.");
@@ -186,11 +187,11 @@ export class StandAloneAimController {
     }
 
     private _applyBone(): void {
-        const { bone } = this.deps;
-        if (!bone || this._pitch === 0 || !bone.rotationQuaternion || !this.deps.isAimClipPlaying()) return;
+        // const { bone } = this.deps;
+        if (!this.bone || this._pitch === 0 || !this.bone.rotationQuaternion || !this.deps.isAimClipPlaying()) return;
 
         const extra = Quaternion.RotationAxis(AIM_BONE_AXIS, AIM_BONE_SIGN * AIM_BONE_FACTOR * this._pitch);
-        bone.rotationQuaternion = bone.rotationQuaternion.multiply(extra);
+        this.bone.rotationQuaternion = this.bone.rotationQuaternion.multiply(extra);
     }
 
     private _reset(): void {
