@@ -75,8 +75,8 @@ export async function buildStandAloneStrategy(
     input: inputController,
     animation,
     tick(dt: number) {
-      aim.update(dt); // NUEVO
       inputController.tick();
+      aim.update(dt); // NUEVO
       physics.tick(dt);
       animation.tick();
       weapon.tick(dt); // NUEVO

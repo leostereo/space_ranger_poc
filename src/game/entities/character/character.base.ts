@@ -29,9 +29,7 @@ import { CombatRules } from "./utils/combat-rules";
 import type { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import type { Material } from "@babylonjs/core/Materials/material";
 import type { InputHub } from "@/game/core/input/input-hub";
-import { AimController } from "./utils/aim.controller";
 
-const AIM_BONE_NAME = "player:__root__.Armature.mixamorig:Hips.mixamorig:Spine"; // TODO: nombre real del hueso que ya manipulás en aim_idle
 
 const BOARD_GROUND_COYOTE_TIME_SECONDS = 0.15; // tolerancia antes de considerar que el board perdió el suelo
 const JUMP_IMPULSE_FRAME = 30; const EQUIP_BOARD_FRAME = 60; // placeholder — ajustar cuando definan el frame real del clip
@@ -198,18 +196,7 @@ export default class CharacterBase extends EventSubscriber {
     });
 
     this.combat = new CombatRules(this.fsm, this.input);
-    // this.aim = new AimController({
-    //   scene,
-    //   input: this.input,
-    //   fsm: this.fsm,
-    //   combat: this.combat,
-    //   weaponRoot,
-    //   muzzle,
-    //   bone: this._findAimBone(),
-    //   isAimClipPlaying: () =>
-    //     !!(this.characterAnimations?.idle_aiming?.isPlaying || this.characterAnimations?.crouch_idle_aim?.isPlaying),
-    // });
-
+    
     this.subscribeEvents();
     this._wireJumpAnimationEvent();
     this._wireEquipBoardAnimationEvent();
@@ -252,14 +239,6 @@ export default class CharacterBase extends EventSubscriber {
       (board !== null && (mesh === board || mesh.parent === board)) ||
       this._isShieldMesh(mesh)
     );
-  }
-
-  private _findAimBone(): TransformNode | null {
-    const bone = this.characterMesh.getChildTransformNodes(false, (node) => node.name.endsWith(AIM_BONE_NAME))[0] ?? null;
-    if (!bone) {
-      console.warn(`CharacterBase: no se encontró el hueso de apuntado "${AIM_BONE_NAME}"; solo se inclinará el arma.`);
-    }
-    return bone;
   }
 
   /** El escudo solo cuenta como blanco mientras está activo (desactivado, sus mallas ni se ven ni protegen). */
