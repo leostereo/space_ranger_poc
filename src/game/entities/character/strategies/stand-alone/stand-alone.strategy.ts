@@ -34,7 +34,6 @@ export async function buildStandAloneStrategy(
   weaponRoot: TransformNode,
   weaponMuzzle: TransformNode, // NUEVO — antes del último param opcional
   combat: CombatRules, // NUEVO — antes del último param opcional
-  characterMesh: Mesh,
   initialGroundDetectedOverride?: boolean,
 
 ): Promise<StandAloneStrategyResult> {

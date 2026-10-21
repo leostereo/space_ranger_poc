@@ -213,7 +213,6 @@ export default class CharacterBase extends EventSubscriber {
       this.weaponRoot,
       this.weaponMuzzle,
       this.combat,
-      this.characterMesh
     );
 
     this.activeStrategy = strategy;
@@ -496,7 +495,6 @@ export default class CharacterBase extends EventSubscriber {
       this.weaponRoot!,
       this.weaponMuzzle, // NUEVO
       this.combat,
-      this.characterMesh,
       initialGroundDetectedOverride,
     );
 
