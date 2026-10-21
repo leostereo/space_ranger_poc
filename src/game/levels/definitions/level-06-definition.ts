@@ -555,6 +555,7 @@ export const level06Definition: LevelDefinition = {
   id: "level-06",
   order: 6,
   brief: "Reach the end of the course.",
+  skybox: { basePath: "images/skybox/space" },
   maps: [{ kind: "procedural", build: buildLevel06Map }],
   spawns: {
     character: LAYOUT.characterSpawn,

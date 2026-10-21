@@ -9,6 +9,7 @@ import { LoadingScreen } from "../screens/loading-screen";
 import type { ScreenManager } from "../ui/screens/screen-manager";
 import { createEnemiesManager } from "../entities/enemies/enemy-factory";
 import { VolumePointSampler } from "../navigation/volume-point-sampler";
+import { Skybox } from "../levels/skybox";
 const PHASE_LABELS: Record<LevelLoadPhase, string> = {
   downloading: "Downloading map",
   optimizing: "Optimizing map",
@@ -63,6 +64,13 @@ export class LevelSetupState implements GameState {
       const map = await this.loader.load(definition, scope);
       if (!map || this.exited) {
         return; // cancelada: exit() ya liberó el nivel
+      }
+
+      if (definition.skybox) {
+        scope.register(await Skybox.create(context.scene, definition.skybox));
+      }
+      if (this.exited) {
+        return;
       }
       this.session.complete(map);
 

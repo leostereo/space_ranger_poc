@@ -108,6 +108,18 @@ export interface ProceduralMapSource {
 
 export type LevelMapSource = GlbMapSource | ProceduralMapSource;
 
+/** Skybox de un nivel: seis imágenes `<basePath>_px|nx|py|ny|pz|nz.<extension>`. */
+export interface SkyboxDefinition {
+  /** Ruta sin sufijo ni extensión, relativa a /public. Ej: "images/skybox/space". */
+  readonly basePath: string;
+  /** Por defecto "png". */
+  readonly extension?: string;
+  /** Lado del cubo. Por defecto 1000. */
+  readonly size?: number;
+  /** Para que el mismo set se vea distinto entre niveles. Por defecto 0. */
+  readonly rotationYDeg?: number;
+}
+
 /** Datos ESTÁTICOS de un nivel: viven en el código y se versionan con él. */
 export interface LevelDefinition {
   readonly id: string;
@@ -119,4 +131,6 @@ export interface LevelDefinition {
   readonly spawns: LevelSpawns;
   readonly waves: readonly WaveDefinition[];
   readonly navigation?: LevelNavigation;
+  readonly skybox?: SkyboxDefinition;
+
 }
