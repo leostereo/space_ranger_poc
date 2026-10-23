@@ -12,7 +12,8 @@ export type EnemyType =
   | "staticDrone"
   | "sentinelDrone"
   | "flyingSentinel"
-  | "raycastDummy";
+  | "raycastDummy"
+  | "dummyKamikazeDrone";
 /** Dónde y hacia dónde aparece un enemigo. */
 export interface EnemySpawn {
   /** Base del enemigo: a ras de suelo (o de la plataforma donde se apoya). */

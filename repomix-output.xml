@@ -40,1412 +40,2334 @@ The content is organized as follows:
 </file_summary>
 
 <directory_structure>
-debug/
-  patrol-volume-debug.ts
-drone/
-  .gitkeep
-  drone-base.ts
-  drone-model.ts
-  drone-modelV2.ts
-flying-sentinel/
-  flying-sentinel-drone.ts
-  flying-sentinel-movement.controller.ts
-sentinel/
-  sentinel-drone.ts
-  sentinel-movement.controller.ts
-  sentinel.fsm.ts
-dummy-target.ts
-enemies-manager.ts
-enemy-factory.ts
-enemy.ts
-static-drone.ts
+definitions/
+  level-01-definition.ts
+  level-02-definition.ts
+  level-03-definition.ts
+  level-04-definition.ts
+  level-05-definition.ts
+  level-06-definition.ts
+procedural/
+  box-path-builder.ts
+  ground-builders.ts
+  track-builder.ts
+strategies/
+  level-01-strategy.ts
+  level-02-strategy.ts
+  level-03-strategy.ts
+  level-04-strategy.ts
+  level-05-strategy.ts
+  level-06-strategy.ts
+ground-physics.ts
+level-definition.ts
+level-definitions.ts
+level-factory.ts
+level-lighting.ts
+level-loader.ts
+level-map-factory.ts
+level-progress.ts
+level-repository.ts
+level-scope.ts
+level-session.ts
+level-strategy.ts
+procedural-map-factory.ts
+skybox.ts
 </directory_structure>
 
 <files>
 This section contains the contents of the repository's files.
 
-<file path="debug/patrol-volume-debug.ts">
+<file path="definitions/level-01-definition.ts">
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+
+import type { LevelDefinition } from "../level-definition";
+
+/**
+ * Nivel 1 — mapa "Batalla del Pilar".
+ * Los datos del mapa vienen del AssetManager del POC. Lo marcado TODO son placeholders:
+ * hay que reemplazarlos por los valores reales del juego.
+ */
+export const level01Definition: LevelDefinition = {
+  id: "level-01",
+  order: 1,
+  brief: "TODO: objetivo del nivel",
+  maps: [{
+    kind: "glb",
+    modelRootUrl: "maps/",
+    modelFile: "topoexport_3D_modeling_batallaDelPilar.glb",
+    rootPosition: new Vector3(0, -900, -100),
+    rootRotationXDeg: 90,
+    groups: [
+      { role: "buildings", name: "merged-buildings", match: { includes: "TPX_Buildings" }, allow32BitIndices: true },
+      { role: "trees", name: "merged-trees", match: { pattern: /^node\d+/i }, allow32BitIndices: false },
+      { role: "roads", name: "merged-roads", match: { includes: "TPX_RoadsOutlines" }, allow32BitIndices: true },
+      { role: "greenAreas", name: "merged-green-areas", match: { includes: "TPX_GreenAreas" }, allow32BitIndices: true },
+      { role: "waterways", name: "merged-waterways", match: { includes: "TPX_Waterways" }, allow32BitIndices: true },
+    ],
+    ground: { name: "ground", match: { includes: "TPX_Ground" } },
+  }],
+  spawns: {
+    character: new Vector3(0, 0, 0), // TODO: coordenadas reales sobre el mapa
+    enemies: {}, // TODO
+    items: [],
+    other: [],
+  },
+  // Placeholder según la idea de hordas de 15 drones.
+  waves: [{ wave: 1, enemyType: "drone", quantity: 15, delaySeconds: 0 }],
+};
+</file>
+
+<file path="definitions/level-02-definition.ts">
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+
+import type { LevelDefinition } from "../level-definition";
+import { buildGround, buildLandingGround, LANDING_GROUND_SIZE } from "../procedural/ground-builders";
+const GROUND_WIDTH = 10;
+const GROUND_DEPTH = 60;
+
+/** Pegado al extremo del ground (fuera de él, para no superponer mallas en el mismo plano). */
+const LANDING_POSITION = new Vector3(0, 0, -(GROUND_DEPTH / 2 + LANDING_GROUND_SIZE / 2));
+const SPAWN_HEIGHT_MARGIN = 0.5; // el personaje aparece apenas sobre la plataforma y cae
+
+export const level02Definition: LevelDefinition = {
+  id: "level-02",
+  order: 2,
+  brief: "Destroy the 3 practice targets (3 hits each).",
+    maps: [
+    buildGround({ width: GROUND_WIDTH, depth: GROUND_DEPTH }),
+    buildLandingGround({ position: LANDING_POSITION }),
+  ],
+  spawns: {
+    character: LANDING_POSITION.add(new Vector3(0, SPAWN_HEIGHT_MARGIN, 0)),
+    enemies: {
+      dummyTarget: [
+        { position: new Vector3(0, 0, 0) },
+        { position: new Vector3(-2, 0, 10) },
+        { position: new Vector3(2, 0, 20) },
+      ],
+    },
+    items: [],
+    other: [],
+  },
+  waves: [{ wave: 1, enemyType: "drone", quantity: 15, delaySeconds: 0 }],
+};
+</file>
+
+<file path="definitions/level-03-definition.ts">
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+
+import type { EnemySpawn, LevelDefinition } from "../level-definition";
+import { buildGround, buildLandingGround, LANDING_GROUND_SIZE } from "../procedural/ground-builders";
+
+const GROUND_WIDTH = 10;
+const GROUND_DEPTH = 60;
+
+/** Pegado al extremo del ground (fuera de él, para no superponer mallas en el mismo plano). */
+const LANDING_POSITION = new Vector3(0, 0, -(GROUND_DEPTH / 2 + LANDING_GROUND_SIZE / 2));
+const SPAWN_HEIGHT_MARGIN = 0.5; // el personaje aparece apenas sobre la plataforma y cae
+
+/** Un dron en `position` que mira en horizontal hacia el landing. */
+const aimAtLanding = (position: Vector3, fireDelaySeconds: number): EnemySpawn => ({
+  position,
+  forward: new Vector3(LANDING_POSITION.x - position.x, 0, LANDING_POSITION.z - position.z).normalize(),
+  fireDelaySeconds,
+});
+
+export const level03Definition: LevelDefinition = {
+  id: "level-03",
+  order: 3,
+  brief: "Destroy the 3 static drones (or let them shoot you down).",
+  maps: [
+    buildGround({ width: GROUND_WIDTH, depth: GROUND_DEPTH }), // primero: es el suelo principal
+    buildLandingGround({ position: LANDING_POSITION }),
+  ],
+  spawns: {
+    character: LANDING_POSITION.add(new Vector3(0, SPAWN_HEIGHT_MARGIN, 0)),
+    enemies: {
+      staticDrone: [
+        aimAtLanding(new Vector3(0, 0, 8), 0),
+        aimAtLanding(new Vector3(-3, 0, 14), 1),
+        aimAtLanding(new Vector3(3, 0, 14), 2),
+      ],
+    },
+    items: [],
+    other: [],
+  },
+  waves: [],
+};
+</file>
+
+<file path="definitions/level-04-definition.ts">
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+
+import { DRONE_HOVER_HEIGHT } from "../../entities/enemies/drone/drone-model";
+import type { PatrolPlane, PatrolVolume } from "../../navigation/patrol-region";
+import type { EnemySpawn, LevelDefinition } from "../level-definition";
+import { buildGround, buildLandingGround, LANDING_GROUND_SIZE } from "../procedural/ground-builders";
+
+const GROUND_WIDTH = 10;
+const GROUND_DEPTH = 60;
+
+/** Pegado al extremo del ground (fuera de él, para no superponer mallas en el mismo plano). */
+const LANDING_POSITION = new Vector3(0, 0, -(GROUND_DEPTH / 2 + LANDING_GROUND_SIZE / 2));
+const SPAWN_HEIGHT_MARGIN = 0.5; // el personaje aparece apenas sobre la plataforma y cae
+
+/** Plano horizontal a la altura de vuelo de los drones. */
+const FLIGHT_PLANE: PatrolPlane = { point: new Vector3(0, DRONE_HOVER_HEIGHT, 0), normal: Vector3.Up() };
+
+const NEAR_PATROL: PatrolVolume = {
+  kind: "box",
+  center: new Vector3(0, DRONE_HOVER_HEIGHT, 10),
+  size: new Vector3(8, 2, 16),
+};
+const FAR_PATROL: PatrolVolume = { kind: "sphere", center: new Vector3(0, DRONE_HOVER_HEIGHT, 22), radius: 4.5 };
+
+/** Un sentinel que parte de `position` mirando al landing y patrulla `volume` a la altura de vuelo. */
+const sentinel = (position: Vector3, volume: PatrolVolume, fireDelaySeconds: number): EnemySpawn => ({
+  position,
+  forward: new Vector3(0, 0, -1),
+  fireDelaySeconds,
+  patrol: { volume, plane: FLIGHT_PLANE },
+});
+
+export const level04Definition: LevelDefinition = {
+  id: "level-04",
+  order: 4,
+  brief: "Destroy the 2 sentinel drones.",
+  maps: [
+    buildGround({ width: GROUND_WIDTH, depth: GROUND_DEPTH }), // primero: es el suelo principal
+    buildLandingGround({ position: LANDING_POSITION }),
+  ],
+  spawns: {
+    character: LANDING_POSITION.add(new Vector3(0, SPAWN_HEIGHT_MARGIN, 0)),
+    enemies: {
+      sentinelDrone: [sentinel(new Vector3(0, 0, 10), NEAR_PATROL, 0), sentinel(new Vector3(0, 0, 22), FAR_PATROL, 1.5)],
+    },
+    items: [],
+    other: [],
+  },
+  waves: [],
+};
+</file>
+
+<file path="definitions/level-05-definition.ts">
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+
+import type { PatrolVolume } from "../../navigation/patrol-region";
+import type { EnemySpawn, LevelDefinition } from "../level-definition";
+import { buildGround, buildLandingGround, LANDING_GROUND_SIZE } from "../procedural/ground-builders";
+
+const GROUND_WIDTH = 10;
+const GROUND_DEPTH = 60;
+
+/** Pegado al extremo del ground (fuera de él, para no superponer mallas en el mismo plano). */
+const LANDING_POSITION = new Vector3(0, 0, -(GROUND_DEPTH / 2 + LANDING_GROUND_SIZE / 2));
+const SPAWN_HEIGHT_MARGIN = 0.5; // el personaje aparece apenas sobre la plataforma y cae
+
+/** Volumen 3D de vuelo: de 1,5 a 6,5 m de altura. */
+const FLIGHT_VOLUME: PatrolVolume = {
+  kind: "box",
+  center: new Vector3(0, 4, 14),
+  size: new Vector3(8, 5, 16),
+};
+
+/** Un flyingSentinel que aparece en el centro del volumen y lo patrulla en 3D (sin plano). */
+const flyingSentinel = (position: Vector3): EnemySpawn => ({
+  position,
+  forward: new Vector3(0, 0, -1),
+  patrol: { volume: FLIGHT_VOLUME },
+});
+
+export const level05Definition: LevelDefinition = {
+  id: "level-05",
+  order: 5,
+  brief: "Destroy the flying sentinel drone.",
+  maps: [
+    buildGround({ width: GROUND_WIDTH, depth: GROUND_DEPTH }), // primero: es el suelo principal
+    buildLandingGround({ position: LANDING_POSITION }),
+  ],
+  spawns: {
+    character: LANDING_POSITION.add(new Vector3(0, SPAWN_HEIGHT_MARGIN, 0)),
+    enemies: {
+      flyingSentinel: [
+        flyingSentinel(FLIGHT_VOLUME.center.clone()),
+        flyingSentinel(FLIGHT_VOLUME.center.clone()),
+        
+      ],
+    },
+    items: [],
+    other: [],
+  },
+  waves: [],
+};
+</file>
+
+<file path="definitions/level-06-definition.ts">
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { Curve3 } from "@babylonjs/core/Maths/math.path";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
-import { CreateSphere } from "@babylonjs/core/Meshes/Builders/sphereBuilder";
+import { CreateTube } from "@babylonjs/core/Meshes/Builders/tubeBuilder";
+import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { Scene } from "@babylonjs/core/scene";
+
+import { DRONE_HOVER_HEIGHT } from "../../entities/enemies/drone/drone-model";
+import type {
+  EnemySpawn,
+  LevelDefinition,
+  ProceduralMapContext,
+  ProceduralMapResult,
+  SolidKind,
+  StaticSolid,
+} from "../level-definition";
+import { createBoxPath } from "../procedural/box-path-builder";
+import { createTrackMesh } from "../procedural/track-builder";
+
+// =====================================================================================
+// Nivel 6: recorrido lineal (plano / puente / túnel) para probar el hoverboard y el jetpack.
+//
+//  1 plano de salida             10 túnel recto con obstáculos
+//  2 puente con sentinels        11 corte largo, cae mucho
+//  3 puente libre                12 túnel con curvas, subidas y bajadas
+//  4 puente cortado (salto)      13 corte largo, sube
+//  5 puente libre                14 puente libre
+//  6 plano: estáticos+cobertura  15 puente con sentinels
+//  7 túnel con curvas            16 puente libre
+//  8 corte del túnel (salto)     --- repetición ---
+//  9 túnel recto con dummies     caída grande (solo con board) -> tramos 7 a 13 otra vez, más abajo
+//                                subida grande (solo con jetpack) -> tramos 14 a 16 otra vez, más arriba
+//                                17 plano de llegada
+// =====================================================================================
+
+// --- Medidas base ---
+const PLAYER_HEIGHT = 0.8; // espejo de config.player.height: reemplazar por el import real
+/** Caja unitaria: mitad del alto del Character = cápsula del Character agachado. */
+const UNIT = PLAYER_HEIGHT / 2;
+const JUMP_OBSTACLE_UNITS = 3; // 1,5 Characters de alto (antes 2 = 1 Character): se salta
+const DODGE_OBSTACLE_UNITS = 4; // alto de 2 Characters: se esquiva
+const COVER_UNITS = 3; // cobertura: 1,5 Characters de alto, el Character de pie queda tapado
+
+// --- Aspecto ---
+const SOLID_GLOW = 0.25; // fracción del color que se emite
+const SOLID_SPECULAR = new Color3(0.1, 0.1, 0.1);
+const TRACK_COLOR = Color3.FromHexString("#2a7fd6");
+const TUBE_COLOR = Color3.FromHexString("#0a7fa8");
+const TUBE_ALPHA = 0.2; // translúcido: se ve el camino por dentro
+const BRIDGE_COLOR = Color3.FromHexString("#d9822b");
+const BREAKABLE_COLOR = Color3.FromHexString("#c0392b"); // rojo: se podrá destruir
+const FALLING_COLOR = Color3.FromHexString("#f1c40f"); // amarillo: caerá
+const FLAT_COLOR = Color3.FromHexString("#5a6270");
+const JUMP_COLOR = Color3.FromHexString("#27ae60"); // verde: se salta
+const DODGE_COLOR = Color3.FromHexString("#8e44ad"); // violeta: se esquiva
+const COVER_COLOR = Color3.FromHexString("#7f8c8d");
+
+type BlockColor = "flat" | "jump" | "dodge" | "cover";
+const BLOCK_COLORS: Record<BlockColor, Color3> = {
+  flat: FLAT_COLOR,
+  jump: JUMP_COLOR,
+  dodge: DODGE_COLOR,
+  cover: COVER_COLOR,
+};
+
+const createSolidMaterial = (scene: Scene, name: string, color: Color3): StandardMaterial => {
+  const material = new StandardMaterial(name, scene);
+  material.diffuseColor = color;
+  material.emissiveColor = color.scale(SOLID_GLOW);
+  material.specularColor = SOLID_SPECULAR;
+  return material;
+};
+
+// --- Túnel ---
+/**
+ * Escala del ancho del túnel respecto del diseño base (radio 8, piso de ~13).
+ * 1 = base, 1.5 = 50% más ancho. El alto escala igual para mantener la proporción.
+ */
+const TUBE_WIDTH_SCALE = 1.5;
+const TUBE_RADIUS = 8 * TUBE_WIDTH_SCALE;
+const TUBE_AXIS_OFFSET_Y = 4.8 * TUBE_WIDTH_SCALE; // el eje del tubo queda sobre el camino (misma proporción que antes)
+const TUBE_TESSELLATION = 20;
+const TUBE_PATH_STEP = 2; // el tubo usa la mitad de los puntos del camino (menos triángulos)
+const TUBE_POINTS_PER_SEGMENT = 32;
+const TRACK_WALL_OVERLAP = 0.15;
+const TRACK_HALF_WIDTH = Math.sqrt(TUBE_RADIUS ** 2 - TUBE_AXIS_OFFSET_Y ** 2) + TRACK_WALL_OVERLAP;
+const TRACK_WIDTH = TRACK_HALF_WIDTH * 2;
+const TRACK_THICKNESS = 0.4;
+const MIN_POINT_DISTANCE = 1e-3;
+const HEADING_SPAN = 8; // puntos hacia atrás para estimar la dirección de salida de una curva
+
+// --- Obstáculos dentro del túnel: se dimensionan a partir del ancho del piso ---
+/** Ancho (en unidades) de la barra de salto: casi todo el piso, con una luz de 0.4 a cada lado. */
+const JUMP_BAR_WIDTH_UNITS = Math.floor((TRACK_WIDTH - 0.8) / UNIT);
+/** Fracción del ancho del piso que cubre una pared de esquivar; el resto es el hueco. */
+const DODGE_WALL_COVER = 0.6;
+/** Posición lateral de dummies y pilares, como fracción de la mitad del ancho del piso. */
+const DUMMY_LATERAL = 0.3 * TRACK_HALF_WIDTH;
+const PILLAR_LATERAL = 0.4 * TRACK_HALF_WIDTH;
+
+// --- Obstáculos del túnel recto: las posiciones base se multiplican por esta escala (distancia entre ellos x10) ---
+const OBSTACLE_SPACING_SCALE = 10;
+const OBSTACLE_TUBE_BASE_LENGTH = 100;
+const obstacleAt = (baseForward: number): number => baseForward * OBSTACLE_SPACING_SCALE;
+
+// --- Dummy targets del túnel recto ---
+const DUMMY_COUNT = 6;
+const DUMMY_SPACING = 20; // distancia entre dummies (antes 10)
+const DUMMY_TUBE_LENGTH = DUMMY_SPACING * (DUMMY_COUNT + 1);
+
+// --- Puente de tablones ---
+const BRIDGE_HALF_WIDTH = 5;
+const BRIDGE_THICKNESS = 0.4;
+const BRIDGE_SEGMENT_LENGTH = 3;
+const BRIDGE_RAIL_HEIGHT = 1.5;
+const BRIDGE_RAIL_THICKNESS = 0.3;
+const BRIDGE_POINT_SPACING = 0.5;
+
+// --- Planos (salida, llegada, zona con cobertura) ---
+const FLAT_THICKNESS = 0.4;
+const FLAT_WIDTH = 30;
+
+// --- Interrupciones: distancia de avance y diferencia de altura. TODAS son para ajustar jugando. ---
+/** Corte del puente que se salva a pie (reducido a la mitad: era 8). */
+const BRIDGE_JUMP_GAP_DISTANCE = 4;
+const BRIDGE_JUMP_GAP = { distance: BRIDGE_JUMP_GAP_DISTANCE, dy: 0 };
+const TUBE_JUMP_GAP = { distance: 12, dy: 0 };
+/**
+ * Las separaciones largas entre túneles y puentes se multiplican por esta escala (solo la distancia
+ * de avance; la diferencia de altura no cambia). El salto a pie del túnel y el del puente no se escalan.
+ */
+const LONG_GAP_DISTANCE_SCALE = 10;
+const longGap = (distance: number, dy: number): { distance: number; dy: number } => ({
+  distance: distance * LONG_GAP_DISTANCE_SCALE,
+  dy,
+});
+const TUBE_DROP_GAP = longGap(20, -10);
+const TUBE_RISE_GAP = longGap(16, 4);
+/** Antes de repetir los túneles: solo se baja cayendo con el board. */
+const REPEAT_DROP_GAP = longGap(20, -25);
+/** Antes de repetir los puentes: solo se llega con jetpack. */
+const JETPACK_RISE_GAP = longGap(14, 25);
+
+/**
+ * Curvas del túnel, en coordenadas locales [avance, lateral (+ = derecha), altura].
+ * Separación de 28 entre puntos y lateral máximo de ±6/7: el radio de giro sale
+ * ~2-3 veces más abierto que el del diseño anterior (20 de separación, lateral de 8 a 14).
+ * Empiezan y terminan en recta para que los tramos encadenen sin quiebres.
+ */
+type Control = readonly [number, number, number];
+const CURVES_A: readonly Control[] = [
+  [0, 0, 0], [12, 0, 0], [40, 6, 3], [68, -6, -2], [96, 7, 4], [124, -4, -3], [152, 0, 0], [164, 0, 0],
+];
+const CURVES_B: readonly Control[] = [
+  [0, 0, 0], [12, 0, 0], [40, -6, -3], [68, 6, -5], [96, -6, -2], [124, 5, -6], [152, 0, -4], [164, 0, -4],
+];
+const CURVES_C: readonly Control[] = [
+  [0, 0, 0], [12, 0, 0], [40, 6, 4], [68, -7, 6], [96, 7, 3], [124, -5, 7], [152, 0, 5], [164, 0, 5],
+];
+const straightControls = (length: number): readonly Control[] => [
+  [0, 0, 0],
+  [length / 3, 0, 0],
+  [(2 * length) / 3, 0, 0],
+  [length, 0, 0],
+];
+
+// --- Reglas ---
+const SPAWN_HEIGHT_MARGIN = 1; // el personaje aparece sobre el plano y cae
+const FALL_MARGIN = 15; // por debajo del punto más bajo del recorrido se da por caído
+const SENTINEL_PATROL_RADIUS = 7;
+const SENTINELS_PER_BRIDGE = 3;
+
+// =====================================================================================
+// Layout: datos puros (sin escena). Se calcula una vez; el mapa y los spawns salen de acá.
+// =====================================================================================
+
+interface Frame {
+  readonly origin: Vector3;
+  /** Giro sobre Y: 0 mira hacia +Z. */
+  readonly heading: number;
+}
+
+interface Gap {
+  readonly distance: number;
+  readonly dy: number;
+}
+
+const forwardOf = (heading: number): Vector3 => new Vector3(Math.sin(heading), 0, Math.cos(heading));
+const rightOf = (heading: number): Vector3 => new Vector3(Math.cos(heading), 0, -Math.sin(heading));
+
+/** Punto en coordenadas locales de un tramo: avance, lateral (+ = derecha) y altura. */
+const localPoint = (frame: Frame, forward: number, lateral: number, up = 0): Vector3 =>
+  frame.origin
+    .add(forwardOf(frame.heading).scale(forward))
+    .add(rightOf(frame.heading).scale(lateral))
+    .add(new Vector3(0, up, 0));
+
+/** Quita puntos consecutivos repetidos: filas iguales generarían triángulos degenerados. */
+const removeDuplicates = (points: Vector3[]): Vector3[] =>
+  points.filter((point, index) => index === 0 || Vector3.Distance(point, points[index - 1]) > MIN_POINT_DISTANCE);
+
+type PlankMode = "none" | "breakable" | "falling";
+
+interface BlockPiece {
+  readonly name: string;
+  readonly center: Vector3;
+  /** Ancho (X local), alto, largo (Z local). */
+  readonly size: Vector3;
+  readonly heading: number;
+  readonly color: BlockColor;
+}
+interface BridgePiece {
+  readonly name: string;
+  readonly points: Vector3[];
+  readonly plankMode: PlankMode;
+}
+interface TubePiece {
+  readonly name: string;
+  readonly points: Vector3[];
+}
+
+interface Level06Layout {
+  readonly blocks: BlockPiece[];
+  readonly bridges: BridgePiece[];
+  readonly tubes: TubePiece[];
+  readonly characterSpawn: Vector3;
+  readonly enemies: {
+    readonly dummyTarget: EnemySpawn[];
+    readonly staticDrone: EnemySpawn[];
+    readonly sentinelDrone: EnemySpawn[];
+  };
+  readonly goal: Vector3;
+  readonly lowestY: number;
+}
+
+const createLayout = (): Level06Layout => {
+  const blocks: BlockPiece[] = [];
+  const bridges: BridgePiece[] = [];
+  const tubes: TubePiece[] = [];
+  const enemies = {
+    dummyTarget: [] as EnemySpawn[],
+    staticDrone: [] as EnemySpawn[],
+    sentinelDrone: [] as EnemySpawn[],
+  };
+
+  // Cursor: dónde termina el último tramo y hacia dónde mira.
+  let position = Vector3.Zero();
+  let heading = 0;
+  const here = (): Frame => ({ origin: position.clone(), heading });
+
+  const advance = (distance: number, dy = 0): void => {
+    position = position.add(forwardOf(heading).scale(distance)).add(new Vector3(0, dy, 0));
+  };
+  const gap = ({ distance, dy }: Gap): void => advance(distance, dy);
+
+  // --- Piezas ---
+  const addBlock = (name: string, frame: Frame, forward: number, lateral: number, size: Vector3, floorUp: number, color: BlockColor): void => {
+    blocks.push({ name, center: localPoint(frame, forward, lateral, floorUp + size.y / 2), size, heading: frame.heading, color });
+  };
+
+  /** Plano: su cara superior queda a la altura del cursor. */
+  const addFlat = (name: string, length: number): Frame => {
+    const frame = here();
+    addBlock(name, frame, length / 2, 0, new Vector3(FLAT_WIDTH, FLAT_THICKNESS, length), -FLAT_THICKNESS, "flat");
+    advance(length);
+    return frame;
+  };
+
+  const addBridge = (name: string, length: number, plankMode: PlankMode): Frame => {
+    const frame = here();
+    const count = Math.ceil(length / BRIDGE_POINT_SPACING);
+    const points = Array.from({ length: count + 1 }, (_, i) => localPoint(frame, (i / count) * length, 0));
+    bridges.push({ name, points, plankMode });
+    advance(length);
+    return frame;
+  };
+
+  const addTube = (name: string, controls: readonly Control[]): Frame => {
+    const frame = here();
+    const spline = Curve3.CreateCatmullRomSpline(
+      controls.map(([forward, lateral, up]) => localPoint(frame, forward, lateral, up)),
+      TUBE_POINTS_PER_SEGMENT,
+      false,
+    ).getPoints();
+    const points = removeDuplicates(spline);
+    tubes.push({ name, points });
+    const last = points[points.length - 1];
+    const behind = points[Math.max(points.length - 1 - HEADING_SPAN, 0)];
+    heading = Math.atan2(last.x - behind.x, last.z - behind.z);
+    position = last.clone();
+    return frame;
+  };
+
+  // --- Obstáculos hechos de cajas unitarias (medidas en unidades) ---
+  const addObstacle = (
+    name: string,
+    frame: Frame,
+    forward: number,
+    lateral: number,
+    widthUnits: number,
+    heightUnits: number,
+    depthUnits: number,
+    color: BlockColor,
+  ): void =>
+    addBlock(name, frame, forward, lateral, new Vector3(widthUnits * UNIT, heightUnits * UNIT, depthUnits * UNIT), 0, color);
+
+  const jumpBar = (name: string, frame: Frame, forward: number, lateral = 0, widthUnits = JUMP_BAR_WIDTH_UNITS): void =>
+    addObstacle(name, frame, forward, lateral, widthUnits, JUMP_OBSTACLE_UNITS, 2, "jump");
+  const dodgePillar = (name: string, frame: Frame, forward: number, lateral: number): void =>
+    addObstacle(name, frame, forward, lateral, 4, DODGE_OBSTACLE_UNITS, 4, "dodge");
+  /** Pared de 2 Characters de alto pegada a un borde del piso; el hueco queda del lado opuesto a `side`. */
+  const dodgeWall = (name: string, frame: Frame, forward: number, side: -1 | 1): void => {
+    const widthUnits = Math.round((TRACK_WIDTH * DODGE_WALL_COVER) / UNIT);
+    const wallWidth = widthUnits * UNIT;
+    addObstacle(name, frame, forward, side * (TRACK_HALF_WIDTH - wallWidth / 2), widthUnits, DODGE_OBSTACLE_UNITS, 2, "dodge");
+  };
+  const coverBox = (name: string, frame: Frame, forward: number, lateral: number, widthUnits: number, depthUnits: number): void =>
+    addObstacle(name, frame, forward, lateral, widthUnits, COVER_UNITS, depthUnits, "cover");
+
+  // --- Enemigos ---
+  const dummyAt = (frame: Frame, forward: number, lateral: number): void => {
+    enemies.dummyTarget.push({ position: localPoint(frame, forward, lateral) });
+  };
+  const staticDroneAt = (frame: Frame, forward: number, lateral: number, fireDelaySeconds: number): void => {
+    enemies.staticDrone.push({
+      position: localPoint(frame, forward, lateral),
+      forward: forwardOf(frame.heading).scale(-1), // mirando hacia quien viene
+      fireDelaySeconds,
+    });
+  };
+  /** Sentinel que patrulla una esfera a su altura de vuelo, centrada sobre el camino. */
+  const sentinelAt = (frame: Frame, forward: number, fireDelaySeconds: number): void => {
+    const point = localPoint(frame, forward, 0);
+    const flightCenter = point.add(new Vector3(0, DRONE_HOVER_HEIGHT, 0));
+    enemies.sentinelDrone.push({
+      position: point,
+      forward: forwardOf(frame.heading).scale(-1),
+      fireDelaySeconds,
+      patrol: {
+        volume: { kind: "sphere", center: flightCenter, radius: SENTINEL_PATROL_RADIUS },
+        plane: { point: flightCenter, normal: Vector3.Up() },
+      },
+    });
+  };
+  const guardedBridge = (name: string, length: number): void => {
+    const frame = addBridge(name, length, "none");
+    for (let i = 0; i < SENTINELS_PER_BRIDGE; i += 1) {
+      const fraction = (i + 1) / (SENTINELS_PER_BRIDGE + 1);
+      sentinelAt(frame, length * fraction, 0.5 + i);
+    }
+  };
+
+  // --- Secciones repetibles. `suffix` mantiene únicos los nombres de las mallas. ---
+
+  /** Tramos 7 a 13: curvas, corte de salto, dummies, curvas, obstáculos, caída, curvas y `exitGap`. */
+  const tubeSection = (suffix: string, exitGap: Gap): void => {
+    addTube(`level06-tube-curves-a${suffix}`, CURVES_A);
+    gap(TUBE_JUMP_GAP);
+
+    const dummiesFrame = addTube(`level06-tube-dummies${suffix}`, straightControls(DUMMY_TUBE_LENGTH));
+    for (let i = 0; i < DUMMY_COUNT; i += 1) {
+      const side = i % 2 === 0 ? -1 : 1;
+      dummyAt(dummiesFrame, DUMMY_SPACING * (i + 1), side * DUMMY_LATERAL);
+    }
+
+    addTube(`level06-tube-curves-b${suffix}`, CURVES_B);
+
+    // Obstáculos: saltar (verde) y esquivar (violeta).
+    const obstaclesFrame = addTube(
+      `level06-tube-obstacles${suffix}`,
+      straightControls(obstacleAt(OBSTACLE_TUBE_BASE_LENGTH)),
+    );
+    jumpBar(`level06-jump-1${suffix}`, obstaclesFrame, obstacleAt(10));
+    jumpBar(`level06-jump-2${suffix}`, obstaclesFrame, obstacleAt(20));
+    jumpBar(`level06-jump-3${suffix}`, obstaclesFrame, obstacleAt(24));
+    dodgePillar(`level06-pillar-1${suffix}`, obstaclesFrame, obstacleAt(38), -PILLAR_LATERAL);
+    dodgePillar(`level06-pillar-2${suffix}`, obstaclesFrame, obstacleAt(46), PILLAR_LATERAL);
+    dodgePillar(`level06-pillar-3${suffix}`, obstaclesFrame, obstacleAt(54), 0);
+    dodgeWall(`level06-wall-1${suffix}`, obstaclesFrame, obstacleAt(68), -1);
+    dodgeWall(`level06-wall-2${suffix}`, obstaclesFrame, obstacleAt(80), 1);
+
+    gap(TUBE_DROP_GAP);
+    addTube(`level06-tube-curves-c${suffix}`, CURVES_C);
+    gap(exitGap);
+  };
+
+  /** Tramos 14 a 16: puente libre, puente con sentinels, puente libre. */
+  const bridgeSection = (suffix: string): void => {
+    addBridge(`level06-bridge-free-c${suffix}`, 40, "breakable");
+    guardedBridge(`level06-bridge-guarded-b${suffix}`, 60);
+    addBridge(`level06-bridge-free-d${suffix}`, 40, "falling");
+  };
+
+  // ===== Secuencia =====
+  // 1 - Plano de salida
+  const startFrame = addFlat("level06-start", 24);
+  const characterSpawn = localPoint(startFrame, 10, 0, SPAWN_HEIGHT_MARGIN);
+
+  // 2 - Puente custodiado, 3 - puente libre
+  guardedBridge("level06-bridge-guarded-a", 60);
+  addBridge("level06-bridge-free-a", 40, "breakable");
+
+  // 4 - Puente interrumpido para probar el salto
+  addBridge("level06-bridge-jump-1", 30, "none");
+  gap(BRIDGE_JUMP_GAP);
+  addBridge("level06-bridge-jump-2", 30, "none");
+
+  // 5 - Puente libre
+  addBridge("level06-bridge-free-b", 40, "falling");
+
+  // 6 - Plano con drones estáticos y cajas para cubrirse
+  const coverFrame = addFlat("level06-cover-area", 50);
+  coverBox("level06-cover-1", coverFrame, 12, -8, 8, 3);
+  coverBox("level06-cover-2", coverFrame, 12, 8, 8, 3);
+  coverBox("level06-cover-3", coverFrame, 22, 0, 12, 3);
+  coverBox("level06-cover-4", coverFrame, 32, -9, 6, 4);
+  coverBox("level06-cover-5", coverFrame, 32, 9, 6, 4);
+  staticDroneAt(coverFrame, 44, -10, 0);
+  staticDroneAt(coverFrame, 44, -3.5, 1);
+  staticDroneAt(coverFrame, 44, 3.5, 2);
+  staticDroneAt(coverFrame, 44, 10, 3);
+
+  // 7 a 13 - Túneles; 14 a 16 - puentes
+  tubeSection("", TUBE_RISE_GAP);
+  bridgeSection("");
+
+  // Repetición: se baja cayendo con el board a los túneles...
+  gap(REPEAT_DROP_GAP);
+  tubeSection("-2", JETPACK_RISE_GAP);
+  // ...y se sube con jetpack a los puentes.
+  bridgeSection("-2");
+
+  // 17 - Plano de llegada
+  const endFrame = addFlat("level06-end", 24);
+  const goal = localPoint(endFrame, 12, 0);
+
+  // Punto más bajo de todo el recorrido (para el piso de caída).
+  const allY = [
+    ...tubes.flatMap((tube) => tube.points.map((point) => point.y)),
+    ...bridges.flatMap((bridge) => bridge.points.map((point) => point.y)),
+    ...blocks.map((block) => block.center.y - block.size.y / 2),
+  ];
+  const lowestY = allY.reduce((lowest, y) => Math.min(lowest, y), Infinity);
+
+  return { blocks, bridges, tubes, characterSpawn, enemies, goal, lowestY };
+};
+
+const LAYOUT = createLayout();
+
+/** Meta: el centro del plano de llegada. */
+export const LEVEL_06_GOALS: readonly Vector3[] = [LAYOUT.goal];
+/** Altura por debajo de la cual el Character se considera caído. */
+export const LEVEL_06_FALL_Y: number = LAYOUT.lowestY - FALL_MARGIN;
+
+// =====================================================================================
+// Mapa: arma las mallas a partir del layout.
+// =====================================================================================
+
+const planksClassifier =
+  (mode: PlankMode) =>
+  (index: number): SolidKind | undefined =>
+    mode !== "none" && index % 12 === 6 ? mode : undefined;
+
+const buildLevel06Map = ({ scene }: ProceduralMapContext): ProceduralMapResult => {
+  const solids: StaticSolid[] = [];
+
+  // Pisos de los túneles: un solo camino continuo (malla) que hace de `ground`.
+  const trackMaterial = createSolidMaterial(scene, "level06-track-material", TRACK_COLOR);
+  trackMaterial.backFaceCulling = false; // si alguna cara quedara invertida, no desaparece
+  trackMaterial.twoSidedLighting = true;
+  const floors = LAYOUT.tubes.map((tube) => {
+    const floor = createTrackMesh(scene, `${tube.name}-track`, tube.points, {
+      halfWidth: TRACK_HALF_WIDTH,
+      thickness: TRACK_THICKNESS,
+    });
+    floor.material = trackMaterial;
+    return floor;
+  });
+  const ground = Mesh.MergeMeshes(floors, true, true);
+  if (!ground) {
+    throw new Error("level-06: no se pudo unir los pisos de los túneles");
+  }
+  ground.name = "level06-track";
+  ground.material = trackMaterial;
+
+  // Túneles: envuelven el camino; el camino es su piso.
+  for (const tube of LAYOUT.tubes) {
+    const tubePath = tube.points
+      .filter((_, index) => index % TUBE_PATH_STEP === 0 || index === tube.points.length - 1)
+      .map((point) => new Vector3(point.x, point.y + TUBE_AXIS_OFFSET_Y, point.z));
+    const mesh = CreateTube(
+      tube.name,
+      {
+        path: tubePath,
+        radius: TUBE_RADIUS,
+        tessellation: TUBE_TESSELLATION,
+        sideOrientation: Mesh.DOUBLESIDE, // el personaje queda del lado interno
+        updatable: false,
+      },
+      scene,
+    );
+    const material = createSolidMaterial(scene, `${tube.name}-material`, TUBE_COLOR);
+    material.alpha = TUBE_ALPHA;
+    material.backFaceCulling = false;
+    mesh.material = material;
+    solids.push({ mesh, shape: "mesh" });
+  }
+
+  // Puentes de tablones.
+  for (const bridge of LAYOUT.bridges) {
+    const boxPath = createBoxPath(
+      scene,
+      bridge.name,
+      bridge.points,
+      {
+        normal: createSolidMaterial(scene, `${bridge.name}-box-material`, BRIDGE_COLOR),
+        breakable: createSolidMaterial(scene, `${bridge.name}-breakable-material`, BREAKABLE_COLOR),
+        falling: createSolidMaterial(scene, `${bridge.name}-falling-material`, FALLING_COLOR),
+      },
+      {
+        halfWidth: BRIDGE_HALF_WIDTH,
+        thickness: BRIDGE_THICKNESS,
+        segmentLength: BRIDGE_SEGMENT_LENGTH,
+        railHeight: BRIDGE_RAIL_HEIGHT,
+        railThickness: BRIDGE_RAIL_THICKNESS,
+        classify: planksClassifier(bridge.plankMode),
+      },
+    );
+    solids.push(
+      ...boxPath.planks.map((plank): StaticSolid => ({
+        mesh: plank.mesh,
+        shape: "box",
+        ...(plank.kind ? { kind: plank.kind } : {}),
+      })),
+      ...boxPath.rails.map((mesh): StaticSolid => ({ mesh, shape: "box" })),
+    );
+  }
+
+  // Planos y obstáculos de cajas.
+  for (const block of LAYOUT.blocks) {
+    const mesh = CreateBox(block.name, { width: block.size.x, height: block.size.y, depth: block.size.z }, scene);
+    mesh.position.copyFrom(block.center);
+    mesh.rotation.y = block.heading;
+    mesh.material = createSolidMaterial(scene, `${block.name}-material`, BLOCK_COLORS[block.color]);
+    solids.push({ mesh, shape: "box" });
+  }
+
+  // Los materiales se liberan con las mallas: el LevelScope las libera con disposeMaterialAndTextures.
+  return { ground, groundShape: "mesh", solids };
+};
+
+export const level06Definition: LevelDefinition = {
+  id: "level-06",
+  order: 6,
+  brief: "Reach the end of the course.",
+  skybox: { basePath: "images/skybox/space" },
+  maps: [{ kind: "procedural", build: buildLevel06Map }],
+  spawns: {
+    character: LAYOUT.characterSpawn,
+    enemies: {
+      dummyTarget: LAYOUT.enemies.dummyTarget,
+      staticDrone: LAYOUT.enemies.staticDrone,
+      sentinelDrone: LAYOUT.enemies.sentinelDrone,
+      raycastDummy: [
+        {
+          position: new Vector3(5, 0.2, 10), // base a ras del suelo donde el personaje pase
+          forward: new Vector3(-1, 0, 0),  // el rayo sale hacia -X, cruzando su camino
+        },
+        {
+          position: new Vector3(5, 0, 10), // base a ras del suelo donde el personaje pase
+          forward: new Vector3(-1, 0, 0),  // el rayo sale hacia -X, cruzando su camino
+        },
+        {
+          position: new Vector3(5, -0.3, 10), // base a ras del suelo donde el personaje pase
+          forward: new Vector3(-1, 0, 0),  // el rayo sale hacia -X, cruzando su camino
+        },
+      ],
+    },
+    items: [],
+    other: [],
+  },
+  waves: [],
+};
+</file>
+
+<file path="procedural/box-path-builder.ts">
+import type { Material } from "@babylonjs/core/Materials/material";
+import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { Scene } from "@babylonjs/core/scene";
 
-import type { PatrolVolume } from "../../../navigation/patrol-region";
+import type { SolidKind } from "../level-definition";
 
-const DEBUG_COLOR = new Color3(0.1, 1, 0.4);
-const SPHERE_SEGMENTS = 16;
+export interface BoxPathMaterials {
+  readonly normal: Material;
+  readonly breakable: Material;
+  readonly falling: Material;
+}
 
-export interface PatrolVolumeDebug {
-  /** Idempotente. */
-  dispose(): void;
+export interface BoxPathOptions {
+  /** Mitad del ancho del piso (m). */
+  readonly halfWidth: number;
+  /** Espesor de los tablones (m). */
+  readonly thickness: number;
+  /** Largo aproximado de cada tablón (m). */
+  readonly segmentLength: number;
+  /** Altura de los bordes laterales sobre el piso (m); 0 = sin bordes. */
+  readonly railHeight: number;
+  readonly railThickness: number;
+  /** Tipo de bloque especial de cada tablón (por índice); undefined = tablón común. */
+  readonly classify?: (plankIndex: number) => SolidKind | undefined;
+}
+
+export interface BoxPiece {
+  readonly mesh: Mesh;
+  readonly kind?: SolidKind;
+}
+
+export interface BoxPath {
+  readonly planks: BoxPiece[];
+  readonly rails: Mesh[];
+}
+
+const PLANK_OVERLAP = 0.05; // un poco más largos, para no dejar rendijas entre tablones
+const MIN_SEGMENT_LENGTH = 0.05;
+const MIN_POINT_DISTANCE = 1e-3;
+
+/** Puntos a distancia (aproximadamente) constante a lo largo de la curva, incluyendo el primero y el último. */
+export function resampleByLength(points: readonly Vector3[], spacing: number): Vector3[] {
+  const samples: Vector3[] = [points[0].clone()];
+  let carried = 0; // distancia recorrida desde la última muestra
+
+  for (let index = 1; index < points.length; index++) {
+    const end = points[index];
+    let from = points[index - 1].clone();
+    let remaining = Vector3.Distance(from, end);
+
+    while (remaining > 0 && carried + remaining >= spacing) {
+      const point = Vector3.Lerp(from, end, (spacing - carried) / remaining);
+      samples.push(point);
+      from = point;
+      remaining = Vector3.Distance(from, end);
+      carried = 0;
+    }
+    carried += remaining;
+  }
+
+  const last = points[points.length - 1];
+  if (Vector3.Distance(samples[samples.length - 1], last) > MIN_POINT_DISTANCE) {
+    samples.push(last.clone());
+  }
+  return samples;
 }
 
 /**
- * Dibuja el volumen de patrulla como malla wireframe. Solo existe en DEV: en producción devuelve null.
- * No es pickable, así que no frena los proyectiles ni estorba al raycast de suelo.
+ * Camino armado solo con cajas: un tablón por tramo, inclinado según la pendiente, y dos bordes laterales.
+ * `centerPath` son los puntos del centro de la superficie superior; los tablones se unen por sus bordes superiores.
  */
-export function createPatrolVolumeDebug(scene: Scene, id: string, volume: PatrolVolume): PatrolVolumeDebug | null {
-  if (!import.meta.env.DEV) {
-    return null;
-  }
+export function createBoxPath(
+  scene: Scene,
+  name: string,
+  centerPath: readonly Vector3[],
+  materials: BoxPathMaterials,
+  options: BoxPathOptions,
+): BoxPath {
+  const { halfWidth, thickness, segmentLength, railHeight, railThickness, classify } = options;
+  const samples = resampleByLength(centerPath, segmentLength);
+  const planks: BoxPiece[] = [];
+  const rails: Mesh[] = [];
 
-  const name = `debug:${id}:patrol-volume`;
-  const mesh: Mesh =
-    volume.kind === "box"
-      ? CreateBox(name, { width: volume.size.x, height: volume.size.y, depth: volume.size.z }, scene)
-      : CreateSphere(name, { diameter: volume.radius * 2, segments: SPHERE_SEGMENTS }, scene);
-  mesh.position.copyFrom(volume.center);
-  mesh.isPickable = false;
+  for (let index = 0; index < samples.length - 1; index++) {
+    const start = samples[index];
+    const end = samples[index + 1];
+    const length = Vector3.Distance(start, end);
+    if (length < MIN_SEGMENT_LENGTH) {
+      continue;
+    }
 
-  const material = new StandardMaterial(`${name}:material`, scene);
-  material.wireframe = true;
-  material.disableLighting = true;
-  material.emissiveColor = DEBUG_COLOR;
-  mesh.material = material;
+    // Orientación: el +Z local del tablón apunta de start a end (pitch negativo = sube).
+    const yaw = Math.atan2(end.x - start.x, end.z - start.z);
+    const pitch = -Math.atan2(end.y - start.y, Math.hypot(end.x - start.x, end.z - start.z));
+    const rotation = Matrix.RotationYawPitchRoll(yaw, pitch, 0);
+    const up = Vector3.TransformNormal(Vector3.Up(), rotation);
+    const right = Vector3.TransformNormal(Vector3.Right(), rotation);
+    const middle = Vector3.Center(start, end);
 
-  let disposed = false;
-  return {
-    dispose: () => {
-      if (disposed) {
-        return;
+    const kind = classify?.(index);
+    const plank = CreateBox(
+      `${name}-plank-${index}`,
+      { width: halfWidth * 2, height: thickness, depth: length + PLANK_OVERLAP },
+      scene,
+    );
+    plank.position = middle.subtract(up.scale(thickness / 2)); // la cara superior pasa por la curva
+    plank.rotation.set(pitch, yaw, 0);
+    plank.material = kind === "breakable" ? materials.breakable : kind === "falling" ? materials.falling : materials.normal;
+    planks.push(kind ? { mesh: plank, kind } : { mesh: plank });
+
+    if (railHeight > 0) {
+      for (const side of [-1, 1]) {
+        const rail = CreateBox(
+          `${name}-rail-${index}-${side}`,
+          { width: railThickness, height: railHeight + thickness, depth: length + PLANK_OVERLAP },
+          scene,
+        );
+        rail.position = middle
+          .add(right.scale(side * (halfWidth + railThickness / 2)))
+          .add(up.scale((railHeight - thickness) / 2));
+        rail.rotation.set(pitch, yaw, 0);
+        rail.material = materials.normal;
+        rails.push(rail);
       }
-      disposed = true;
-      mesh.dispose(false, true); // el material es propio: se libera con la malla
+    }
+  }
+  return { planks, rails };
+}
+</file>
+
+<file path="procedural/ground-builders.ts">
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { CreateGround } from "@babylonjs/core/Meshes/Builders/groundBuilder";
+
+import type { ProceduralMapSource } from "../level-definition";
+
+const DEFAULT_GROUND_NAME = "ground";
+const DEFAULT_GROUND_COLOR = new Color3(0.35, 0.38, 0.42);
+
+const DEFAULT_LANDING_GROUND_NAME = "landing-ground";
+export const LANDING_GROUND_SIZE = 3;
+const DEFAULT_LANDING_GROUND_COLOR = new Color3(0.2, 0.55, 0.35);
+
+export interface GroundOptions {
+  readonly width: number;
+  readonly depth: number;
+  /** Nombre de la malla. Si un nivel usa varios, conviene que sean distintos. */
+  readonly name?: string;
+  readonly color?: Color3;
+  readonly position?: Vector3;
+}
+
+export type LandingGroundOptions = Omit<GroundOptions, "width" | "depth">;
+
+/** Suelo rectangular. Es una fuente procedural lista para usar en `maps`. */
+export function buildGround(options: GroundOptions): ProceduralMapSource {
+  const {
+    width,
+    depth,
+    name = DEFAULT_GROUND_NAME,
+    color = DEFAULT_GROUND_COLOR,
+    position = Vector3.Zero(),
+  } = options;
+
+  return {
+    kind: "procedural",
+    build: ({ scene }) => {
+      const ground = CreateGround(name, { width, height: depth }, scene);
+      ground.position.copyFrom(position);
+
+      const material = new StandardMaterial(`${name}-material`, scene);
+      material.diffuseColor = color;
+      material.specularColor = Color3.Black();
+      ground.material = material;
+
+      return { ground };
     },
   };
 }
-</file>
 
-<file path="drone/.gitkeep">
-
-</file>
-
-<file path="drone/drone-base.ts">
-import "@babylonjs/core/Rendering/outlineRenderer"; // habilita renderOverlay en los meshes
-import { Color3 } from "@babylonjs/core/Maths/math.color";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
-import type { Mesh } from "@babylonjs/core/Meshes/mesh";
-import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
-
-import type { MaterialAssetKey } from "../../../assets/asset-keys";
-import type { EnemySpawn, EnemyType } from "../../../levels/level-definition";
-import type { ProjectileHitPayload } from "@/game/services/event-manager";
-
-
-
-import { EnemyBase } from "../enemy";
-import type { EnemyDeps } from "../enemy-factory";
-import { buildDroneModelV2, DRONE_HOVER_HEIGHT } from "./drone-modelV2";
-import { DEFAULT_PROJECTILE_WEAPON_CONFIG, ProjectileWeaponConfig, ProjectileWeaponController } from "../../character/strategies/weapon/projectile-weapon.controller";
-
-const DRONE_HEALTH = 3; // con daño 1 por proyectil: 3 disparos
-const HIT_FLASH_DURATION = 0.12; // segundos
-const HIT_FLASH_COLOR = Color3.White();
-const HIT_FLASH_ALPHA = 0.6;
-
-const FIRE_INTERVAL_SECONDS = 3;
-const WEAPON_CONFIG: ProjectileWeaponConfig = {
-  ...DEFAULT_PROJECTILE_WEAPON_CONFIG,
-  fireRate: 1 / FIRE_INTERVAL_SECONDS,
-  projectileSpeed: 10, // lento: se puede esquivar
-  projectileLifetime: 8,
-  projectileRadius: 0.04,
-  projectileLength: 0.3,
-  poolSize: 4,
-  damage: 1,
-  emissiveColor: new Color3(1, 0.45, 0.05),
-  muzzleFlashScale: 0.12,
-  impactPoolSize: 2,
-};
-
-const BODY_MATERIAL_KEY: MaterialAssetKey = "static-drone-body";
-
-export interface DroneOptions {
-  /** Material de las hélices, la semiesfera y el cañón. */
-  readonly accentMaterial: MaterialAssetKey;
-  /** true: el cañón se inclina para apuntar exacto al forward. false: dispara en horizontal. */
-  readonly pitchToForward: boolean;
-  /** true: `spawn.position` es el centro del dron (vuela en un volumen). false (por defecto): es la base y se suma DRONE_HOVER_HEIGHT. */
-  readonly spawnAtExactPosition?: boolean;
-  /** false: el dron no dispara. Por defecto, true. */
-  readonly armed?: boolean;
-}
-
-const resolveForward = (forward: Vector3 | undefined): Vector3 =>
-  !forward || forward.lengthSquared() === 0 ? Vector3.Forward() : forward.normalizeToNew();
-
-/**
- * Lo común de los drones: modelo, arma que dispara cada 3 segundos, vida, destello al recibir daño
- * y destrucción. Cada dron agrega su comportamiento en `onThink`.
- */
-export abstract class DroneBase extends EnemyBase {
-  /** Posición y yaw del dron. */
-  protected readonly root: TransformNode;
-  /** Para efectos visuales (flotación, pitch, roll); cuelga de root. */
-  protected readonly visual: TransformNode;
-  private readonly meshes: Mesh[];
-  private readonly weapon: ProjectileWeaponController;
-  private health = DRONE_HEALTH;
-  private flashRemaining = 0;
-  private released = false;
-  private readonly armed: boolean;
-
-  constructor(id: string, type: EnemyType, spawn: EnemySpawn, deps: EnemyDeps, options: DroneOptions) {
-    super(id, type);
-    this.armed = options.armed ?? true;
-
-    const position = options.spawnAtExactPosition
-      ? spawn.position.clone()
-      : new Vector3(spawn.position.x, spawn.position.y + DRONE_HOVER_HEIGHT, spawn.position.z);
-    const model = buildDroneModelV2(
-      deps.scene,
-      id,
-      {
-        body: deps.registry.getMaterial(BODY_MATERIAL_KEY),
-        accent: deps.registry.getMaterial(options.accentMaterial),
-      },
-      position,
-      resolveForward(spawn.forward),
-      options.pitchToForward,
-    );
-    this.root = model.root;
-    this.visual = model.visual;
-    this.meshes = model.meshes;
-
-    for (const mesh of this.meshes) {
-      mesh.overlayColor = HIT_FLASH_COLOR;
-      mesh.overlayAlpha = HIT_FLASH_ALPHA;
-    }
-
-    this.weapon = new ProjectileWeaponController(
-      deps.scene,
-      model.muzzle,
-      () => true, // el intervalo de 3 s lo marca la cadencia del arma
-      this.meshes, // sus propios meshes no frenan sus proyectiles
-      WEAPON_CONFIG,
-      { sourceId: id, isExtraTarget: deps.isPlayerMesh },
-    );
-  }
-
-  ownsMesh(mesh: AbstractMesh): boolean {
-    return this.meshes.some((own) => own === mesh);
-  }
-
-  /** Comportamiento propio del dron (movimiento, etc.). Corre antes del arma, en cada frame. */
-  protected onThink(_deltaTime: number): void {}
-
-  protected onUpdate(deltaTime: number): void {
-    this.onThink(deltaTime);
-    if (this.armed) {
-      this.weapon.tick(deltaTime);
-    }
-
-    if (this.flashRemaining > 0) {
-      this.flashRemaining -= deltaTime;
-      if (this.flashRemaining <= 0) {
-        this.setFlash(false);
-      }
-    }
-  }
-
-  protected onHit(hit: ProjectileHitPayload): void {
-    this.health -= hit.damage;
-    if (import.meta.env.DEV) {
-      console.info(`[${this.type}] ${this.id}: vida ${Math.max(this.health, 0)}/${DRONE_HEALTH}`);
-    }
-
-    if (this.health <= 0) {
-      this.destroy();
-      return;
-    }
-    this.flashRemaining = HIT_FLASH_DURATION;
-    this.setFlash(true);
-  }
-
-  protected onDestroyed(): void {
-    this.release();
-  }
-
-  protected onDispose(): void {
-    this.release();
-  }
-
-  /** Suelta arma y mallas una sola vez (puede llamarse al morir y de nuevo al liberar el nivel). */
-  private release(): void {
-    if (this.released) {
-      return;
-    }
-    this.released = true;
-    this.weapon.dispose(); // primero: el fogonazo es hijo del muzzle
-    this.root.dispose(false, false); // los materiales son compartidos: no se liberan acá
-  }
-
-  private setFlash(on: boolean): void {
-    for (const mesh of this.meshes) {
-      mesh.renderOverlay = on;
-    }
-  }
-}
-</file>
-
-<file path="drone/drone-model.ts">
-import type { Material } from "@babylonjs/core/Materials/material";
-import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
-import { CreateCylinder } from "@babylonjs/core/Meshes/Builders/cylinderBuilder";
-import { CreateSphere } from "@babylonjs/core/Meshes/Builders/sphereBuilder";
-import { CreateTorus } from "@babylonjs/core/Meshes/Builders/torusBuilder";
-import type { Mesh } from "@babylonjs/core/Meshes/mesh";
-import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
-import type { Scene } from "@babylonjs/core/scene";
-
-/** Distancia fija entre la base (suelo) y el centro del cuerpo. */
-export const DRONE_HOVER_HEIGHT = 0.7;
-
-const BODY_WIDTH = 0.35; // 30% más angosto que la primera versión (0.5)
-const BODY_HEIGHT = 0.15;
-const BODY_DEPTH = 0.8; // el largo va sobre Z: el frente del dron es +Z local
-
-// Cuatro hélices (torus acostados): dos a cada lado, pegadas al cuerpo.
-const PROP_DIAMETER = 0.36; // 20% más grandes que la primera versión (0.3)
-const PROP_THICKNESS = 0.04;
-const PROP_TESSELLATION = 24;
-const PROP_CENTER_X = BODY_WIDTH / 2 + PROP_DIAMETER / 2;
-const PROP_CENTER_Z = BODY_DEPTH * 0.3;
-
-// Semiesfera bajo el cuerpo, de la que sale el cañón.
-const DOME_DIAMETER = 0.24;
-const DOME_SEGMENTS = 16;
-const DOME_HALF = 0.5; // slice de Babylon: la mitad de la altura
-const CANNON_DIAMETER = 0.05;
-const CANNON_LENGTH = 0.3;
-const CANNON_TESSELLATION = 12;
-const CANNON_PIVOT_Y = -BODY_HEIGHT / 2 - (DOME_DIAMETER / 2) * 0.5; // dentro de la semiesfera
-
-export interface DroneMaterials {
-  readonly body: Material;
-  readonly accent: Material; // hélices, semiesfera y cañón
-}
-
-export interface DroneModel {
-  /** Posición y yaw del dron: lo mueve el movimiento. */
-  readonly root: TransformNode;
-  /** Cuelga de root: reservado para efectos visuales (flotación, pitch, roll). */
-  readonly visual: TransformNode;
-  readonly meshes: Mesh[];
-  /** Boca del cañón: su +Z es hacia donde sale el disparo. */
-  readonly muzzle: TransformNode;
-}
-
-/**
- * Arma el dron: cuerpo rectangular, cuatro hélices (torus), semiesfera inferior y cañón.
- * `position` es el centro del cuerpo. El yaw sale del forward; con `pitchToForward` el cañón
- * también se inclina para apuntar exactamente al forward.
- */
-export function buildDroneModel(
-  scene: Scene,
-  id: string,
-  materials: DroneMaterials,
-  position: Vector3,
-  forward: Vector3,
-  pitchToForward: boolean,
-): DroneModel {
-  const root = new TransformNode(`enemy:${id}`, scene);
-  root.position.copyFrom(position);
-  root.rotation.y = Math.atan2(forward.x, forward.z);
-
-  const visual = new TransformNode(`enemy:${id}:visual`, scene);
-  visual.parent = root;
-
-  const meshes: Mesh[] = [];
-  const attach = (mesh: Mesh, material: Material, parent: TransformNode = visual): Mesh => {
-    mesh.parent = parent;
-    mesh.material = material;
-    meshes.push(mesh);
-    return mesh;
-  };
-
-  attach(CreateBox(`enemy:${id}:body`, { width: BODY_WIDTH, height: BODY_HEIGHT, depth: BODY_DEPTH }, scene), materials.body);
-
-  let propIndex = 0;
-  for (const side of [-1, 1]) {
-    for (const row of [-1, 1]) {
-      const prop = CreateTorus(
-        `enemy:${id}:prop${propIndex++}`,
-        { diameter: PROP_DIAMETER, thickness: PROP_THICKNESS, tessellation: PROP_TESSELLATION },
-        scene,
-      );
-      prop.position.set(side * PROP_CENTER_X, BODY_HEIGHT / 2, row * PROP_CENTER_Z);
-      attach(prop, materials.accent);
-    }
-  }
-
-  // Semiesfera con la parte curva hacia abajo.
-  const dome = CreateSphere(`enemy:${id}:dome`, { diameter: DOME_DIAMETER, slice: DOME_HALF, segments: DOME_SEGMENTS }, scene);
-  dome.rotation.x = Math.PI;
-  dome.position.y = -BODY_HEIGHT / 2;
-  attach(dome, materials.accent);
-
-  // Cañón: un pivote (para inclinarlo) y un cilindro que sale hacia +Z.
-  const cannonPivot = new TransformNode(`enemy:${id}:cannonPivot`, scene);
-  cannonPivot.parent = visual;
-  cannonPivot.position.y = CANNON_PIVOT_Y;
-  if (pitchToForward) {
-    cannonPivot.rotation.x = -Math.asin(Math.max(-1, Math.min(1, forward.y)));
-  }
-
-  const cannon = CreateCylinder(
-    `enemy:${id}:cannon`,
-    { diameter: CANNON_DIAMETER, height: CANNON_LENGTH, tessellation: CANNON_TESSELLATION },
-    scene,
-  );
-  cannon.rotation.x = Math.PI / 2;
-  cannon.position.z = CANNON_LENGTH / 2;
-  attach(cannon, materials.accent, cannonPivot);
-
-  const muzzle = new TransformNode(`enemy:${id}:muzzle`, scene);
-  muzzle.parent = cannonPivot;
-  muzzle.position.z = CANNON_LENGTH;
-
-  return { root, visual, meshes, muzzle };
-}
-</file>
-
-<file path="drone/drone-modelV2.ts">
-import type { Material } from "@babylonjs/core/Materials/material";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { CreateCylinder } from "@babylonjs/core/Meshes/Builders/cylinderBuilder";
-import { CreatePolyhedron } from "@babylonjs/core/Meshes/Builders/polyhedronBuilder";
-import { CreateSphere } from "@babylonjs/core/Meshes/Builders/sphereBuilder";
-import { CreateTorus } from "@babylonjs/core/Meshes/Builders/torusBuilder";
-import type { Mesh } from "@babylonjs/core/Meshes/mesh";
-import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
-import type { Scene } from "@babylonjs/core/scene";
-
-// 🛠️ CONTROL DE ESCALA GLOBAL DEL DRON
-// 1.0 = Tamaño original. Modifica este multiplicador para agrandar o achicar todo el dron simétricamente.
-const GLOBAL_SCALE = 3.0; 
-
-export const DRONE_HOVER_HEIGHT = 0.7 * GLOBAL_SCALE; // Altura adaptada automáticamente a la escala
-const STAR_THICKNESS = 0.05;       
-const STAR_LENGTH = 0.3;          
-const STAR_BASE_WIDTH = 0.27;      
-
-const PROP_DIAMETER = 0.5;      
-const PROP_THICKNESS = 0.06;       
-
-const COCKPIT_DIAMETER = 0.4;     
-const COCKPIT_OFFSET_Y = -0.05;     
-
-const DOME_DIAMETER = 0.18;        
-const CANNON_DIAMETER = 0.035;
-const CANNON_LENGTH = 0.32;
-const CANNON_OFFSET_Y = -0.02; 
-const CANNON_DEPTH_OFFSET = 0.02; 
-
-export interface DroneMaterials {
-  readonly body: Material;
-  readonly accent: Material;
-}
-
-export interface DroneModelV2 {
-  readonly root: TransformNode;
-  readonly visual: TransformNode;
-  readonly meshes: Mesh[];
-  readonly propellers: Mesh[];
-  readonly muzzle: TransformNode;
-  readonly cannonGroup: TransformNode;
-  readonly cannonPivot: TransformNode;
-  readonly cockpit: Mesh;
-}
-
-/**
- * Construye el dron V2 en forma de estrella de 4 puntas rotada en diagonal.
- * Escala de forma automática todo el conjunto visual mediante la constante `GLOBAL_SCALE`.
- */
-export function buildDroneModelV2(
-  scene: Scene,
-  id: string,
-  materials: DroneMaterials,
-  position: Vector3,
-  forward: Vector3,
-  pitchToForward: boolean,
-): DroneModelV2 {
-  // Root actúa como el contenedor lógico (para físicas/IA). Mantiene escala 1:1 para evitar colisiones raras.
-  const root = new TransformNode(`enemy:${id}`, scene);
-  root.position.copyFrom(position);
-
-  const normalizedForward = forward.clone().normalize();
-  root.rotation.y = Math.atan2(normalizedForward.x, normalizedForward.z);
-
-  // Visual aplica la transformación cosmética y escala de forma absoluta a todos sus hijos
-  const visual = new TransformNode(`enemy:${id}:visual`, scene);
-  visual.parent = root;
-  visual.scaling.set(GLOBAL_SCALE, GLOBAL_SCALE, GLOBAL_SCALE); // 🌟 APLICACIÓN DE ESCALA GLOBAL
-
-  const meshes: Mesh[] = [];
-  const propellers: Mesh[] = [];
-
-  const attach = (mesh: Mesh, material: Material, parent: TransformNode = visual): Mesh => {
-    mesh.parent = parent;
-    mesh.material = material;
-    meshes.push(mesh);
-    return mesh;
-  };
-
-  const CHASSIS_ROTATION_Y = Math.PI / 4;
-
-  // --- CUERPO EN ESTRELLA ---
-  const arm1 = CreatePolyhedron(`enemy:${id}:arm1`, { type: 1, size: 1 }, scene);
-  arm1.scaling.set(STAR_LENGTH * 2, STAR_THICKNESS, STAR_BASE_WIDTH); 
-  arm1.rotation.y = CHASSIS_ROTATION_Y; 
-  attach(arm1, materials.body);
-
-  const arm2 = CreatePolyhedron(`enemy:${id}:arm2`, { type: 1, size: 1 }, scene);
-  arm2.scaling.set(STAR_BASE_WIDTH, STAR_THICKNESS, STAR_LENGTH * 2); 
-  arm2.rotation.y = CHASSIS_ROTATION_Y; 
-  attach(arm2, materials.body);
-
-  const core = CreateCylinder(`enemy:${id}:core`, { diameter: STAR_BASE_WIDTH * 0.8, height: STAR_THICKNESS * 1.1, tessellation: 8 }, scene);
-  core.rotation.y = CHASSIS_ROTATION_Y; 
-  attach(core, materials.body);
-
-  // --- CABINA SUPERIOR ---
-  const cockpit = CreateSphere(`enemy:${id}:cockpit`, { diameter: COCKPIT_DIAMETER, slice: 0.5, segments: 16 }, scene);
-  cockpit.position.y = (STAR_THICKNESS / 2) + COCKPIT_OFFSET_Y;
-  attach(cockpit, materials.accent);
-
-  // --- HÉLICES EN DIAGONAL ---
-  const realTipDistance = STAR_LENGTH * 2.5; 
-  const diagFactor = Math.sin(Math.PI / 4);
-  const offsetDistance = realTipDistance * diagFactor;
-
-  const propPositions = [
-    new Vector3(offsetDistance, STAR_THICKNESS / 2, offsetDistance),   
-    new Vector3(-offsetDistance, STAR_THICKNESS / 2, -offsetDistance), 
-    new Vector3(-offsetDistance, STAR_THICKNESS / 2, offsetDistance),  
-    new Vector3(offsetDistance, STAR_THICKNESS / 2, -offsetDistance),  
-  ];
-
-  propPositions.forEach((pos, index) => {
-    const prop = CreateTorus(
-      `enemy:${id}:prop${index}`,
-      { diameter: PROP_DIAMETER, thickness: PROP_THICKNESS, tessellation: 24 },
-      scene,
-    );
-    prop.position.copyFrom(pos); 
-    attach(prop, materials.accent);
-    propellers.push(prop);
+/** Plataforma de aterrizaje de 3 x 3: igual que `buildGround` pero de tamaño fijo. */
+export function buildLandingGround(options: LandingGroundOptions = {}): ProceduralMapSource {
+  return buildGround({
+    width: LANDING_GROUND_SIZE,
+    depth: LANDING_GROUND_SIZE,
+    name: DEFAULT_LANDING_GROUND_NAME,
+    color: DEFAULT_LANDING_GROUND_COLOR,
+    ...options,
   });
+}
+</file>
 
-  // --- SISTEMA DE ARMAS INFERIOR ---
-  const cannonGroup = new TransformNode(`enemy:${id}:cannonGroup`, scene);
-  cannonGroup.parent = visual;
-  cannonGroup.position.y = -STAR_THICKNESS / 2 + CANNON_OFFSET_Y;
+<file path="procedural/track-builder.ts">
+import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { CreateRibbon } from "@babylonjs/core/Meshes/Builders/ribbonBuilder";
+import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { Scene } from "@babylonjs/core/scene";
 
-  const dome = CreateSphere(`enemy:${id}:dome`, { diameter: DOME_DIAMETER, segments: 16 }, scene);
-  dome.position.y = 0; 
-  attach(dome, materials.accent, cannonGroup);
+export interface TrackOptions {
+  /** Mitad del ancho del camino (m). */
+  readonly halfWidth: number;
+  /** Espesor del camino (m): con grosor, el cuerpo físico no se atraviesa a velocidad. */
+  readonly thickness: number;
+}
 
-  const cannonPivot = new TransformNode(`enemy:${id}:cannonPivot`, scene);
-  cannonPivot.parent = cannonGroup;
-  cannonPivot.position.y = -(DOME_DIAMETER / 2) + CANNON_DEPTH_OFFSET;
+const MIN_HORIZONTAL_TANGENT_SQUARED = 1e-8;
 
-  if (pitchToForward) {
-    cannonPivot.rotation.x = -Math.asin(normalizedForward.y);
+/**
+ * Camino con la sección SIEMPRE horizontal (sin inclinación lateral) por más que la curva suba, baje o gire.
+ * `path` son los puntos del centro de la superficie superior; el espesor va hacia abajo.
+ * Es un prisma cerrado de una sola cara por triángulo, con las normales hacia afuera.
+ */
+export function createTrackMesh(scene: Scene, name: string, path: readonly Vector3[], options: TrackOptions): Mesh {
+  if (path.length < 2) {
+    throw new Error("[createTrackMesh] the path needs at least 2 points");
+  }
+  const { halfWidth, thickness } = options;
+
+  const topLeft: Vector3[] = [];
+  const topRight: Vector3[] = [];
+  const bottomRight: Vector3[] = [];
+  const bottomLeft: Vector3[] = [];
+
+  let right = new Vector3(1, 0, 0);
+  for (let index = 0; index < path.length; index++) {
+    const before = path[Math.max(index - 1, 0)];
+    const after = path[Math.min(index + 1, path.length - 1)];
+    const tangent = after.subtract(before);
+
+    // Derecha horizontal = Up × tangente = (t.z, 0, -t.x). Si la tangente es vertical, conserva la anterior.
+    if (tangent.x * tangent.x + tangent.z * tangent.z > MIN_HORIZONTAL_TANGENT_SQUARED) {
+      right = new Vector3(tangent.z, 0, -tangent.x).normalize();
+    }
+
+    const lateral = right.scale(halfWidth);
+    const left = path[index].subtract(lateral);
+    const rightEdge = path[index].add(lateral);
+    topLeft.push(left);
+    topRight.push(rightEdge);
+    bottomRight.push(rightEdge.subtractFromFloats(0, thickness, 0));
+    bottomLeft.push(left.subtractFromFloats(0, thickness, 0));
   }
 
-  const cannon = CreateCylinder(
-    `enemy:${id}:cannon`,
-    { diameter: CANNON_DIAMETER, height: CANNON_LENGTH, tessellation: 12 },
+  const track = CreateRibbon(
+    name,
+    { pathArray: [topLeft, topRight, bottomRight, bottomLeft], closeArray: true, updatable: false },
     scene,
   );
-  cannon.rotation.x = Math.PI / 2;
-  cannon.position.z = CANNON_LENGTH / 2;
-  attach(cannon, materials.accent, cannonPivot);
 
-  const muzzle = new TransformNode(`enemy:${id}:muzzle`, scene);
-  muzzle.parent = cannonPivot;
-  muzzle.position.z = CANNON_LENGTH;
-
-  return { root, visual, meshes, propellers, muzzle, cannonGroup, cannonPivot, cockpit };
+  // El primer vértice es topLeft[0]: su normal tiene que mirar hacia arriba. Si no, se invierte todo el prisma.
+  const normals = track.getVerticesData(VertexBuffer.NormalKind);
+  if (normals && normals[1] < 0) {
+    track.flipFaces(true);
+  }
+  return track;
 }
 </file>
 
-<file path="flying-sentinel/flying-sentinel-drone.ts">
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-
-import type { EnemySpawn } from "../../../levels/level-definition";
-import type { NavigationService } from "../../../navigation/navigation-service";
-import type { PatrolRegion } from "../../../navigation/patrol-region";
-import { createPatrolVolumeDebug, type PatrolVolumeDebug } from "../debug/patrol-volume-debug";
-import { DroneBase } from "../drone/drone-base";
-import type { EnemyDeps } from "../enemy-factory";
-import { SentinelFsm } from "../sentinel/sentinel.fsm";
-import { FlyingSentinelMovementController } from "./flying-sentinel-movement.controller";
-
-const PATROL_RETRY_DELAY_SECONDS = 1; // si el servicio no devuelve un punto, reintenta más tarde
+<file path="strategies/level-01-strategy.ts">
+import { LevelStrategy, type LevelStrategyDeps } from "../level-strategy";
 
 /**
- * Sentinel volador: patrulla puntos aleatorios dentro de un volumen 3D. Aparece en `spawn.position`
- * (que debe estar dentro del volumen). Por ahora solo vuela: no dispara. La FSM es la del sentinel,
- * con su único estado Patrol; los próximos estados se suman después.
+ * Nivel 1. PLACEHOLDER: todavía no hay Character, enemigos ni HUD (migraciones siguientes),
+ * así que no tiene reglas propias: el resultado se fuerza con las teclas de depuración (solo DEV).
+ * El visor es la cámara placeholder; se reemplaza por la del personaje.
  */
-export class FlyingSentinelDrone extends DroneBase {
-  private readonly navigation: NavigationService;
-  private readonly region: PatrolRegion | undefined;
-  private readonly movement: FlyingSentinelMovementController;
-  private readonly fsm: SentinelFsm;
-  private readonly destination = new Vector3();
-  private volumeDebug: PatrolVolumeDebug | null = null;
+export class Level01Strategy extends LevelStrategy {
+  // constructor(deps: LevelStrategyDeps) {
+  //   super(deps);
+  //   createLevelViewer(deps.context.scene, deps.context.canvas, deps.scope);
+  // }
 
-  constructor(id: string, spawn: EnemySpawn, deps: EnemyDeps) {
-    super(id, "flyingSentinel", spawn, deps, {
-      accentMaterial: "sentinel-drone-accent",
-      pitchToForward: false,
-      spawnAtExactPosition: true,
-      armed: false,
-    });
-    this.navigation = deps.navigation;
-    this.region = spawn.patrol;
-    if (!this.region?.volume) {
-      console.warn(`[FlyingSentinelDrone] ${id} has no patrol volume in its spawn: it will not move`);
-    } else {
-      this.volumeDebug = createPatrolVolumeDebug(deps.scene, id, this.region.volume);
-    }
-
-    this.movement = new FlyingSentinelMovementController(this.root, this.visual);
-    this.fsm = new SentinelFsm({
-      onEnterPatrol: () => this.pickDestination(),
-      hasFinishedTrip: () => this.movement.isIdle,
-    });
-    this.fsm.start();
+  protected onTick(): void {
+    // TODO: Character.update, EnemiesManager.update, HUD.update
   }
 
-  protected override onThink(deltaTime: number): void {
-    this.fsm.tick();
-    this.movement.update(deltaTime);
+  protected checkWin(): boolean {
+    return false; // TODO: todas las oleadas eliminadas
   }
 
-  protected override onDestroyed(): void {
-    this.releaseDebug();
-    super.onDestroyed();
-  }
-
-  protected override onDispose(): void {
-    this.fsm.dispose();
-    this.releaseDebug();
-    super.onDispose();
-  }
-
-  /** Estado Patrol: toma un punto 3D del servicio y va hacia él. */
-  private pickDestination(): void {
-    const point = this.region ? this.navigation.getRandomPoint(this.region, this.destination) : null;
-    if (point) {
-      this.movement.moveTo(point);
-    } else {
-      this.movement.wait(PATROL_RETRY_DELAY_SECONDS);
-    }
-  }
-
-  private releaseDebug(): void {
-    this.volumeDebug?.dispose();
-    this.volumeDebug = null;
+  protected checkLose(): boolean {
+    return false; // TODO: el personaje murió
   }
 }
 </file>
 
-<file path="flying-sentinel/flying-sentinel-movement.controller.ts">
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+<file path="strategies/level-02-strategy.ts">
+import { LevelStrategy, LevelStrategyDeps } from "../level-strategy";
 
-const TURN_SPEED_RADIANS = Math.PI; // 180°/s
-const ALIGN_TOLERANCE_RADIANS = (3 * Math.PI) / 180; // alineado: empieza a trasladarse
-const MOVE_SPEED = 2.5; // m/s (promedio: con suavizado arranca y frena despacio)
-const EASE_MOVEMENT = true; // smoothstep sobre el lerp
-const DWELL_SECONDS = 0.5; // pausa al llegar
-const MIN_TRAVEL_DISTANCE = 0.5; // destinos más cercanos no valen un viaje
-const MIN_HORIZONTAL_DISTANCE = 1e-3; // por debajo, el yaw no está definido: se conserva el actual
-
-const MAX_PITCH_RADIANS = (25 * Math.PI) / 180; // inclinación máxima del cuerpo al subir/bajar
-const PITCH_SMOOTHING = 6; // 1/s: qué tan rápido el pitch sigue a su objetivo
-
-type MovementPhase = "idle" | "turning" | "moving" | "waiting";
-
-const TWO_PI = Math.PI * 2;
-
-/** Diferencia angular más corta de `from` a `to`, entre −π y π. */
-const shortestAngleDiff = (from: number, to: number): number => {
-  let diff = (to - from) % TWO_PI;
-  if (diff > Math.PI) {
-    diff -= TWO_PI;
-  } else if (diff < -Math.PI) {
-    diff += TWO_PI;
-  }
-  return diff;
-};
-
-/**
- * Movimiento 3D de un dron volador. Mismo contrato que SentinelMovementController (moveTo / wait / isIdle),
- * así la SentinelFsm se reutiliza sin cambios.
- *
- * - Gira (yaw) sobre `root` hasta mirar el destino en el plano horizontal.
- * - Se traslada en línea recta en las tres dimensiones (lerp con smoothstep).
- * - Mientras sube o baja, inclina `visual` (pitch); en pausa y giros vuelve a nivelarse.
- */
-export class FlyingSentinelMovementController {
-  private phase: MovementPhase = "idle";
-  private yaw: number;
-  private pitch = 0;
-  private pitchTarget = 0;
-  private readonly start = new Vector3();
-  private readonly target = new Vector3();
-  private moveElapsed = 0;
-  private moveDuration = 0;
-  private waitRemaining = 0;
-
-  constructor(
-    private readonly root: TransformNode,
-    private readonly visual: TransformNode,
-  ) {
-    this.yaw = root.rotation.y;
+export class Level02Strategy extends LevelStrategy {
+  constructor(deps: LevelStrategyDeps) {
+    super(deps);
+    // createLevelViewer(deps.context.scene, deps.context.canvas, deps.scope);
   }
 
-  /** Libre: terminó el viaje (o no tiene ninguno). */
-  get isIdle(): boolean {
-    return this.phase === "idle";
+  protected override onPlay(): void {
+    console.log(`[Level02Strategy] play: ${this.definition.id}, spawn: ${this.characterSpawn.toString()}`);
   }
 
-  /** Empieza un viaje: gira hacia el destino y se traslada hasta él. */
-  moveTo(destination: Vector3): void {
-    this.target.copyFrom(destination);
-    if (Vector3.DistanceSquared(this.root.position, this.target) < MIN_TRAVEL_DISTANCE * MIN_TRAVEL_DISTANCE) {
-      this.wait(DWELL_SECONDS);
-      return;
-    }
-    this.phase = "turning";
+  protected onTick(): void {
+    // TODO: Character.update, EnemiesManager.update, HUD.update
   }
 
-  /** Se queda quieto `seconds` y después queda libre (también sirve para reintentar más tarde). */
-  wait(seconds: number): void {
-    this.phase = "waiting";
-    this.waitRemaining = seconds;
-    this.pitchTarget = 0;
+  protected checkWin(): boolean {
+    return this.enemies.aliveCount === 0; // todos los blancos destruidos
   }
 
-  update(deltaTime: number): void {
-    switch (this.phase) {
-      case "turning":
-        this.updateTurning(deltaTime);
-        break;
-      case "moving":
-        this.updateMoving(deltaTime);
-        break;
-      case "waiting":
-        this.waitRemaining -= deltaTime;
-        if (this.waitRemaining <= 0) {
-          this.phase = "idle";
-        }
-        break;
-      case "idle":
-        break;
-    }
-    this.updatePitch(deltaTime);
-  }
-
-  private updateTurning(deltaTime: number): void {
-    const dx = this.target.x - this.root.position.x;
-    const dz = this.target.z - this.root.position.z;
-
-    // Destino justo arriba/abajo: no hay hacia dónde girar.
-    if (dx * dx + dz * dz < MIN_HORIZONTAL_DISTANCE * MIN_HORIZONTAL_DISTANCE) {
-      this.startMoving();
-      return;
-    }
-
-    const desiredYaw = Math.atan2(dx, dz);
-    const diff = shortestAngleDiff(this.yaw, desiredYaw);
-
-    if (Math.abs(diff) <= ALIGN_TOLERANCE_RADIANS) {
-      this.yaw = desiredYaw;
-      this.root.rotation.y = this.yaw;
-      this.startMoving();
-      return;
-    }
-
-    const step = Math.min(Math.abs(diff), TURN_SPEED_RADIANS * deltaTime);
-    this.yaw += Math.sign(diff) * step;
-    this.root.rotation.y = this.yaw;
-  }
-
-  private startMoving(): void {
-    this.start.copyFrom(this.root.position);
-    const distance = Vector3.Distance(this.start, this.target);
-    this.moveDuration = distance / MOVE_SPEED;
-    this.moveElapsed = 0;
-
-    // En Babylon un rotation.x positivo baja la nariz: para subir el pitch es negativo.
-    const climb = distance > 0 ? (this.target.y - this.start.y) / distance : 0;
-    this.pitchTarget = Math.max(-MAX_PITCH_RADIANS, Math.min(MAX_PITCH_RADIANS, -Math.asin(climb)));
-
-    this.phase = "moving";
-  }
-
-  private updateMoving(deltaTime: number): void {
-    this.moveElapsed += deltaTime;
-    const t = this.moveDuration > 0 ? Math.min(this.moveElapsed / this.moveDuration, 1) : 1;
-    const eased = EASE_MOVEMENT ? t * t * (3 - 2 * t) : t;
-    Vector3.LerpToRef(this.start, this.target, eased, this.root.position);
-
-    if (t >= 1) {
-      this.wait(DWELL_SECONDS);
-    }
-  }
-
-  private updatePitch(deltaTime: number): void {
-    const blend = 1 - Math.exp(-PITCH_SMOOTHING * deltaTime);
-    this.pitch += (this.pitchTarget - this.pitch) * blend;
-    this.visual.rotation.x = this.pitch;
+  protected checkLose(): boolean {
+    return false; // TODO: el personaje murió
   }
 }
 </file>
 
-<file path="sentinel/sentinel-drone.ts">
+<file path="strategies/level-03-strategy.ts">
+import { LevelStrategy } from "../level-strategy";
+
+const DEATH_TO_GAME_OVER_DELAY_SECONDS = 2.5; // deja ver la animación de muerte antes de la pantalla de derrota
+
+/** Se gana destruyendo todos los drones; se pierde unos segundos después de que el personaje muere. */export class Level03Strategy extends LevelStrategy {
+  private secondsDead = 0;
+
+  protected onTick(deltaTime: number): void {
+    if (this.character.isDead) {
+      this.secondsDead += deltaTime;
+    }
+  }
+
+  protected checkWin(): boolean {
+    return this.enemies.aliveCount === 0; // todos los drones destruidos
+  }
+
+  protected checkLose(): boolean {
+    return this.secondsDead >= DEATH_TO_GAME_OVER_DELAY_SECONDS;
+  }
+}
+</file>
+
+<file path="strategies/level-04-strategy.ts">
+import { LevelStrategy } from "../level-strategy";
+
+/** Se gana destruyendo todos los sentinels; se pierde unos segundos después de que el personaje muere. */
+export class Level04Strategy extends LevelStrategy {
+  private secondsDead = 0;
+
+  protected onTick(deltaTime: number): void {
+    if (this.character.isDead) {
+      this.secondsDead += deltaTime;
+    }
+  }
+
+  protected checkWin(): boolean {
+    return this.enemies.aliveCount === 0;
+  }
+
+  protected checkLose(): boolean {
+    return this.secondsDead >= this.DEATH_TO_GAME_OVER_DELAY_SECONDS;
+  }
+}
+</file>
+
+<file path="strategies/level-05-strategy.ts">
+import { LevelStrategy } from "../level-strategy";
+
+export class Level05Strategy extends LevelStrategy {
+    private secondsDead = 0;
+    
+    protected onTick(_deltaTime: number): void { }
+
+    protected checkWin(): boolean {
+        return this.enemies.aliveCount === 0;
+    }
+
+    protected checkLose(): boolean {
+        return this.secondsDead >= this.DEATH_TO_GAME_OVER_DELAY_SECONDS;
+    }
+}
+</file>
+
+<file path="strategies/level-06-strategy.ts">
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 
-import type { NavigationService } from "../../../navigation/navigation-service";
-import type { PatrolRegion } from "../../../navigation/patrol-region";
-import type { EnemySpawn } from "../../../levels/level-definition";
-import { DroneBase } from "../drone/drone-base";
-import type { EnemyDeps } from "../enemy-factory";
-import { SentinelFsm } from "./sentinel.fsm";
-import { SentinelMovementController } from "./sentinel-movement.controller";
+import { LevelStrategy } from "../level-strategy";
 
-const PATROL_RETRY_DELAY_SECONDS = 1; // si el servicio no devuelve un punto, reintenta más tarde
+const END_REACHED_RADIUS = 3; // distancia a la meta para darla por alcanzada
+const DEATH_TO_GAME_OVER_DELAY_SECONDS = 2.5; // deja ver la animación de muerte antes de la pantalla de derrota
 
-/**
- * Dron centinela: patrulla puntos aleatorios que le da el servicio de navegación dentro de su región,
- * girando hacia cada uno antes de ir. Dispara cada 3 segundos hacia donde mira y se puede destruir.
- * Más adelante: flotación, yaw y pitch como efecto visual.
- */
-export class SentinelDrone extends DroneBase {
-  private readonly navigation: NavigationService;
-  private readonly region: PatrolRegion | undefined;
-  private readonly movement: SentinelMovementController;
-  private readonly fsm: SentinelFsm;
-  private readonly destination = new Vector3();
+/** Se gana llegando al final del camino; se pierde al caer del camino o unos segundos después de morir. */
+export class Level06Strategy extends LevelStrategy {
+  private secondsDead = 0;
 
-  constructor(id: string, spawn: EnemySpawn, deps: EnemyDeps) {
-    super(id, "sentinelDrone", spawn, deps, { accentMaterial: "sentinel-drone-accent", pitchToForward: false });
-    this.navigation = deps.navigation;
-    this.region = spawn.patrol;
-    if (!this.region) {
-      console.warn(`[SentinelDrone] ${id} has no patrol region in its spawn: it will not move`);
+  protected onTick(deltaTime: number): void {
+    if (this.character.isDead) {
+      this.secondsDead += deltaTime;
     }
-
-    this.movement = new SentinelMovementController(this.root);
-    this.fsm = new SentinelFsm({
-      onEnterPatrol: () => this.pickDestination(),
-      hasFinishedTrip: () => this.movement.isIdle,
-    });
-    this.fsm.start();
   }
 
-  protected override onThink(deltaTime: number): void {
-    this.fsm.tick();
-    this.movement.update(deltaTime);
+  protected checkWin(): boolean {
+        return false;
   }
 
-  protected override onDispose(): void {
-    this.fsm.dispose();
-    super.onDispose();
-  }
-
-  /** Estado Patrol: toma un punto del servicio y va hacia él. */
-  private pickDestination(): void {
-    const point = this.region ? this.navigation.getRandomPoint(this.region, this.destination) : null;
-    if (point) {
-      this.movement.moveTo(point);
-    } else {
-      this.movement.wait(PATROL_RETRY_DELAY_SECONDS);
-    }
+  protected checkLose(): boolean {
+        return this.secondsDead >= this.DEATH_TO_GAME_OVER_DELAY_SECONDS;
   }
 }
 </file>
 
-<file path="sentinel/sentinel-movement.controller.ts">
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
-
-const TURN_SPEED_RADIANS = Math.PI; // 180°/s
-const ALIGN_TOLERANCE_RADIANS = (3 * Math.PI) / 180; // alineado: empieza a trasladarse
-const MOVE_SPEED = 2.5; // m/s (promedio: con suavizado arranca y frena despacio)
-const EASE_MOVEMENT = true; // smoothstep sobre el lerp
-const DWELL_SECONDS = 0.5; // pausa al llegar
-const MIN_TRAVEL_DISTANCE = 0.5; // destinos más cercanos no valen un viaje
-
-type MovementPhase = "idle" | "turning" | "moving" | "waiting";
-
-const TWO_PI = Math.PI * 2;
-
-/** Diferencia angular más corta de `from` a `to`, entre −π y π. */
-const shortestAngleDiff = (from: number, to: number): number => {
-  let diff = (to - from) % TWO_PI;
-  if (diff > Math.PI) {
-    diff -= TWO_PI;
-  } else if (diff < -Math.PI) {
-    diff += TWO_PI;
-  }
-  return diff;
-};
-
-/**
- * Mueve un nodo hacia un destino: primero gira (yaw) hasta mirarlo y después se traslada con lerp.
- * Al llegar espera un instante y queda libre (idle). El cañón sale siempre hacia adelante del nodo.
- */
-export class SentinelMovementController {
-  private phase: MovementPhase = "idle";
-  private yaw: number;
-  private readonly start = new Vector3();
-  private readonly target = new Vector3();
-  private moveElapsed = 0;
-  private moveDuration = 0;
-  private waitRemaining = 0;
-
-  constructor(private readonly root: TransformNode) {
-    this.yaw = root.rotation.y;
-  }
-
-  /** Libre: terminó el viaje (o no tiene ninguno). */
-  get isIdle(): boolean {
-    return this.phase === "idle";
-  }
-
-  /** Empieza un viaje: gira hacia el destino y se traslada hasta él. */
-  moveTo(destination: Vector3): void {
-    this.target.copyFrom(destination);
-    if (Vector3.DistanceSquared(this.root.position, this.target) < MIN_TRAVEL_DISTANCE * MIN_TRAVEL_DISTANCE) {
-      this.wait(DWELL_SECONDS);
-      return;
-    }
-    this.phase = "turning";
-  }
-
-  /** Se queda quieto `seconds` y después queda libre (también sirve para reintentar más tarde). */
-  wait(seconds: number): void {
-    this.phase = "waiting";
-    this.waitRemaining = seconds;
-  }
-
-  update(deltaTime: number): void {
-    switch (this.phase) {
-      case "turning":
-        this.updateTurning(deltaTime);
-        break;
-      case "moving":
-        this.updateMoving(deltaTime);
-        break;
-      case "waiting":
-        this.waitRemaining -= deltaTime;
-        if (this.waitRemaining <= 0) {
-          this.phase = "idle";
-        }
-        break;
-      case "idle":
-        break;
-    }
-  }
-
-  private updateTurning(deltaTime: number): void {
-    const desiredYaw = Math.atan2(this.target.x - this.root.position.x, this.target.z - this.root.position.z);
-    const diff = shortestAngleDiff(this.yaw, desiredYaw);
-
-    if (Math.abs(diff) <= ALIGN_TOLERANCE_RADIANS) {
-      this.yaw = desiredYaw;
-      this.root.rotation.y = this.yaw;
-      this.startMoving();
-      return;
-    }
-
-    const step = Math.min(Math.abs(diff), TURN_SPEED_RADIANS * deltaTime);
-    this.yaw += Math.sign(diff) * step;
-    this.root.rotation.y = this.yaw;
-  }
-
-  private startMoving(): void {
-    this.start.copyFrom(this.root.position);
-    this.moveDuration = Vector3.Distance(this.start, this.target) / MOVE_SPEED;
-    this.moveElapsed = 0;
-    this.phase = "moving";
-  }
-
-  private updateMoving(deltaTime: number): void {
-    this.moveElapsed += deltaTime;
-    const t = Math.min(this.moveElapsed / this.moveDuration, 1);
-    const eased = EASE_MOVEMENT ? t * t * (3 - 2 * t) : t;
-    Vector3.LerpToRef(this.start, this.target, eased, this.root.position);
-
-    if (t >= 1) {
-      this.wait(DWELL_SECONDS);
-    }
-  }
-}
-</file>
-
-<file path="sentinel/sentinel.fsm.ts">
-export type SentinelState = "Patrol";
-
-export interface SentinelFsmDeps {
-  /** Entrar a Patrol: elegir un destino nuevo y empezar a ir. */
-  onEnterPatrol: () => void;
-  /** ¿Terminó el viaje actual (giro, traslado y pausa)? */
-  hasFinishedTrip: () => boolean;
-}
-
-type Guard = () => boolean;
-
-/** FSM del sentinel. Hoy un solo estado; los próximos (ej: atacar, huir) se suman acá. */
-export class SentinelFsm {
-  private state: SentinelState = "Patrol";
-  private readonly transitions: Record<SentinelState, Partial<Record<SentinelState, Guard>>>;
-  private readonly onEnter: Record<SentinelState, () => void>;
-  private readonly listeners = new Set<(state: SentinelState) => void>();
-
-  constructor(deps: SentinelFsmDeps) {
-    this.transitions = {
-      // Patrol -> Patrol: al terminar un viaje se vuelve a entrar para sortear el siguiente destino.
-      Patrol: { Patrol: deps.hasFinishedTrip },
-    };
-    this.onEnter = { Patrol: deps.onEnterPatrol };
-  }
-
-  /** Entra al estado inicial. */
-  start(): void {
-    this.onEnter[this.state]();
-  }
-
-  tick(): void {
-    const guards = this.transitions[this.state];
-    for (const next of Object.keys(guards) as SentinelState[]) {
-      if (guards[next]?.()) {
-        this.setState(next);
-        return;
-      }
-    }
-  }
-
-  getState(): SentinelState {
-    return this.state;
-  }
-
-  onStateChange(listener: (state: SentinelState) => void): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  }
-
-  dispose(): void {
-    this.listeners.clear();
-  }
-
-  private setState(next: SentinelState): void {
-    this.state = next;
-    this.onEnter[next]();
-    this.listeners.forEach((listener) => listener(next));
-  }
-}
-</file>
-
-<file path="dummy-target.ts">
-import "@babylonjs/core/Rendering/outlineRenderer"; // habilita renderOverlay en los meshes
-import { Color3 } from "@babylonjs/core/Maths/math.color";
-import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
-import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
+<file path="ground-physics.ts">
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { PhysicsShapeType } from "@babylonjs/core/Physics/v2/IPhysicsEnginePlugin";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
+import type { Scene } from "@babylonjs/core/scene";
 
-import type { ProjectileHitPayload } from "@/game/services/event-manager";
-import { EnemyBase } from "./enemy";
-import type { EnemyDeps } from "./enemy-factory";
+import type { StaticShape } from "./level-definition";
+import type { LoadedMap } from "./level-map-factory";
+import type { LevelScope } from "./level-scope";
 
-const DUMMY_WIDTH = 1.2;
-const DUMMY_HEIGHT = 2;
-const DUMMY_DEPTH = 0.2;
-const DUMMY_MASS = 0; // estático: no se mueve ni cae
-const DUMMY_FRICTION = 0.5;
-const DUMMY_RESTITUTION = 0;
-const DUMMY_HEALTH = 3; // con daño 1 por proyectil: 3 disparos
+const STATIC_MASS = 0; // estático
+const STATIC_FRICTION = 0.8; // TODO: usar el valor de la config del POC
+const STATIC_RESTITUTION = 0; // sin rebote al aterrizar
 
-const HIT_FLASH_DURATION = 0.12; // segundos
-const HIT_FLASH_COLOR = Color3.White();
-const HIT_FLASH_ALPHA = 0.6;
+const SHAPE_TYPES: Record<StaticShape, PhysicsShapeType> = {
+  box: PhysicsShapeType.BOX,
+  mesh: PhysicsShapeType.MESH,
+};
 
-/** Blanco de práctica: un rectángulo estático que recibe impactos, destella y se destruye al quedarse sin vida. */
-export class DummyTarget extends EnemyBase {
-  readonly mesh: Mesh;
-  private readonly aggregate: PhysicsAggregate;
-  private health = DUMMY_HEALTH;
-  private flashRemaining = 0;
-  private released = false;
+/**
+ * Crea el cuerpo físico estático de los suelos y de las mallas sólidas del nivel. Se liberan con el scope.
+ * Devuelve el cuerpo de cada malla, por si la strategy necesita luego destruirlo o volverlo dinámico.
+ */
+export function createGroundPhysics(map: LoadedMap, scene: Scene, scope: LevelScope): ReadonlyMap<Mesh, PhysicsAggregate> {
+  const bodies = new Map<Mesh, PhysicsAggregate>();
+  if (!scene.isPhysicsEnabled()) {
+    console.warn("[createGroundPhysics] the scene has no physics engine enabled: grounds have no body");
+    return bodies;
+  }
 
-  /** `spawn` es la base del blanco (a ras de suelo): el centro queda media altura más arriba. */
-  constructor(id: string, spawn: Vector3, deps: EnemyDeps) {
-    super(id, "dummyTarget");
-
-    this.mesh = CreateBox(`enemy:${id}`, { width: DUMMY_WIDTH, height: DUMMY_HEIGHT, depth: DUMMY_DEPTH }, deps.scene);
-    this.mesh.material = deps.registry.getMaterial("dummy-target");
-    this.mesh.isPickable = true; // los proyectiles lo detectan por raycast
-    this.mesh.position.set(spawn.x, spawn.y + DUMMY_HEIGHT / 2, spawn.z); // ANTES del aggregate: Havok toma la posición al construirlo
-    this.mesh.overlayColor = HIT_FLASH_COLOR;
-    this.mesh.overlayAlpha = HIT_FLASH_ALPHA;
-
-    this.aggregate = new PhysicsAggregate(
-      this.mesh,
-      PhysicsShapeType.BOX,
-      { mass: DUMMY_MASS, friction: DUMMY_FRICTION, restitution: DUMMY_RESTITUTION },
-      deps.scene,
+  const addBody = (mesh: Mesh, shape: StaticShape): void => {
+    bodies.set(
+      mesh,
+      scope.register(
+        new PhysicsAggregate(
+          mesh,
+          SHAPE_TYPES[shape],
+          { mass: STATIC_MASS, friction: STATIC_FRICTION, restitution: STATIC_RESTITUTION },
+          scene,
+        ),
+      ),
     );
-  }
+  };
 
-  ownsMesh(mesh: AbstractMesh): boolean {
-    return mesh === this.mesh;
+  for (const ground of map.grounds) {
+    addBody(ground, map.groundShapes.get(ground) ?? "box");
   }
+  for (const solid of map.solids) {
+    addBody(solid.mesh, solid.shape);
+  }
+  return bodies;
+}
+</file>
 
-  protected onHit(hit: ProjectileHitPayload): void {
-    this.health -= hit.damage;
-    if (import.meta.env.DEV) {
-      console.info(`[DummyTarget] ${this.id}: vida ${Math.max(this.health, 0)}/${DUMMY_HEALTH}`);
+<file path="level-definition.ts">
+import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { Scene } from "@babylonjs/core/scene";
+
+import type { PatrolRegion } from "../navigation/patrol-region";
+import type { LevelScope } from "./level-scope";
+
+/** Tipos de enemigo que un nivel puede pedir. */
+export type EnemyType =
+  | "drone"
+  | "dummyTarget"
+  | "staticDrone"
+  | "sentinelDrone"
+  | "flyingSentinel"
+  | "raycastDummy"
+  | "dummyKamikazeDrone";
+/** Dónde y hacia dónde aparece un enemigo. */
+export interface EnemySpawn {
+  /** Base del enemigo: a ras de suelo (o de la plataforma donde se apoya). */
+  readonly position: Vector3;
+  /** Hacia dónde mira. Solo importa a los que apuntan; por defecto, +Z. */
+  readonly forward?: Vector3;
+  /** Segundos que espera antes del primer disparo (para desfasar enemigos que disparan a la vez). Por defecto, 0. */
+  readonly fireDelaySeconds?: number;
+  /** Región (volumen y/o plano) donde patrulla; solo la usan los enemigos que se mueven por puntos. */
+  readonly patrol?: PatrolRegion;
+}
+
+/** Spawns por categoría de enemigo. */
+export type EnemySpawns = Partial<Record<EnemyType, readonly EnemySpawn[]>>;
+export interface WaveDefinition {
+  /** Número de oleada (1, 2, 3...). */
+  readonly wave: number;
+  readonly enemyType: EnemyType;
+  readonly quantity: number;
+  /** Segundos desde el inicio de la oleada hasta que aparecen. */
+  readonly delaySeconds: number;
+}
+
+export interface LevelSpawns {
+  readonly character: Vector3;
+  readonly enemies: EnemySpawns;
+  readonly items: readonly Vector3[];
+  readonly other: readonly Vector3[];
+}
+
+/** Datos para pathfinding terrestre. Los enemigos voladores no lo necesitan. */
+export interface LevelNavigation {
+  readonly navmeshFile?: string;
+  readonly waypoints?: readonly Vector3[];
+}
+
+/** Cómo se reconoce una malla del GLB del mapa: por fragmento del nombre o por expresión regular. */
+export type MapMeshMatcher = { readonly includes: string } | { readonly pattern: RegExp };
+
+export type MapMeshRole = "buildings" | "trees" | "roads" | "greenAreas" | "waterways";
+
+/** Un grupo de mallas del mapa que se fusiona en una sola (menos draw calls). */
+export interface MapMeshGroup {
+  readonly role: MapMeshRole;
+  /** Nombre con el que queda la malla fusionada. */
+  readonly name: string;
+  readonly match: MapMeshMatcher;
+  readonly allow32BitIndices: boolean;
+}
+
+export interface GlbMapSource {
+  readonly kind: "glb";
+  readonly modelRootUrl: string;
+  readonly modelFile: string;
+  /** Se aplica ANTES de fusionar, para que las mallas calculen bien sus coordenadas. */
+  readonly rootPosition: Vector3;
+  readonly rootRotationXDeg: number;
+  readonly groups: readonly MapMeshGroup[];
+  /** El suelo no se fusiona: queda como malla independiente (lo usa el hoverboard). */
+  readonly ground: { readonly name: string; readonly match: MapMeshMatcher };
+}
+
+export interface ProceduralMapContext {
+  readonly scene: Scene;
+  /** Para registrar lo que no sea una malla (cuerpos de física, observers, etc.). */
+  readonly scope: LevelScope;
+}
+
+/** Forma del cuerpo físico estático: "box" sirve para planos; "mesh" sigue la geometría (curvas, relieve). */
+export type StaticShape = "box" | "mesh";
+
+/** Para qué se reserva un bloque sólido; lo usará la strategy del nivel (ej: destruirlo o hacerlo caer). */
+export type SolidKind = "breakable" | "falling";
+
+/** Malla que además de verse debe colisionar (cuerpo estático). */
+export interface StaticSolid {
+  readonly mesh: Mesh;
+  readonly shape: StaticShape;
+  /** Bloque especial; sin valor = bloque común. */
+  readonly kind?: SolidKind;
+}
+
+export interface ProceduralMapResult {
+  /** Suelo del nivel, si esta fuente aporta uno. */
+  readonly ground?: Mesh;
+  /** Forma del cuerpo físico del suelo. Por defecto "box". */
+  readonly groundShape?: StaticShape;
+  /** Resto de las mallas creadas (sin física). */
+  readonly meshes?: readonly Mesh[];
+  /** Mallas que no son suelo pero deben colisionar (paredes, túneles, etc.). */
+  readonly solids?: readonly StaticSolid[];
+}
+
+/** Mapa creado por código con primitivas de Babylon. Las mallas que devuelve las adopta el LevelScope. */
+export interface ProceduralMapSource {
+  readonly kind: "procedural";
+  readonly build: (context: ProceduralMapContext) => ProceduralMapResult;
+}
+
+export type LevelMapSource = GlbMapSource | ProceduralMapSource;
+
+/** Skybox de un nivel: seis imágenes `<basePath>_px|nx|py|ny|pz|nz.<extension>`. */
+export interface SkyboxDefinition {
+  /** Ruta sin sufijo ni extensión, relativa a /public. Ej: "images/skybox/space". */
+  readonly basePath: string;
+  /** Por defecto "png". */
+  readonly extension?: string;
+  /** Lado del cubo. Por defecto 1000. */
+  readonly size?: number;
+  /** Para que el mismo set se vea distinto entre niveles. Por defecto 0. */
+  readonly rotationYDeg?: number;
+}
+
+/** Datos ESTÁTICOS de un nivel: viven en el código y se versionan con él. */
+export interface LevelDefinition {
+  readonly id: string;
+  /** Orden secuencial: el nivel pendiente de menor `order` es el siguiente. */
+  readonly order: number;
+  /** Objetivo del nivel (se muestra en la pausa). */
+  readonly brief: string;
+  readonly maps: readonly LevelMapSource[];
+  readonly spawns: LevelSpawns;
+  readonly waves: readonly WaveDefinition[];
+  readonly navigation?: LevelNavigation;
+  readonly skybox?: SkyboxDefinition;
+
+}
+</file>
+
+<file path="level-definitions.ts">
+import { level01Definition } from "./definitions/level-01-definition";
+import { level02Definition } from "./definitions/level-02-definition";
+import { level03Definition } from "./definitions/level-03-definition";
+import { level04Definition } from "./definitions/level-04-definition";
+import { level05Definition } from "./definitions/level-05-definition";
+import { level06Definition } from "./definitions/level-06-definition";
+import type { LevelDefinition } from "./level-definition";
+
+/** Todos los niveles del juego. Para agregar uno: crear su definición y sumarla acá. */
+// export const LEVEL_DEFINITIONS: readonly LevelDefinition[] = [level01Definition, level02Definition];
+// export const LEVEL_DEFINITIONS: readonly LevelDefinition[] = [level01Definition, level02Definition, level03Definition, level04Definition, level05Definition];
+export const LEVEL_DEFINITIONS: readonly LevelDefinition[] = [ level05Definition,level06Definition];
+</file>
+
+<file path="level-factory.ts">
+import { Level01Strategy } from "./strategies/level-01-strategy";
+import type { LevelStrategy, LevelStrategyDeps } from "./level-strategy";
+import { Level02Strategy } from "./strategies/level-02-strategy";
+import { Level03Strategy } from "./strategies/level-03-strategy";
+import { Level04Strategy } from "./strategies/level-04-strategy";
+import { Level05Strategy } from "./strategies/level-05-strategy";
+import { Level06Strategy } from "./strategies/level-06-strategy";
+
+type StrategyBuilder = (deps: LevelStrategyDeps) => LevelStrategy;
+
+/** Un strategy concreto por nivel. Para agregar uno: crear la clase y registrarla acá. */
+const STRATEGY_BUILDERS: Readonly<Record<string, StrategyBuilder>> = {
+  "level-01": (deps) => new Level01Strategy(deps),
+  "level-02": (deps) => new Level02Strategy(deps),
+  "level-03": (deps) => new Level03Strategy(deps),
+  "level-04": (deps) => new Level04Strategy(deps),
+  "level-05": (deps) => new Level05Strategy(deps),
+  "level-06": (deps) => new Level06Strategy(deps),
+}
+  ;
+
+/** Estado 3B: arma el strategy del nivel (y, a futuro, Character, EnemiesManager y HUD que se le inyectan). */
+export function createLevelStrategy(deps: LevelStrategyDeps): LevelStrategy {
+  const build = STRATEGY_BUILDERS[deps.definition.id];
+  if (!build) {
+    throw new Error(`[createLevelStrategy] there is no strategy registered for the level "${deps.definition.id}"`);
+  }
+  return build(deps);
+}
+</file>
+
+<file path="level-lighting.ts">
+import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import type { Scene } from "@babylonjs/core/scene";
+
+import type { LevelScope } from "./level-scope";
+
+/** Luz general del nivel (hemisférica, desde arriba). Se libera junto con el scope. */
+export function createLevelLighting(scene: Scene, scope: LevelScope): HemisphericLight {
+  return scope.register(new HemisphericLight("level-light", Vector3.Up(), scene));
+}
+</file>
+
+<file path="level-loader.ts">
+import "@babylonjs/loaders/glTF"; // registra el loader de .glb/.gltf
+import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
+import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { Scene } from "@babylonjs/core/scene";
+
+import { TypedEventEmitter } from "../core/events/typed-event-emitter";
+import type { GlbMapSource, LevelDefinition, MapMeshRole, StaticShape, StaticSolid } from "./level-definition";
+import { createGlbMap, type LoadedGlbMap, type LoadedMap } from "./level-map-factory";
+import type { LevelScope } from "./level-scope";
+import { createProceduralMap } from "./procedural-map-factory";
+
+/** Qué parte de la barra ocupa la descarga; el resto es el procesamiento (fusión de mallas). */
+const DOWNLOAD_PROGRESS_WEIGHT = 0.8;
+
+export type LevelLoadPhase = "downloading" | "optimizing" | "building";
+
+/** Informa el avance de UNA fuente (0 a 1, o null si no se puede calcular). */
+type SourceProgressReporter = (phase: LevelLoadPhase, fraction: number | null) => void;
+
+export interface LevelLoaderEventMap {
+  /** `fraction` es null mientras no se puede calcular (barra indeterminada). */
+  progressChanged: { phase: LevelLoadPhase; fraction: number | null };
+  levelLoaded: { levelId: string; durationMs: number; mergedGroups: number; droppedMeshes: number };
+}
+
+/** Estado 3A: carga la geometría del nivel dentro de un LevelScope. */
+export class LevelLoader {
+  readonly events = new TypedEventEmitter<LevelLoaderEventMap>();
+
+  constructor(private readonly scene: Scene) {}
+
+  /** Devuelve null si el scope se liberó durante la carga (cancelada). Rechaza si algo falla. */
+  /**
+   * Procesa en orden todas las fuentes de mapa del nivel; cada una ocupa una porción igual de la barra.
+   * Devuelve null si el scope se liberó durante la carga (cancelada). Rechaza si algo falla
+   * o si ninguna fuente aporta un suelo.
+   */
+  async load(definition: LevelDefinition, scope: LevelScope): Promise<LoadedMap | null> {
+    const startedAt = performance.now();
+    const { maps } = definition;
+
+    const merged = new Map<MapMeshRole, Mesh>();
+    const grounds: Mesh[] = [];
+    const groundShapes = new Map<Mesh, StaticShape>();
+    const solids: StaticSolid[] = [];
+    const proceduralMeshes: Mesh[] = [];
+    let droppedMeshCount = 0;
+
+    for (let index = 0; index < maps.length; index++) {
+      const source = maps[index];
+      const report: SourceProgressReporter = (phase, fraction) => {
+        this.events.emit("progressChanged", {
+          phase,
+          fraction: fraction === null ? null : (index + fraction) / maps.length,
+        });
+      };
+
+      if (source.kind === "glb") {
+        const loaded = await this.loadGlb(source, scope, report);
+        if (!loaded) {
+          return null;
+        }
+        loaded.merged.forEach((mesh, role) => {
+          if (merged.has(role)) {
+            console.warn(`[LevelLoader] the role "${role}" is defined by more than one map of "${definition.id}"`);
+          }
+          merged.set(role, mesh);
+        });
+        grounds.push(loaded.ground);
+        droppedMeshCount += loaded.droppedMeshCount;
+      } else {
+        report("building", 0);
+        const built = createProceduralMap(source, this.scene, scope);
+        if (!built) {
+          return null;
+        }
+        if (built.ground) {
+          grounds.push(built.ground);
+          groundShapes.set(built.ground, built.groundShape);
+        }
+        proceduralMeshes.push(...built.meshes);
+        solids.push(...built.solids);
+        report("building", 1);
+      }
     }
 
-    if (this.health <= 0) {
-      this.destroy();
-      return;
+    if (grounds.length === 0) {
+      throw new Error(`[LevelLoader] the level "${definition.id}" has no ground in any of its maps`);
     }
-    this.flashRemaining = HIT_FLASH_DURATION;
-    this.mesh.renderOverlay = true;
+
+    this.events.emit("levelLoaded", {
+      levelId: definition.id,
+      durationMs: performance.now() - startedAt,
+      mergedGroups: merged.size,
+      droppedMeshes: droppedMeshCount,
+    });
+    return { merged, ground: grounds[0], grounds, groundShapes, solids, proceduralMeshes, droppedMeshCount };
   }
 
-  protected onUpdate(deltaTime: number): void {
-    if (this.flashRemaining <= 0) {
-      return;
-    }
-    this.flashRemaining -= deltaTime;
-    if (this.flashRemaining <= 0) {
-      this.mesh.renderOverlay = false;
+  private async loadGlb(
+    source: GlbMapSource,
+    scope: LevelScope,
+    report: SourceProgressReporter,
+  ): Promise<LoadedGlbMap | null> {
+    report("downloading", null);
+    const imported = await SceneLoader.ImportMeshAsync("", source.modelRootUrl, source.modelFile, this.scene, (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        report("downloading", (event.loaded / event.total) * DOWNLOAD_PROGRESS_WEIGHT);
+      }
+    });
+
+    try {
+      return await createGlbMap(imported.meshes, source, scope, (fraction) => {
+        report("optimizing", DOWNLOAD_PROGRESS_WEIGHT + fraction * (1 - DOWNLOAD_PROGRESS_WEIGHT));
+      });
+    } finally {
+      // Lo que el mapa no usa del GLB (animaciones, esqueletos, luces) no se conserva.
+      imported.animationGroups.forEach((group) => group.dispose());
+      imported.skeletons.forEach((skeleton) => skeleton.dispose());
+      imported.lights.forEach((light) => light.dispose());
     }
   }
 
-  protected onDestroyed(): void {
-    this.release();
-  }
-
-  protected onDispose(): void {
-    this.release();
-  }
-
-  /** Suelta cuerpo y mesh una sola vez (puede llamarse al morir y de nuevo al liberar el nivel). */
-  private release(): void {
-    if (this.released) {
-      return;
-    }
-    this.released = true;
-    this.aggregate.dispose();
-    this.mesh.dispose(); // el material es compartido: no se libera acá
+  dispose(): void {
+    this.events.clear();
   }
 }
 </file>
 
-<file path="enemies-manager.ts">
-import { EventSubscriber } from "@/game/services/event-subscriber";
-import { GameEvents, type ProjectileHitPayload } from "@/game/services/event-manager";
-import type { Enemy } from "./enemy";
+<file path="level-map-factory.ts">
+import { Axis, Space } from "@babylonjs/core/Maths/math.axis";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { Tools } from "@babylonjs/core/Misc/tools";
+
+import { yieldToBrowser } from "../core/async/yield-to-browser";
+import type { GlbMapSource, MapMeshGroup, MapMeshMatcher, MapMeshRole, StaticShape, StaticSolid } from "./level-definition";
+import type { LevelScope } from "./level-scope";
+
+/** Nombre del nodo raíz que el loader de glTF crea alrededor de cada GLB. */
+const GLTF_ROOT_NODE_NAME = "__root__";
+
+// Parámetros de Mesh.MergeMeshes (el parámetro allow32BitIndices viene de cada grupo).
+const MERGE_DISPOSES_SOURCE = true;
+const MERGE_SUBDIVIDES_WITH_SUBMESHES = false;
+const MERGE_USES_MULTI_MATERIALS = true;
+
+export interface LoadedGlbMap {
+  readonly merged: ReadonlyMap<MapMeshRole, Mesh>;
+  readonly ground: Mesh;
+  /** Mallas del GLB que no pertenecen a ningún grupo ni al suelo y se descartaron. */
+  readonly droppedMeshCount: number;
+}
+
+/** Mapa completo del nivel: la suma de todas sus fuentes (GLB y procedurales). */
+export interface LoadedMap {
+  readonly merged: ReadonlyMap<MapMeshRole, Mesh>;
+  /** Suelo principal: el primero de `grounds`. */
+  readonly ground: Mesh;
+  readonly grounds: readonly Mesh[];
+  /** Forma del cuerpo físico de cada suelo; los que no figuran usan "box". */
+  readonly groundShapes: ReadonlyMap<Mesh, StaticShape>;
+  /** Mallas que no son suelo pero deben colisionar. */
+  readonly solids: readonly StaticSolid[];
+  readonly proceduralMeshes: readonly Mesh[];
+  readonly droppedMeshCount: number;
+}
+
+const matches = (name: string, matcher: MapMeshMatcher): boolean =>
+  "includes" in matcher ? name.includes(matcher.includes) : matcher.pattern.test(name);
 
 /**
- * Dueño de todos los enemigos del nivel: los actualiza, los pausa y los libera juntos.
- * También escucha los impactos de proyectiles y se los entrega al enemigo alcanzado.
+ * Convierte las mallas importadas del GLB del mapa en el mapa listo para jugar:
+ * posiciona el root, fusiona cada grupo en una sola malla (menos draw calls), deja el suelo
+ * como malla independiente y descarta el resto. Todo queda adoptado por `scope`.
+ *
+ * Devuelve null si el scope se liberó mientras trabajaba (carga cancelada): en ese caso
+ * limpia todo lo importado. Lanza (también limpiando) si el GLB no tiene root o no tiene suelo.
  */
-export class EnemiesManager extends EventSubscriber {
-  private readonly enemies: Enemy[] = [];
-  private paused = false;
+export async function createGlbMap(
+  importedMeshes: readonly AbstractMesh[],
+  map: GlbMapSource,
+  scope: LevelScope,
+  /** Progreso del procesamiento, de 0 a 1. */
+  onProgress?: (fraction: number) => void,
+): Promise<LoadedGlbMap | null> {
+  const root = importedMeshes.find((mesh) => mesh.name === GLTF_ROOT_NODE_NAME);
+  if (!root) {
+    importedMeshes.forEach((mesh) => mesh.dispose(false, true));
+    throw new Error(`[createGlbMap] the GLB has no "${GLTF_ROOT_NODE_NAME}" node`);
+  }
+  const discardImported = (): void => root.dispose(false, true);
+
+  if (scope.isDisposed) {
+    discardImported();
+    return null;
+  }
+
+  // 1. El root a su posición de juego ANTES de fusionar: las mallas calculan sus coordenadas con él.
+  root.position.copyFrom(map.rootPosition);
+  root.rotate(Axis.X, Tools.ToRadians(map.rootRotationXDeg), Space.LOCAL);
+  root.setEnabled(true);
+
+  // 2. Cada malla va a su primer grupo (o es el suelo): ninguna se usa dos veces.
+  const meshesByGroup = new Map<MapMeshGroup, Mesh[]>();
+  let ground: Mesh | null = null;
+  let droppedMeshCount = 0;
+  for (const mesh of importedMeshes) {
+    if (mesh === root || !(mesh instanceof Mesh) || !mesh.name) {
+      continue;
+    }
+    if (!ground && matches(mesh.name, map.ground.match)) {
+      ground = mesh;
+      continue;
+    }
+    const group = map.groups.find((candidate) => matches(mesh.name, candidate.match));
+    if (group) {
+      meshesByGroup.set(group, [...(meshesByGroup.get(group) ?? []), mesh]);
+    } else {
+      droppedMeshCount++;
+    }
+  }
+  if (!ground) {
+    discardImported();
+    throw new Error(`[createLevelMap] no mesh of the GLB matches the ground "${map.ground.name}"`);
+  }
+
+  // 3. Fusionar de a un grupo, cediendo el hilo entre grupos para que la barra de progreso se pinte.
+  const merged = new Map<MapMeshRole, Mesh>();
+  for (let index = 0; index < map.groups.length; index++) {
+    const group = map.groups[index];
+    onProgress?.(index / map.groups.length);
+    await yieldToBrowser();
+    if (scope.isDisposed) {
+      discardImported();
+      return null;
+    }
+
+    const meshes = meshesByGroup.get(group);
+    if (!meshes || meshes.length === 0) {
+      continue;
+    }
+    meshes.forEach((mesh) => mesh.computeWorldMatrix(true));
+    const fused = Mesh.MergeMeshes(
+      meshes,
+      MERGE_DISPOSES_SOURCE,
+      group.allow32BitIndices,
+      undefined,
+      MERGE_SUBDIVIDES_WITH_SUBMESHES,
+      MERGE_USES_MULTI_MATERIALS,
+    );
+    if (!fused) {
+      console.warn(`[createLevelMap] could not merge the group "${group.name}" (${meshes.length} meshes)`);
+      continue;
+    }
+    fused.name = group.name;
+    scope.adopt(fused);
+    merged.set(group.role, fused);
+  }
+
+  // 4. El suelo no se fusiona: se saca del root para que sobreviva a su limpieza.
+  ground.computeWorldMatrix(true);
+  ground.name = map.ground.name;
+  scope.adopt(ground);
+
+  // 5. Todo lo que quedó dentro del root son cáscaras vacías y mallas descartadas.
+  onProgress?.(1);
+  discardImported();
+
+  return { merged, ground, droppedMeshCount };
+}
+</file>
+
+<file path="level-progress.ts">
+export type LevelStatus = "pending" | "completed";
+
+/** Lo ÚNICO que se persiste de un nivel. */
+export interface LevelProgress {
+  readonly levelId: string;
+  readonly status: LevelStatus;
+}
+</file>
+
+<file path="level-repository.ts">
+import type { StorageLike } from "../core/storage/safe-storage";
+import type { LevelDefinition } from "./level-definition";
+import type { LevelProgress, LevelStatus } from "./level-progress";
+
+/** Clave de persistencia. Si cambia el formato guardado, subir la versión. */
+const PROGRESS_STORAGE_KEY = "game.level-progress.v1";
+
+interface StoredProgress {
+  readonly version: 1;
+  readonly completedLevelIds: readonly string[];
+}
+
+/**
+ * Acceso al progreso persistido de los niveles. Es la única clase que conoce el medio
+ * de persistencia: el resto del juego pregunta por el próximo nivel y marca completados.
+ */
+export class LevelRepository {
+  private readonly levels: readonly LevelDefinition[]; // ordenados por `order`
+  private readonly completed: Set<string>;
+
+  constructor(
+    definitions: readonly LevelDefinition[],
+    private readonly storage: StorageLike,
+  ) {
+    this.levels = LevelRepository.validateAndSort(definitions);
+    this.completed = this.load();
+  }
+
+  /** El nivel pendiente de menor `order`, o null si ya se completaron todos. */
+  getNextPending(): LevelDefinition | null {
+    return this.levels.find((level) => !this.completed.has(level.id)) ?? null;
+  }
+
+  getStatus(levelId: string): LevelStatus {
+    this.requireKnown(levelId);
+    return this.completed.has(levelId) ? "completed" : "pending";
+  }
+
+  getAll(): readonly LevelProgress[] {
+    return this.levels.map((level) => ({ levelId: level.id, status: this.getStatus(level.id) }));
+  }
+
+  /** Idempotente: marcar dos veces el mismo nivel no cambia nada. */
+  markCompleted(levelId: string): void {
+    this.requireKnown(levelId);
+    if (this.completed.has(levelId)) {
+      return;
+    }
+    this.completed.add(levelId);
+    this.save();
+  }
+
+  /** Borra todo el progreso (estado 8: juego completado). */
+  reset(): void {
+    this.completed.clear();
+    try {
+      this.storage.removeItem(PROGRESS_STORAGE_KEY);
+    } catch (error) {
+      console.warn("[LevelRepository] could not clear the saved progress", error);
+    }
+  }
+
+  private requireKnown(levelId: string): void {
+    if (!this.levels.some((level) => level.id === levelId)) {
+      throw new Error(`[LevelRepository] unknown level "${levelId}"`);
+    }
+  }
+
+  /** Lee lo guardado. Un dato corrupto o con niveles que ya no existen se descarta sin romper el arranque. */
+  private load(): Set<string> {
+    try {
+      const raw = this.storage.getItem(PROGRESS_STORAGE_KEY);
+      if (raw === null) {
+        return new Set();
+      }
+      const parsed: unknown = JSON.parse(raw);
+      if (!LevelRepository.isStoredProgress(parsed)) {
+        console.warn("[LevelRepository] saved progress has an unexpected format; ignoring it");
+        return new Set();
+      }
+      const known = new Set(this.levels.map((level) => level.id));
+      return new Set(parsed.completedLevelIds.filter((id) => known.has(id)));
+    } catch (error) {
+      console.warn("[LevelRepository] could not read the saved progress; starting from scratch", error);
+      return new Set();
+    }
+  }
+
+  /** Si no se puede guardar (cuota, modo privado) el progreso sigue vivo en memoria durante la sesión. */
+  private save(): void {
+    const data: StoredProgress = { version: 1, completedLevelIds: [...this.completed] };
+    try {
+      this.storage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(data));
+    } catch (error) {
+      console.warn("[LevelRepository] could not save the progress; it will last only this session", error);
+    }
+  }
+
+  private static isStoredProgress(value: unknown): value is StoredProgress {
+    if (typeof value !== "object" || value === null) {
+      return false;
+    }
+    const candidate = value as { version?: unknown; completedLevelIds?: unknown };
+    return (
+      candidate.version === 1 &&
+      Array.isArray(candidate.completedLevelIds) &&
+      candidate.completedLevelIds.every((id) => typeof id === "string")
+    );
+  }
+
+  private static validateAndSort(definitions: readonly LevelDefinition[]): readonly LevelDefinition[] {
+    const ids = new Set<string>();
+    const orders = new Set<number>();
+    for (const level of definitions) {
+      if (ids.has(level.id)) {
+        throw new Error(`[LevelRepository] duplicated level id "${level.id}"`);
+      }
+      if (orders.has(level.order)) {
+        throw new Error(`[LevelRepository] duplicated level order ${level.order} ("${level.id}")`);
+      }
+      ids.add(level.id);
+      orders.add(level.order);
+    }
+    return [...definitions].sort((a, b) => a.order - b.order);
+  }
+}
+</file>
+
+<file path="level-scope.ts">
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import type { Scene } from "@babylonjs/core/scene";
+
+/**
+ * Dueño de TODO lo que se crea para un nivel. Al terminar el nivel un solo dispose() lo libera:
+ * los nodos colgados de `root` y cualquier cosa registrada (cuerpos de Havok, observers, cámaras...).
+ */
+export class LevelScope {
+  readonly root: TransformNode;
+
+  private readonly disposers: (() => void)[] = [];
   private disposed = false;
 
-  constructor() {
-    super();
-    this.subscribeEvents();
+  constructor(
+    scene: Scene,
+    readonly levelId: string,
+  ) {
+    this.root = new TransformNode(`level-root:${levelId}`, scene);
   }
 
-  get count(): number {
-    return this.enemies.length;
+  get isDisposed(): boolean {
+    return this.disposed;
   }
 
-  /** Cuántos siguen vivos (los destruidos quedan registrados hasta liberar el nivel). */
-  get aliveCount(): number {
-    let alive = 0;
-    for (const enemy of this.enemies) {
-      if (enemy.isAlive) {
-        alive++;
-      }
-    }
-    return alive;
-  }
-
-  /** Registra un enemigo. Si el manager ya fue liberado, lo libera de inmediato. */
-  add<T extends Enemy>(enemy: T): T {
+  /**
+   * Registra algo para liberar junto con el nivel (en orden inverso al de registro).
+   * Si el scope ya fue liberado, lo libera de inmediato: así una carga cancelada no deja basura.
+   */
+  register<T extends { dispose(): void }>(item: T): T {
     if (this.disposed) {
-      enemy.dispose();
+      item.dispose();
     } else {
-      this.enemies.push(enemy);
+      this.disposers.push(() => item.dispose());
     }
-    return enemy;
+    return item;
   }
 
-  update(deltaTime: number): void {
-    if (this.paused || this.disposed) {
-      return;
-    }
-    for (const enemy of this.enemies) {
-      enemy.update(deltaTime);
-    }
+  /** Cuelga un nodo de la raíz del nivel conservando su transform en el mundo. */
+  adopt<T extends TransformNode>(node: T): T {
+    node.setParent(this.root);
+    return node;
   }
 
-  pause(): void {
-    if (this.paused || this.disposed) {
-      return;
-    }
-    this.paused = true;
-    this.enemies.forEach((enemy) => enemy.pause());
-  }
-
-  resume(): void {
-    if (!this.paused || this.disposed) {
-      return;
-    }
-    this.paused = false;
-    this.enemies.forEach((enemy) => enemy.resume());
-  }
-
-  /** La partida terminó en derrota: los enemigos dejan de actuar. */
-  gameOver(): void {
-    if (this.disposed) {
-      return;
-    }
-    this.enemies.forEach((enemy) => enemy.gameOver());
-  }
-
-  /** Idempotente. */
   dispose(): void {
     if (this.disposed) {
       return;
     }
     this.disposed = true;
-    this.unsubscribeEvents();
-    for (const enemy of this.enemies) {
+    for (const dispose of this.disposers.reverse()) {
       try {
-        enemy.dispose();
+        dispose();
       } catch (error) {
-        console.error(`[EnemiesManager] failed to dispose the enemy "${enemy.id}"`, error);
+        console.error(`[LevelScope] failed to dispose a resource of "${this.levelId}"`, error);
       }
     }
-    this.enemies.length = 0;
-  }
-
-  protected registerEvents(): void {
-    this.listen(GameEvents.ProjectileHit, (hit) => this.onProjectileHit(hit));
-  }
-
-  private onProjectileHit(hit: ProjectileHitPayload): void {
-    if (this.paused || this.disposed) {
-      return;
-    }
-    if (hit.sourceId !== undefined) {
-      return; // disparo de otro enemigo: sin fuego amigo
-    }
-    this.enemies.find((enemy) => enemy.ownsMesh(hit.mesh))?.takeHit(hit);
+    this.disposers.length = 0;
+    this.root.dispose(false, true); // hijos + sus materiales y texturas
   }
 }
 </file>
 
-<file path="enemy-factory.ts">
-import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+<file path="level-session.ts">
 import type { Scene } from "@babylonjs/core/scene";
 
-import type { AssetRegistry } from "../../assets/asset-registry";
-import type { EnemySpawn, EnemySpawns, EnemyType } from "../../levels/level-definition";
-import { DummyTarget } from "./dummy-target";
-import type { Enemy } from "./enemy";
-import { EnemiesManager } from "./enemies-manager";
-import type { NavigationService } from "../../navigation/navigation-service";
-import { FlyingSentinelDrone } from "./flying-sentinel/flying-sentinel-drone";
-import { SentinelDrone } from "./sentinel/sentinel-drone";
-import { StaticDrone } from "./static-drone";
+import type { LevelDefinition } from "./level-definition";
+import type { LoadedMap } from "./level-map-factory";
+import { LevelScope } from "./level-scope";
+import type { LevelStrategy } from "./level-strategy";
 
-export interface EnemyDeps {
-  readonly scene: Scene;
-  readonly registry: AssetRegistry;
-  /** ¿Esta malla es del jugador (o de su board)? Los enemigos que disparan lo usan para saber si lo alcanzaron. */
-  readonly isPlayerMesh: (mesh: AbstractMesh) => boolean;
-  /** Puntos navegables para los enemigos que se mueven solos. */
-  readonly navigation: NavigationService;
-}
-
-type EnemyBuilder = (spawn: EnemySpawn, id: string, deps: EnemyDeps) => Enemy;
-
-/** Un builder por tipo de enemigo. Para agregar uno: crear la clase y registrarla acá. */
-const ENEMY_BUILDERS: Readonly<Partial<Record<EnemyType, EnemyBuilder>>> = {
-  dummyTarget: (spawn, id, deps) => new DummyTarget(id, spawn.position, deps),
-  staticDrone: (spawn, id, deps) => new StaticDrone(id, spawn, deps),
-  sentinelDrone: (spawn, id, deps) => new SentinelDrone(id, spawn, deps),
-  flyingSentinel: (spawn, id, deps) => new FlyingSentinelDrone(id, spawn, deps),
-};
-
-/** Crea todos los enemigos que pide el nivel (por categoría) y los deja registrados en un EnemiesManager. */
-export function createEnemiesManager(spawns: EnemySpawns, deps: EnemyDeps): EnemiesManager {
-  const manager = new EnemiesManager();
-  try {
-    for (const [type, entries] of Object.entries(spawns) as [EnemyType, readonly EnemySpawn[] | undefined][]) {
-      if (!entries || entries.length === 0) {
-        continue;
-      }
-      const build = ENEMY_BUILDERS[type];
-      if (!build) {
-        throw new Error(`[createEnemiesManager] there is no builder registered for the enemy "${type}"`);
-      }
-      entries.forEach((spawn, index) => manager.add(build(spawn, `${type}-${index + 1}`, deps)));
-    }
-  } catch (error) {
-    manager.dispose(); // no dejar enemigos a medio crear
-    throw error;
-  }
-  return manager;
-}
-</file>
-
-<file path="enemy.ts">
-import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
-
-import type { ProjectileHitPayload } from "@/game/services/event-manager";
-import type { EnemyType } from "../../levels/level-definition";
-
-/** Contrato de todo enemigo: lo único que el EnemiesManager sabe de ellos. */
-export interface Enemy {
-  readonly id: string;
-  readonly type: EnemyType;
-  /** false cuando fue destruido o liberado. */
-  readonly isAlive: boolean;
-  /** ¿Esta malla pertenece a este enemigo? Sirve para resolver a quién alcanzó un proyectil. */
-  ownsMesh(mesh: AbstractMesh): boolean;
-  update(deltaTime: number): void;
-  takeHit(hit: ProjectileHitPayload): void;
-  pause(): void;
-  resume(): void;
-  gameOver(): void;
-  /** Idempotente. */
-  dispose(): void;
+export interface ActiveLevel {
+  readonly definition: LevelDefinition;
+  readonly scope: LevelScope;
+  /** null hasta que termina la carga (3A). */
+  map: LoadedMap | null;
+  /** null hasta 3B, y de nuevo null cuando la partida terminó (estados 6 y 7). */
+  strategy: LevelStrategy | null;
 }
 
 /**
- * Base con el ciclo de vida común (template method): cada enemigo define su comportamiento
- * en onUpdate y, si lo necesita, en los demás hooks.
+ * El nivel que está cargado ahora. Sobrevive a los estados (3A lo crea, 3B y "playing" lo usan)
+ * y se libera al abrir otro nivel, al terminar o al cerrar el juego.
  */
-export abstract class EnemyBase implements Enemy {
-  protected paused = false;
-  protected isGameOver = false;
-  private destroyed = false;
-  private disposed = false;
+export class LevelSession {
+  private active: ActiveLevel | null = null;
 
-  constructor(
-    readonly id: string,
-    readonly type: EnemyType,
-  ) {}
+  constructor(private readonly scene: Scene) {}
 
-  get isAlive(): boolean {
-    return !this.destroyed && !this.disposed;
+  get current(): ActiveLevel | null {
+    return this.active;
   }
 
-  abstract ownsMesh(mesh: AbstractMesh): boolean;
+  /** Libera el nivel anterior (si hay) y abre el scope del nuevo. */
+  begin(definition: LevelDefinition): LevelScope {
+    this.end();
+    const scope = new LevelScope(this.scene, definition.id);
+    this.active = { definition, scope, map: null, strategy: null };
+    return scope;
+  }
 
-  update(deltaTime: number): void {
-    if (this.paused || this.isGameOver || !this.isAlive) {
-      return;
+  complete(map: LoadedMap): void {
+    this.requireActive().map = map;
+  }
+
+  setStrategy(strategy: LevelStrategy): void {
+    const active = this.requireActive();
+    active.strategy?.dispose();
+    active.strategy = strategy;
+  }
+
+  /** Libera solo la partida (strategy y lo que posee); el mapa sigue en pie. Estados 6 y 7. */
+  disposeStrategy(): void {
+    if (this.active?.strategy) {
+      this.active.strategy.dispose();
+      this.active.strategy = null;
     }
-    this.onUpdate(deltaTime);
   }
 
-  takeHit(hit: ProjectileHitPayload): void {
-    if (this.isGameOver || !this.isAlive) {
-      return;
+  end(): void {
+    this.disposeStrategy();
+    this.active?.scope.dispose();
+    this.active = null;
+  }
+
+  private requireActive(): ActiveLevel {
+    if (!this.active) {
+      throw new Error("[LevelSession] there is no level in progress");
     }
-    this.onHit(hit);
+    return this.active;
+  }
+}
+</file>
+
+<file path="level-strategy.ts">
+import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
+import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { TypedEventEmitter } from "../core/events/typed-event-emitter";
+import type { GameContext } from "../game-context";
+import type CharacterBase from "../entities/character/character.base";
+import type { LevelDefinition } from "./level-definition";
+import type { LoadedMap } from "./level-map-factory";
+import type { LevelScope } from "./level-scope";
+import { createLevelLighting } from "./level-lighting";
+export type LevelOutcome = "completed" | "failed";
+import type { EnemiesManager } from "../entities/enemies/enemies-manager";
+export interface LevelStrategyEventMap {
+  levelFinished: { outcome: LevelOutcome };
+}
+
+export interface LevelStrategyDeps {
+  readonly context: GameContext;
+  readonly definition: LevelDefinition;
+  readonly scope: LevelScope;
+  readonly map: LoadedMap;
+  readonly character: CharacterBase;
+  readonly enemies: EnemiesManager;
+}
+
+type Phase = "created" | "playing" | "paused" | "finished" | "disposed";
+
+/**
+ * Director del gameplay de un nivel durante el estado 4 (template method).
+ * Cada nivel hereda y define sus reglas (onTick / checkWin / checkLose).
+ *
+ * No conoce la FSM: avisa con el evento `levelFinished` y el estado `playing` decide la transición.
+ * Los recursos de nivel los libera el LevelScope; acá se libera lo propio de la partida.
+ */
+
+
+export abstract class LevelStrategy {
+  readonly DEATH_TO_GAME_OVER_DELAY_SECONDS = 2.5; // deja ver la animación de muerte antes de la pantalla de derrota
+  readonly events = new TypedEventEmitter<LevelStrategyEventMap>();
+
+  protected readonly context: GameContext;
+  protected readonly definition: LevelDefinition;
+  protected readonly scope: LevelScope;
+  protected readonly map: LoadedMap;
+  protected readonly character: CharacterBase;
+  protected readonly enemies: EnemiesManager;
+
+  private phase: Phase = "created";
+  private pausedAnimationGroups: AnimationGroup[] = [];
+  private physicsWasEnabled = true;
+
+  constructor(deps: LevelStrategyDeps) {
+    this.context = deps.context;
+    this.definition = deps.definition;
+    this.scope = deps.scope;
+    this.map = deps.map;
+    this.character = deps.character;
+    this.enemies = deps.enemies;
+    createLevelLighting(this.context.scene, this.scope);
   }
 
+  /** Dónde debe aparecer el Character (definido por el nivel). */
+  protected get characterSpawn(): Vector3 {
+    return this.definition.spawns.character;
+  }
+
+  /** Arranque (desde 3B). */
+  play(): void {
+    if (this.phase !== "created") {
+      throw new Error(`[LevelStrategy] play() called in phase "${this.phase}"`);
+    }
+    this.phase = "playing";
+    this.character.activateCamera(); // la cámara del Character manda sobre cualquier otra que arme el nivel
+    this.onPlay();
+  }
+
+  /** Congela la partida: física y animaciones. El render de Babylon sigue activo. */
   pause(): void {
-    if (this.paused) {
+    if (this.phase !== "playing") {
       return;
     }
-    this.paused = true;
+    this.phase = "paused";
+    const { scene } = this.context;
+    this.physicsWasEnabled = scene.physicsEnabled;
+    scene.physicsEnabled = false;
+    this.pausedAnimationGroups = scene.animationGroups.filter((group) => group.isPlaying);
+    this.pausedAnimationGroups.forEach((group) => group.pause());
+    this.enemies.pause();
     this.onPause();
   }
 
   resume(): void {
-    if (!this.paused) {
+    if (this.phase !== "paused") {
       return;
     }
-    this.paused = false;
+    this.phase = "playing";
+    this.context.scene.physicsEnabled = this.physicsWasEnabled;
+    this.pausedAnimationGroups.forEach((group) => group.restart()); // retoma desde donde quedó
+    this.pausedAnimationGroups = [];
+    this.enemies.resume();
     this.onResume();
   }
 
-  gameOver(): void {
-    if (this.isGameOver) {
+  /** Un frame de juego. Orden: entidades -> hook del nivel -> reglas de victoria/derrota. */
+  tick(deltaTime: number): void {
+    if (this.phase !== "playing") {
       return;
     }
-    this.isGameOver = true;
-    this.onGameOver();
+    this.character.update(deltaTime);
+    this.enemies.update(deltaTime);
+    this.onTick(deltaTime);    
+    if (this.phase !== "playing") {
+      return; // onTick pudo terminar el nivel
+    }
+    if (this.checkWin()) {
+      this.finish("completed");
+    } else if (this.checkLose()) {
+      this.finish("failed");
+    }
   }
 
+  /** SOLO PARA DEPURACIÓN: fuerza el resultado del nivel. */
+  forceOutcome(outcome: LevelOutcome): void {
+    if (this.phase === "playing") {
+      this.finish(outcome);
+    }
+  }
+
+  /** Idempotente. */
   dispose(): void {
-    if (this.disposed) {
+    if (this.phase === "disposed") {
       return;
     }
-    this.disposed = true;
+    this.phase = "disposed";
     this.onDispose();
+    this.events.clear();
   }
 
-  /** Lo llama el propio enemigo cuando muere: deja de contar como vivo y suelta sus recursos. */
-  protected destroy(): void {
-    if (!this.isAlive) {
-      return;
-    }
-    this.destroyed = true;
-    this.onDestroyed();
-  }
+  protected abstract onTick(deltaTime: number): void;
+  protected abstract checkWin(): boolean;
+  protected abstract checkLose(): boolean;
 
-  protected abstract onUpdate(deltaTime: number): void;
-  protected onHit(_hit: ProjectileHitPayload): void {}
+  protected onPlay(): void {}
   protected onPause(): void {}
   protected onResume(): void {}
-  protected onGameOver(): void {}
-  /** El enemigo murió: soltar mesh, cuerpo físico, etc. El manager lo libera igual al terminar el nivel. */
-  protected onDestroyed(): void {}
-  protected abstract onDispose(): void;
+  protected onDispose(): void {}
+
+  /** Termina el nivel una sola vez y avisa. */
+  protected finish(outcome: LevelOutcome): void {
+    if (this.phase !== "playing") {
+      return;
+    }
+    this.phase = "finished";
+    if (outcome === "failed") {
+      this.enemies.gameOver();
+    }
+    this.events.emit("levelFinished", { outcome });
+  }
 }
 </file>
 
-<file path="static-drone.ts">
-import type { EnemySpawn } from "../../levels/level-definition";
-import { DroneBase } from "./drone/drone-base";
-import type { EnemyDeps } from "./enemy-factory";
+<file path="procedural-map-factory.ts">
+import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { Scene } from "@babylonjs/core/scene";
+
+import type { ProceduralMapSource, StaticShape, StaticSolid } from "./level-definition";
+import type { LevelScope } from "./level-scope";
+
+export interface LoadedProceduralMap {
+  readonly meshes: readonly Mesh[];
+  readonly ground: Mesh | null;
+  readonly groundShape: StaticShape;
+  readonly solids: readonly StaticSolid[];
+}
 
 /**
- * Dron fijo: flota a una altura constante, no se mueve y dispara cada 3 segundos hacia su forward
- * (el cañón se inclina para apuntar exacto). Más adelante: física, flotación, pitch y roll.
+ * Ejecuta la construcción de una fuente procedural y deja todo lo que creó adoptado por `scope`.
+ * Devuelve null si el scope ya se liberó (carga cancelada): en ese caso no construye nada.
  */
-export class StaticDrone extends DroneBase {
-  constructor(id: string, spawn: EnemySpawn, deps: EnemyDeps) {
-    super(id, "staticDrone", spawn, deps, { accentMaterial: "static-drone-accent", pitchToForward: true });
+export function createProceduralMap(
+  source: ProceduralMapSource,
+  scene: Scene,
+  scope: LevelScope,
+): LoadedProceduralMap | null {
+  if (scope.isDisposed) {
+    return null;
+  }
+
+  const { ground = null, groundShape = "box", meshes = [], solids = [] } = source.build({ scene, scope });
+  if (ground) {
+    scope.adopt(ground);
+  }
+  meshes.forEach((mesh) => scope.adopt(mesh));
+  solids.forEach((solid) => scope.adopt(solid.mesh));
+
+  return { meshes, ground, groundShape, solids };
+}
+</file>
+
+<file path="skybox.ts">
+import "@babylonjs/core/Meshes/Builders/boxBuilder";
+
+import { CubeTexture } from "@babylonjs/core/Materials/Textures/cubeTexture";
+import { Texture } from "@babylonjs/core/Materials/Textures/texture";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { Scene } from "@babylonjs/core/scene";
+
+import type { SkyboxDefinition } from "./level-definition";
+
+// Babylon exige este orden para las caras del cubo.
+const FACE_SUFFIXES = ["_px", "_py", "_pz", "_nx", "_ny", "_nz"] as const;
+
+export class Skybox {
+  private constructor(
+    private readonly mesh: Mesh,
+    private readonly material: StandardMaterial,
+    private readonly texture: CubeTexture,
+  ) {}
+
+  static async create(scene: Scene, definition: SkyboxDefinition): Promise<Skybox> {
+    const extension = definition.extension ?? "png";
+    const files = FACE_SUFFIXES.map((suffix) => `${definition.basePath}${suffix}.${extension}`);
+
+    const texture = await new Promise<CubeTexture>((resolve, reject) => {
+      const cube = new CubeTexture(
+        definition.basePath, scene, null, false, files,
+        () => resolve(cube),
+        (message) => {
+          cube.dispose();
+          reject(new Error(`[Skybox] could not load ${definition.basePath}: ${message ?? "unknown error"}`));
+        },
+      );
+    });
+    texture.coordinatesMode = Texture.SKYBOX_MODE;
+
+    const material = new StandardMaterial("skybox-material", scene);
+    material.backFaceCulling = false;
+    material.disableLighting = true;
+    material.diffuseColor = Color3.Black();
+    material.specularColor = Color3.Black();
+    material.reflectionTexture = texture;
+    material.fogEnabled = false;
+
+    const mesh = MeshBuilder.CreateBox("skybox", { size: definition.size ?? 1000 }, scene);
+    mesh.material = material;
+    mesh.infiniteDistance = true;   // acompaña a la cámara: nunca te acercás al borde
+    mesh.ignoreCameraMaxZ = true;   // no se recorta por el far plane
+    mesh.isPickable = false;        // que no lo agarren raycasts (disparos, hoverboard)
+    mesh.rotation.y = ((definition.rotationYDeg ?? 0) * Math.PI) / 180;
+
+    return new Skybox(mesh, material, texture);
+  }
+
+  dispose(): void {
+    this.mesh.dispose();
+    this.material.dispose(); // no libera la textura por defecto
+    this.texture.dispose();
   }
 }
 </file>

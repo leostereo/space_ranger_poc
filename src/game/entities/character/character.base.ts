@@ -258,6 +258,11 @@ export default class CharacterBase extends EventSubscriber {
     return this.fsm.getState() === "Dead";
   }
 
+  /** Posición del Character en el mundo (la cápsula; sobre el board, la del jinete). No modificar el vector. */
+  get position(): Vector3 {
+    return this.characterMesh.getAbsolutePosition();
+  }
+
   protected registerEvents(): void {
     this.listen(GameEvents.PlayerShooted, (payload) => this._onPlayerShooted(payload));
     this.listen(GameEvents.ProjectileHit, (hit) => this._onProjectileHit(hit));
