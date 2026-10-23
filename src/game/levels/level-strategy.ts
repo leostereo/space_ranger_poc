@@ -106,7 +106,11 @@ export abstract class LevelStrategy {
       return;
     }
     this.character.update(deltaTime);
-    this.enemies.update(deltaTime);
+    
+    // Captura la posición actual del root del personaje (o la prop que exponga tu CharacterBase)
+    const currentCharacterPos = this.character.position;
+    this.enemies.update(deltaTime, currentCharacterPos);
+    
     this.onTick(deltaTime);    
     if (this.phase !== "playing") {
       return; // onTick pudo terminar el nivel

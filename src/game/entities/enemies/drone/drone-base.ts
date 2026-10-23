@@ -47,6 +47,15 @@ export interface DroneOptions {
   readonly spawnAtExactPosition?: boolean;
   /** false: el dron no dispara. Por defecto, true. */
   readonly armed?: boolean;
+  /** Fábrica visual opcional para que cada drone tenga su propio mesh e identidad geométrica. */
+  readonly customModelBuilder?: (
+    scene: any,
+    id: string,
+    materials: { body: any; accent: any },
+    position: Vector3,
+    forward: Vector3,
+    pitchToForward: boolean
+  ) => any;
 }
 
 const resolveForward = (forward: Vector3 | undefined): Vector3 =>
@@ -75,17 +84,23 @@ export abstract class DroneBase extends EnemyBase {
     const position = options.spawnAtExactPosition
       ? spawn.position.clone()
       : new Vector3(spawn.position.x, spawn.position.y + DRONE_HOVER_HEIGHT, spawn.position.z);
-    const model = buildDroneModelV2(
+    const materials = {
+      body: deps.registry.getMaterial(BODY_MATERIAL_KEY),
+      accent: deps.registry.getMaterial(options.accentMaterial),
+    };
+
+    // Si el drone configuró su propio builder lo usa; si no, cae en el buildDroneModelV2 por defecto
+    const builder = options.customModelBuilder ?? buildDroneModelV2;
+
+    const model = builder(
       deps.scene,
       id,
-      {
-        body: deps.registry.getMaterial(BODY_MATERIAL_KEY),
-        accent: deps.registry.getMaterial(options.accentMaterial),
-      },
+      materials,
       position,
       resolveForward(spawn.forward),
       options.pitchToForward,
     );
+
     this.root = model.root;
     this.visual = model.visual;
     this.meshes = model.meshes;
@@ -110,10 +125,10 @@ export abstract class DroneBase extends EnemyBase {
   }
 
   /** Comportamiento propio del dron (movimiento, etc.). Corre antes del arma, en cada frame. */
-  protected onThink(_deltaTime: number): void {}
+  protected onThink(_deltaTime: number, _playerPosition: Vector3): void { }
 
-  protected onUpdate(deltaTime: number): void {
-    this.onThink(deltaTime);
+  protected onUpdate(deltaTime: number, playerPosition: Vector3): void {
+    this.onThink(deltaTime, playerPosition);
     if (this.armed) {
       this.weapon.tick(deltaTime);
     }

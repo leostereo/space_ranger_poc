@@ -11,6 +11,7 @@ import { FlyingSentinelDrone } from "./flying-sentinel/flying-sentinel-drone";
 import { SentinelDrone } from "./sentinel/sentinel-drone";
 import { StaticDrone } from "./static-drone";
 import { RaycastDummy } from "./raycast-dummy";
+import { DummyKamikazeDrone } from "./dummy-kamikaze-drone/dummy-kamikaze-drone";
 
 export interface EnemyDeps {
   readonly scene: Scene;
@@ -30,6 +31,7 @@ const ENEMY_BUILDERS: Readonly<Partial<Record<EnemyType, EnemyBuilder>>> = {
   sentinelDrone: (spawn, id, deps) => new SentinelDrone(id, spawn, deps),
   flyingSentinel: (spawn, id, deps) => new FlyingSentinelDrone(id, spawn, deps),
   raycastDummy: (spawn, id, deps) => new RaycastDummy(id, spawn, deps),
+  dummyKamikazeDrone: (spawn, id, deps) => new DummyKamikazeDrone(id, spawn, deps),
 };
 
 /** Crea todos los enemigos que pide el nivel (por categoría) y los deja registrados en un EnemiesManager. */

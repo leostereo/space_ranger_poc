@@ -47,7 +47,7 @@ export class FlyingSentinelDrone extends DroneBase {
     this.fsm.start();
   }
 
-  protected override onThink(deltaTime: number): void {
+  protected override onThink(deltaTime: number, _playerPosition: Vector3): void {
     this.fsm.tick();
     this.movement.update(deltaTime);
   }

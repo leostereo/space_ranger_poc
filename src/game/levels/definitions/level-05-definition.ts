@@ -15,7 +15,7 @@ const SPAWN_HEIGHT_MARGIN = 0.5; // el personaje aparece apenas sobre la platafo
 const FLIGHT_VOLUME: PatrolVolume = {
   kind: "box",
   center: new Vector3(0, 4, 14),
-  size: new Vector3(8, 5, 16),
+  size: new Vector3(80, 50, 56),
 };
 
 /** Un flyingSentinel que aparece en el centro del volumen y lo patrulla en 3D (sin plano). */

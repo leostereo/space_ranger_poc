@@ -68,7 +68,7 @@ export class DummyTarget extends EnemyBase {
     this.mesh.renderOverlay = true;
   }
 
-  protected onUpdate(deltaTime: number): void {
+  protected onUpdate(deltaTime: number, _playerPosition: Vector3): void {
     if (this.flashRemaining <= 0) {
       return;
     }

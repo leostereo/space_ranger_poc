@@ -5,7 +5,7 @@ import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
  * Controller encargado exclusivamente de la traslación y rotación del Drone.
  * No toma decisiones lógicas, solo obedece órdenes del Drone/FSM.
  */
-export class FlyingSentinelMovementController {
+export class DummyKamikazeMovementController {
     private readonly targetPosition = new Vector3();
     private isMoving = false;
     private speedMultiplier = 1.0;

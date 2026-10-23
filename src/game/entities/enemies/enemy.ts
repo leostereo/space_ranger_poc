@@ -1,7 +1,8 @@
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
-
+import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { ProjectileHitPayload } from "@/game/services/event-manager";
 import type { EnemyType } from "../../levels/level-definition";
+
 
 /** Contrato de todo enemigo: lo único que el EnemiesManager sabe de ellos. */
 export interface Enemy {
@@ -11,7 +12,7 @@ export interface Enemy {
   readonly isAlive: boolean;
   /** ¿Esta malla pertenece a este enemigo? Sirve para resolver a quién alcanzó un proyectil. */
   ownsMesh(mesh: AbstractMesh): boolean;
-  update(deltaTime: number): void;
+  update(deltaTime: number, playerPosition: Vector3): void;
   takeHit(hit: ProjectileHitPayload): void;
   pause(): void;
   resume(): void;
@@ -41,11 +42,11 @@ export abstract class EnemyBase implements Enemy {
 
   abstract ownsMesh(mesh: AbstractMesh): boolean;
 
-  update(deltaTime: number): void {
+  update(deltaTime: number, playerPosition: Vector3): void {
     if (this.paused || this.isGameOver || !this.isAlive) {
       return;
     }
-    this.onUpdate(deltaTime);
+    this.onUpdate(deltaTime, playerPosition);
   }
 
   takeHit(hit: ProjectileHitPayload): void {
@@ -96,7 +97,7 @@ export abstract class EnemyBase implements Enemy {
     this.onDestroyed();
   }
 
-  protected abstract onUpdate(deltaTime: number): void;
+  protected abstract onUpdate(deltaTime: number, playerPosition: Vector3): void;
   protected onHit(_hit: ProjectileHitPayload): void {}
   protected onPause(): void {}
   protected onResume(): void {}

@@ -1,3 +1,4 @@
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { EventSubscriber } from "@/game/services/event-subscriber";
 import { GameEvents, type ProjectileHitPayload } from "@/game/services/event-manager";
 import type { Enemy } from "./enemy";
@@ -41,12 +42,12 @@ export class EnemiesManager extends EventSubscriber {
     return enemy;
   }
 
-  update(deltaTime: number): void {
+  update(deltaTime: number, playerPosition: Vector3): void {
     if (this.paused || this.disposed) {
       return;
     }
     for (const enemy of this.enemies) {
-      enemy.update(deltaTime);
+      enemy.update(deltaTime, playerPosition);
     }
   }
 

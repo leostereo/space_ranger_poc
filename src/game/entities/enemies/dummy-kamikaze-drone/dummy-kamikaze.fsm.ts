@@ -18,8 +18,8 @@ export interface DummyKamikazeFsmCallbacks {
 }
 
 /**
- * Controla el ciclo de vida de los estados del DummyKamikazeDrone
- * y maneja de forma desacoplada el tiempo restante de cada estado.
+ * Gestiona el estado de comportamiento autónomo del DummyKamikazeDrone.
+ * Encapsula de forma desacoplada la cuenta regresiva del estado activo.
  */
 export class DummyKamikazeFsm {
   private _state: DummyKamikazeState = "Patrol";
@@ -35,17 +35,14 @@ export class DummyKamikazeFsm {
     return this._stateTimer;
   }
 
-  /** Inicializa la FSM en el estado de Patrulla. */
+  /** Posiciona la FSM en el estado de arranque. */
   public start(): void {
     this._state = "Patrol";
     this._stateTimer = 0;
     this.callbacks.onEnterPatrol();
   }
 
-  /** 
-   * Decrementa el temporizador interno basándose en el deltaTime del frame.
-   * Se ejecuta al inicio del onThink del Drone.
-   */
+  /** Decrementa el timer basándose en el deltaTime de la simulación. */
   public tick(deltaTime: number): void {
     if (this._stateTimer > 0) {
       this._stateTimer -= deltaTime;
@@ -55,21 +52,21 @@ export class DummyKamikazeFsm {
     }
   }
 
-  /** Modifica el temporizador del estado actual (Fine Tuning desde el Drone). */
+  /** Configura un límite de tiempo explícito para el estado en curso (Fine Tuning). */
   public setStateTimer(seconds: number): void {
     this._stateTimer = seconds;
   }
 
-  /** Realiza la transición limpiamente y dispara los eventos de entrada. */
+  /** Cambia el estado activo y dispara la lógica de inicialización correspondiente. */
   public transitionTo(newState: DummyKamikazeState): void {
     if (this._state === newState) return;
 
     if (import.meta.env.DEV) {
-      console.info(`[DummyKamikazeFsm] Transición: ${this._state} -> ${newState}`);
+      console.info(`[DummyKamikazeFsm] Transición de comportamiento: ${this._state} -> ${newState}`);
     }
 
     this._state = newState;
-    this._stateTimer = 0; // Limpieza por defecto
+    this._stateTimer = 0;
 
     switch (newState) {
       case "Patrol":    this.callbacks.onEnterPatrol(); break;
@@ -82,7 +79,5 @@ export class DummyKamikazeFsm {
     }
   }
 
-  public dispose(): void {
-    // Espacio para desuscripción de eventos globales si se añaden a futuro
-  }
+  public dispose(): void {}
 }
