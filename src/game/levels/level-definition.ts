@@ -6,7 +6,13 @@ import type { PatrolRegion } from "../navigation/patrol-region";
 import type { LevelScope } from "./level-scope";
 
 /** Tipos de enemigo que un nivel puede pedir. */
-export type EnemyType = "drone" | "dummyTarget" | "staticDrone" | "sentinelDrone" | "flyingSentinel";
+export type EnemyType =
+  | "drone"
+  | "dummyTarget"
+  | "staticDrone"
+  | "sentinelDrone"
+  | "flyingSentinel"
+  | "raycastDummy";
 /** Dónde y hacia dónde aparece un enemigo. */
 export interface EnemySpawn {
   /** Base del enemigo: a ras de suelo (o de la plataforma donde se apoya). */

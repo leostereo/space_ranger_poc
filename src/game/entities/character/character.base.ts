@@ -108,6 +108,8 @@ export default class CharacterBase extends EventSubscriber {
   private disposeEquipment: (() => void) | null = null;
   private flareTexture: Texture;
   private boardMaterial: Material;
+  private hitboxStanding: Mesh;
+  private hitboxCrouched: Mesh;
 
   /** Construye el Character listo para jugar. Quien lo crea lo registra en el LevelScope (`scope.register`). */
   static async create(scene: Scene, registry: AssetRegistry, spawn: Vector3, inputHub: InputHub): Promise<CharacterBase> {
@@ -121,7 +123,7 @@ export default class CharacterBase extends EventSubscriber {
 
     const { characterMesh, characterAggregate, characterAnimations, weaponRoot, muzzle,
       thrusterGroup, thrusterLeft, thrusterRight, thrusterLeftNozzle, thrusterRightNozzle, shieldRoot,
-      dispose: disposeEquipment } = characterAndEquipment_builder(scene, registry, spawn);
+      dispose: disposeEquipment, hitboxCrouched, hitboxStanding } = characterAndEquipment_builder(scene, registry, spawn);
     this.characterMesh = characterMesh;
     this.characterAggregate = characterAggregate;
     this.characterAnimations = characterAnimations;
@@ -138,6 +140,8 @@ export default class CharacterBase extends EventSubscriber {
     weaponRoot.parent = this.characterMesh;
     this._applyWeaponOffset(WEAPON_OFFSETS.standAlone);
     this.shieldRoot = shieldRoot;
+    this.hitboxCrouched = hitboxCrouched;
+    this.hitboxStanding = hitboxStanding;
 
     if (!this.characterMesh.rotationQuaternion) {
       this.characterMesh.rotationQuaternion = Quaternion.Identity();
@@ -230,14 +234,18 @@ export default class CharacterBase extends EventSubscriber {
     }
   }
 
-  /** ¿Esta malla es del Character: su cápsula, su board o su escudo activo? Los enemigos lo usan para saber si lo alcanzaron. */
   isPlayerMesh(mesh: AbstractMesh): boolean {
     const board = this._activeBoardMesh;
     return (
-      mesh === this.characterMesh ||
+      mesh === this._activeHitbox() ||
       (board !== null && (mesh === board || mesh.parent === board)) ||
       this._isShieldMesh(mesh)
     );
+  }
+
+  /** El hitbox vigente sigue al estado de agachado (el mismo que cambia la forma de física). */
+  private _activeHitbox(): Mesh {
+    return this.fsm.standAloneSubFsm.getState() === "Crouch" ? this.hitboxCrouched : this.hitboxStanding;
   }
 
   /** El escudo solo cuenta como blanco mientras está activo (desactivado, sus mallas ni se ven ni protegen). */

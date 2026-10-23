@@ -6,11 +6,14 @@ import { Ray } from "@babylonjs/core/Culling/ray";
 import type { PickingInfo } from "@babylonjs/core/Collisions/pickingInfo";
 import {
   CHARACTER_CAPSULE_BOTTOM_POINT,
+  CHARACTER_CAPSULE_CROUCH_TOP_POINT,
+  CHARACTER_CAPSULE_HEIGHT,
   CHARACTER_CAPSULE_RADIUS,
-  CHARACTER_CAPSULE_STANDING_TOP_POINT,
-} from "../../character.constants";import type { IPhysicsController } from "../contracts/iphysics-controller";
+} from "../../character.constants";
+import { PhysicsShapeCapsule } from "@babylonjs/core/Physics/v2/physicsShape";
+import type { PhysicsShape } from "@babylonjs/core/Physics/v2/physicsShape";
+import type { IPhysicsController } from "../contracts/iphysics-controller";
 import type { CharacterInputState } from "../../character.input";
-import { PhysicsShapeCapsule } from "@babylonjs/core";
 import { OnGroundSubState } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone.on-ground";
 import { OnGroundCrouchedSubState } from "../../character-fsm/standAlone-fsm/character.fsm.stand-alone.on-ground-crouched"; // NUEVO
 import { isShieldActive } from "../../utils/combat-rules";
@@ -41,17 +44,12 @@ const RUNNING_JUMP_VERTICAL_IMPULSE = 4; // más bajo que JUMP_IMPULSE (10) — 
 const RUNNING_JUMP_FORWARD_BOOST = 8;    // más alto que antes (6) — más alcance para cruzar el hueco
 const WALK_BACKWARD_SPEED = 2; // más lento que WALK_SPEED (4) — retroceder es más cauto que avanzar
 const STRAFE_SPEED = 2.2; // más lento que WALK_SPEED (4) — strafe táctico
-const CAPSULE_RADIUS = CHARACTER_CAPSULE_RADIUS;
-const CAPSULE_BOTTOM = CHARACTER_CAPSULE_BOTTOM_POINT;
-const CAPSULE_STANDING_TOP = CHARACTER_CAPSULE_STANDING_TOP_POINT;
-const CAPSULE_CROUCH_TOP = 0.1;
 
 
 export class StandAlonePhysicsController implements IPhysicsController {
   private _groundDetected = true;
   private _groundGraceRemaining = 0; // cuánto falta para dar por perdido el suelo cuando el rayo falla
   private _groundNormal = Vector3.Up(); // normal del suelo bajo el personaje (suavizada)
-  private _isCrouched = false; // NUEVO
   private _ray = new Ray(Vector3.Zero(), Vector3.Down(), 5);
   private _isRolling = false;
   private _rollElapsed = 0;
@@ -67,6 +65,8 @@ export class StandAlonePhysicsController implements IPhysicsController {
   private _isDead = false; // NUEVO
   private _diedInAir = false; // NUEVO — murió sin tocar el piso: falta avisar el aterrizaje
   private _onDeadLanded: (() => void) | null = null; // NUEVO
+  private _standingShape: PhysicsShape;
+  private _crouchShape: PhysicsShapeCapsule | null = null;
 
   constructor(
     private scene: Scene,
@@ -76,6 +76,7 @@ export class StandAlonePhysicsController implements IPhysicsController {
     private getSubState: () => OnGroundSubState | OnGroundCrouchedSubState | "JumpImpulseStart" | "RunningJumpImpulseStart" | "OnAir" | "CrouchRollStart",
   ) {
     this._groundDetected = initialGroundDetected;
+    this._standingShape = this.characterAggregate.shape!; // la que creó Babylon desde el mesh
     this._setupFallAndLanding();
   }
 
@@ -389,9 +390,7 @@ export class StandAlonePhysicsController implements IPhysicsController {
   }
 
   private _updateGroundDetection(dt: number): void {
-    const topY = this._isCrouched ? CAPSULE_CROUCH_TOP : CAPSULE_STANDING_TOP; // CAMBIADO
-    const halfHeight = (topY - CAPSULE_BOTTOM) / 2; // CAMBIADO
-    const rayLength = halfHeight + GROUND_RAY_MARGIN; // CAMBIADO — antes: generalConfig.playerConfig.height / 2 + GROUND_RAY_MARGIN
+    const rayLength = CHARACTER_CAPSULE_HEIGHT / 2 + GROUND_RAY_MARGIN;
 
     const origin = this.characterAggregate.transformNode.getAbsolutePosition();
     this._ray.origin.set(origin.x, origin.y, origin.z);
@@ -436,23 +435,36 @@ export class StandAlonePhysicsController implements IPhysicsController {
 
   /** Llamado al entrar a Crouch (StandAloneFsm.onEnter). */
   notifyCrouchEnter(): void {
-    console.log("crouch enter called"); // TEMPORAL
-    this._isCrouched = true;
-    this._applyCapsuleShape(CAPSULE_CROUCH_TOP);
+    this._crouchShape ??= this._buildCrouchShape();
+    this._applyShape(this._crouchShape);
   }
 
-  /** Llamado al salir de Crouch (StandAloneFsm.onExit). */
-  notifyCrouchExit(): void { // NUEVO
-    this._isCrouched = false;
-    this._applyCapsuleShape(CAPSULE_STANDING_TOP);
+  notifyCrouchExit(): void {
+    this._applyShape(this._standingShape);
   }
 
-  private _applyCapsuleShape(topY: number): void {
-    const pointA = new Vector3(0, CAPSULE_BOTTOM, 0);
-    const pointB = new Vector3(0, topY, 0);
-    const newShape = new PhysicsShapeCapsule(pointA, pointB, CAPSULE_RADIUS, this.scene);
-    this.characterAggregate.shape = newShape;
-    // this.characterAggregate.body.shape = newShape; // NUEVO
+  private _buildCrouchShape(): PhysicsShapeCapsule {
+    const shape = new PhysicsShapeCapsule(
+      new Vector3(0, CHARACTER_CAPSULE_BOTTOM_POINT, 0),
+      new Vector3(0, CHARACTER_CAPSULE_CROUCH_TOP_POINT, 0),
+      CHARACTER_CAPSULE_RADIUS,
+      this.scene,
+    );
+    // La forma nueva no hereda el material del aggregate.
+    shape.material = { friction: GROUND_FRICTION, restitution: GROUND_RESTITUTION };
+    return shape;
+  }
+
+  private _applyShape(shape: PhysicsShape): void {
+    const body = this.characterAggregate.body;
+    body.shape = shape; // directo al body: no dispone la forma anterior, así reuso las dos
+    // Por precaución: mantener sin inercia en X/Z (el personaje solo gira en Y).
+    const mp = body.getMassProperties();
+    if (mp.inertia) {
+      mp.inertia.x = 0;
+      mp.inertia.z = 0;
+      body.setMassProperties(mp);
+    }
   }
 
   getLastImpactVerticalSpeed(): number {
@@ -491,5 +503,8 @@ export class StandAlonePhysicsController implements IPhysicsController {
     this._onDeadLanded = onLanded ?? null;
   }
 
-  dispose(): void { }
+  dispose(): void {
+    this._crouchShape?.dispose();
+    this._crouchShape = null;
+  }
 }

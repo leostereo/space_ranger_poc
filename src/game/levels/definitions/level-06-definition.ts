@@ -563,6 +563,20 @@ export const level06Definition: LevelDefinition = {
       dummyTarget: LAYOUT.enemies.dummyTarget,
       staticDrone: LAYOUT.enemies.staticDrone,
       sentinelDrone: LAYOUT.enemies.sentinelDrone,
+      raycastDummy: [
+        {
+          position: new Vector3(5, 0.2, 10), // base a ras del suelo donde el personaje pase
+          forward: new Vector3(-1, 0, 0),  // el rayo sale hacia -X, cruzando su camino
+        },
+        {
+          position: new Vector3(5, 0, 10), // base a ras del suelo donde el personaje pase
+          forward: new Vector3(-1, 0, 0),  // el rayo sale hacia -X, cruzando su camino
+        },
+        {
+          position: new Vector3(5, -0.3, 10), // base a ras del suelo donde el personaje pase
+          forward: new Vector3(-1, 0, 0),  // el rayo sale hacia -X, cruzando su camino
+        },
+      ],
     },
     items: [],
     other: [],

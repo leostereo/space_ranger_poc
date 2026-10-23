@@ -15,6 +15,7 @@ import { CHARACTER_CAPSULE_HEIGHT, CHARACTER_CAPSULE_RADIUS, CHARACTER_MASS } fr
 import { createWeaponPrefab } from "@/game/assets/factories/weapon-factory";
 import { createThrusterPrefab } from "@/game/assets/factories/thruster-factory";
 import { createShieldPrefab } from "@/game/assets/factories/shield-factory";
+import { CHARACTER_CROUCH_HEIGHT_FACTOR } from "../character.constants";
 
 /** Prefijo de los nombres de todo lo creado acá: distingue al personaje de los prototipos del registro. */
 const CHARACTER_PREFIX = "player:";
@@ -41,8 +42,10 @@ export interface CharacterAndEquipmentBuildResult {
   /**
    * Libera lo creado acá: personaje clonado y sus animaciones, arma, propulsores, escudo y cápsula.
    * El PhysicsAggregate lo libera el llamador (cambia al alternar de vehículo).
-   */
+  */
   dispose(): void;
+  hitboxStanding: Mesh;
+  hitboxCrouched: Mesh;
 }
 
 const disableModelPicking = (model: AbstractMesh): void => {
@@ -105,6 +108,17 @@ export function characterAndEquipment_builder(
     scene,
   );
 
+  const crouchedHeight = CHARACTER_CAPSULE_HEIGHT * CHARACTER_CROUCH_HEIGHT_FACTOR;
+  // Pies fijos: al achicarse, el centro baja la mitad de lo que se achica.
+  const hitboxStanding = createHitbox(scene, `${CHARACTER_PREFIX}hitbox-standing`, CHARACTER_CAPSULE_HEIGHT, 0, capsule);
+  const hitboxCrouched = createHitbox(
+    scene,
+    `${CHARACTER_PREFIX}hitbox-crouched`,
+    crouchedHeight,
+    -(CHARACTER_CAPSULE_HEIGHT - crouchedHeight) / 2,
+    capsule,
+  );
+
   return {
     characterMesh: capsule,
     characterAggregate,
@@ -124,5 +138,25 @@ export function characterAndEquipment_builder(
       shield.dispose();
       capsule.dispose(false, false);
     },
+    hitboxStanding,
+    hitboxCrouched
   };
 }
+
+const createHitbox = (scene: Scene, name: string, height: number, centerY: number, parent: Mesh): Mesh => {
+  const hitbox = CreateCapsule(
+    name,
+    {
+      height: Math.max(height, CHARACTER_CAPSULE_RADIUS * 2),
+      radius: CHARACTER_CAPSULE_RADIUS,
+      tessellation: CAPSULE_TESSELLATION,
+      capSubdivisions: CAPSULE_CAP_SUBDIVISIONS,
+    },
+    scene,
+  );
+  hitbox.parent = parent;
+  hitbox.position.y = centerY;
+  hitbox.isVisible = false;
+  hitbox.isPickable = false; // no cuenta para el suelo ni para tus proyectiles; los enemigos lo aceptan por isPlayerMesh
+  return hitbox;
+};
