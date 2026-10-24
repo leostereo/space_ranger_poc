@@ -8,7 +8,7 @@ import type { CharacterAnimationSet } from "@/game/assets/animations/character-c
 import type { AssetRegistry } from "@/game/assets/asset-registry";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { EventSubscriber } from "@/game/services/event-subscriber";
-import { EventManager, GameEvents, type PlayerShootedPayload, type ProjectileHitPayload } from "@/game/services/event-manager";
+import { EventManager, GameEvents, KamikazeImpactPayload, type PlayerShootedPayload, type ProjectileHitPayload } from "@/game/services/event-manager";
 import { createCharacterFollowCamera } from "./character.camera";
 
 import { CharacterFsm } from "./character-fsm/character.fsm";
@@ -266,6 +266,7 @@ export default class CharacterBase extends EventSubscriber {
   protected registerEvents(): void {
     this.listen(GameEvents.PlayerShooted, (payload) => this._onPlayerShooted(payload));
     this.listen(GameEvents.ProjectileHit, (hit) => this._onProjectileHit(hit));
+    this.listen(GameEvents.KamikazeImpact, (hit) => this._onKamikazeImpact(hit));
   }
 
   /** Un proyectil alcanzó al Character (o a su board): se traduce al evento de daño que ya maneja. */
@@ -273,6 +274,20 @@ export default class CharacterBase extends EventSubscriber {
     if (!this.isPlayerMesh(hit.mesh)) return;
     if (this._isShieldMesh(hit.mesh)) return; // el escudo absorbe el impacto: sin daño
     this._onPlayerShooted({ damage: hit.damage, hitPoint: hit.point, direction: hit.direction, sourceId: hit.sourceId });
+  }
+
+  private _onKamikazeImpact(hit: KamikazeImpactPayload) {
+    if (this.combat.isShielding()) return;
+    if (!this.fsm.canReceiveHit()) return;
+    const alive = this.health.loseLife();
+    EventManager.emit(GameEvents.PlayerDamaged, { livesLeft: this.health.lives });
+
+    if (alive) {
+      this.fsm.notifyHit();
+    } else {
+      this.fsm.notifyDeath();
+      EventManager.emit(GameEvents.PlayerDied, {});
+    }
   }
 
   private _onPlayerShooted(_payload: PlayerShootedPayload): void {

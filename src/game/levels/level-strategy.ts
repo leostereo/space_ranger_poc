@@ -9,6 +9,7 @@ import type { LevelScope } from "./level-scope";
 import { createLevelLighting } from "./level-lighting";
 export type LevelOutcome = "completed" | "failed";
 import type { EnemiesManager } from "../entities/enemies/enemies-manager";
+import { PlayerShotDebugEmitter } from "../debug/player-shot-debug-emitter";
 export interface LevelStrategyEventMap {
   levelFinished: { outcome: LevelOutcome };
 }
@@ -47,6 +48,7 @@ export abstract class LevelStrategy {
   private phase: Phase = "created";
   private pausedAnimationGroups: AnimationGroup[] = [];
   private physicsWasEnabled = true;
+  private shotDebugEmitter: PlayerShotDebugEmitter | null = null;
 
   constructor(deps: LevelStrategyDeps) {
     this.context = deps.context;
@@ -56,6 +58,9 @@ export abstract class LevelStrategy {
     this.character = deps.character;
     this.enemies = deps.enemies;
     createLevelLighting(this.context.scene, this.scope);
+    if (import.meta.env.DEV) {
+      this.shotDebugEmitter = new PlayerShotDebugEmitter();
+    }
   }
 
   /** Dónde debe aparecer el Character (definido por el nivel). */

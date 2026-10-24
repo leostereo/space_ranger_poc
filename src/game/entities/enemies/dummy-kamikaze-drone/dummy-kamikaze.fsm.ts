@@ -3,7 +3,6 @@ export type DummyKamikazeState =
   | "Spotting"
   | "Chasing"
   | "Charging"
-  | "Stunned"
   | "Returning"
   | "Exploding";
 
@@ -12,14 +11,13 @@ export interface DummyKamikazeFsmCallbacks {
   readonly onEnterSpotting: () => void;
   readonly onEnterChasing: () => void;
   readonly onEnterCharging: () => void;
-  readonly onEnterStunned: () => void;
   readonly onEnterReturning: () => void;
   readonly onEnterExploding: () => void;
 }
 
 /**
- * Gestiona el estado de comportamiento autónomo del DummyKamikazeDrone.
- * Encapsula de forma desacoplada la cuenta regresiva del estado activo.
+ * Controla el ciclo de vida de los estados del DummyKamikazeDrone.
+ * Encapsula la cuenta regresiva del estado activo.
  */
 export class DummyKamikazeFsm {
   private _state: DummyKamikazeState = "Patrol";
@@ -57,12 +55,12 @@ export class DummyKamikazeFsm {
     this._stateTimer = seconds;
   }
 
-  /** Cambia el estado activo y dispara la lógica de inicialización correspondiente. */
+  /** Cambia el estado activo y dispara la lógica de entrada correspondiente. */
   public transitionTo(newState: DummyKamikazeState): void {
     if (this._state === newState) return;
 
     if (import.meta.env.DEV) {
-      console.info(`[DummyKamikazeFsm] Transición de comportamiento: ${this._state} -> ${newState}`);
+      console.info(`[DummyKamikazeFsm] Transición: ${this._state} -> ${newState}`);
     }
 
     this._state = newState;
@@ -73,7 +71,6 @@ export class DummyKamikazeFsm {
       case "Spotting":  this.callbacks.onEnterSpotting(); break;
       case "Chasing":   this.callbacks.onEnterChasing(); break;
       case "Charging":  this.callbacks.onEnterCharging(); break;
-      case "Stunned":   this.callbacks.onEnterStunned(); break;
       case "Returning": this.callbacks.onEnterReturning(); break;
       case "Exploding": this.callbacks.onEnterExploding(); break;
     }

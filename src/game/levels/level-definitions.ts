@@ -10,6 +10,6 @@ import type { LevelDefinition } from "./level-definition";
 /** Todos los niveles del juego. Para agregar uno: crear su definición y sumarla acá. */
 // export const LEVEL_DEFINITIONS: readonly LevelDefinition[] = [level01Definition, level02Definition];
 // export const LEVEL_DEFINITIONS: readonly LevelDefinition[] = [level01Definition, level02Definition, level03Definition, level04Definition, level05Definition];
-// export const LEVEL_DEFINITIONS: readonly LevelDefinition[] = [ level05Definition,level06Definition];
+ export const LEVEL_DEFINITIONS: readonly LevelDefinition[] = [ level06Definition];
 // export const LEVEL_DEFINITIONS: readonly LevelDefinition[] = [ level05Definition ];
-export const LEVEL_DEFINITIONS: readonly LevelDefinition[] = [ level07Definition ];
+// export const LEVEL_DEFINITIONS: readonly LevelDefinition[] = [ level07Definition ];

@@ -7,6 +7,8 @@ export const GameEvents = {
   PlayerDamaged: "player_damaged",
   PlayerDied: "player_died",
   ProjectileHit: "projectile_hit",
+  KamikazeImpact: "KamikazeImpact"
+
 } as const;
 
 export interface PlayerShootedPayload {
@@ -28,6 +30,13 @@ export interface ProjectileHitPayload {
   damage: number;
   sourceId?: string;
 }
+export interface KamikazeImpactPayload {
+  readonly damage: number;
+  readonly position: Vector3;
+  readonly direction: Vector3;
+  readonly hitMesh: AbstractMesh;
+  readonly sourceId: string;
+}
 
 /** Mapa evento -> payload. Para sumar un evento nuevo: una entrada acá y otra en GameEvents. */
 export interface GameEventMap {
@@ -35,6 +44,7 @@ export interface GameEventMap {
   [GameEvents.PlayerDamaged]: PlayerDamagedPayload;
   [GameEvents.PlayerDied]: Record<string, never>;
   [GameEvents.ProjectileHit]: ProjectileHitPayload;
+  [GameEvents.KamikazeImpact]: KamikazeImpactPayload;
 }
 
 export type GameEventName = keyof GameEventMap;

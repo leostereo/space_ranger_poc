@@ -40,8 +40,11 @@ export const level07Definition: LevelDefinition = {
     character: LANDING_POSITION.add(new Vector3(0, SPAWN_HEIGHT_MARGIN, 0)),
     enemies: {
       // Invocamos el nuevo identificador de enemigo que registramos en la factoría
-      dummyKamikazeDrone: [
-        dummyKamikaze(FLIGHT_VOLUME.center.clone()),
+     dummyKamikazeDrone: [
+        dummyKamikaze(FLIGHT_VOLUME.center.clone()), // Primer dron (centro del volumen)
+        dummyKamikaze(FLIGHT_VOLUME.center.add(new Vector3(3, 0, 4))), // Segundo dron desplazado un poco en X y Z
+        dummyKamikaze(FLIGHT_VOLUME.center.add(new Vector3(-3, 0, 4))), // Segundo dron desplazado un poco en X y Z
+        dummyKamikaze(FLIGHT_VOLUME.center.add(new Vector3(-3, 0, -4))), // Segundo dron desplazado un poco en X y Z
       ],
     },
     items: [],
