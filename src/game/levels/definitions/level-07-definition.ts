@@ -46,6 +46,20 @@ export const level07Definition: LevelDefinition = {
         dummyKamikaze(FLIGHT_VOLUME.center.add(new Vector3(-3, 0, 4))), // Segundo dron desplazado un poco en X y Z
         dummyKamikaze(FLIGHT_VOLUME.center.add(new Vector3(-3, 0, -4))), // Segundo dron desplazado un poco en X y Z
       ],
+      raycastDummy: [
+        // {
+        //   position: new Vector3(5, 0.1, -30), // base a ras del suelo donde el personaje pase
+        //   forward: new Vector3(-1, 0, 0),  // el rayo sale hacia -X, cruzando su camino
+        //       },
+        // {
+        //   position: new Vector3(5, 0, 10), // base a ras del suelo donde el personaje pase
+        //   forward: new Vector3(-1, 0, 0),  // el rayo sale hacia -X, cruzando su camino
+        // },
+        // {
+        //   position: new Vector3(5, -0.3, 10), // base a ras del suelo donde el personaje pase
+        //   forward: new Vector3(-1, 0, 0),  // el rayo sale hacia -X, cruzando su camino
+        // },
+      ],
     },
     items: [],
     other: [],

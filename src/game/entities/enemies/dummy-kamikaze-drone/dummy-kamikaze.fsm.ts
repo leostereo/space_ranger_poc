@@ -59,9 +59,9 @@ export class DummyKamikazeFsm {
   public transitionTo(newState: DummyKamikazeState): void {
     if (this._state === newState) return;
 
-    if (import.meta.env.DEV) {
-      console.info(`[DummyKamikazeFsm] Transición: ${this._state} -> ${newState}`);
-    }
+    // if (import.meta.env.DEV) {
+    //   console.info(`[DummyKamikazeFsm] Transición: ${this._state} -> ${newState}`);
+    // }
 
     this._state = newState;
     this._stateTimer = 0;

@@ -54,7 +54,7 @@ const SHOOTING_PITCH_RAMP_SECONDS = 0.4; // tiempo manteniendo W/S hasta llegar 
 
 // ── muerte ── (mismos valores que standAlone, para que el aterrizaje se sienta igual)
 const DEAD_LANDING_DAMPING_RATE = 6; // NUEVO — más alto = frena más rápido al tocar el piso
-const DEAD_GROUND_RAY_MARGIN = 0.15; // NUEVO
+const DEAD_GROUND_RAY_MARGIN = 0.2; // NUEVO
 const DEAD_UPWARD_VELOCITY_THRESHOLD = 0.5; // NUEVO — subiendo no cuenta como "tocó el piso"
 const CAPSULE_BOTTOM = CHARACTER_CAPSULE_BOTTOM_POINT;
 const CAPSULE_STANDING_TOP = CHARACTER_CAPSULE_STANDING_TOP_POINT;

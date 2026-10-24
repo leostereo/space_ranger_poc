@@ -39,18 +39,18 @@ export interface ProjectileWeaponOptions {
 export const DEFAULT_PROJECTILE_WEAPON_CONFIG: ProjectileWeaponConfig = {
     fireRate: 6,
     damage: 1,
-    projectileSpeed: 60,
+    projectileSpeed: 100,
     projectileLifetime: 2,
-    projectileRadius: 0.02,
-    projectileLength: 0.2,
+    projectileRadius: 0.1,
+    projectileLength: 0.65,
     poolSize: 20,
-    emissiveColor: new Color3(1, 0.05, 0.05),
+    emissiveColor: new Color3(1, 0.2, 0.2), // Un rojo más vibrante
     muzzleFlashDuration: 0.06,
-    muzzleFlashScale: 0.18,
+    muzzleFlashScale: 0.25,                 // Fogonazo un poco más grande
     muzzleFlashColor: new Color3(1, 0.95, 0.6),
     impactEffectDuration: 0.15,
-    impactEffectScale: 0.22,
-    impactEffectColor: new Color3(1, 0.6, 0.15), // naranja/chispa — distinto del rojo del proyectil, se lee como "impacto"
+    impactEffectScale: 0.35,                 // Chispas del impacto más visibles al chocar
+    impactEffectColor: new Color3(1, 0.6, 0.15),
     impactPoolSize: 6,
 };
 
@@ -95,17 +95,28 @@ export class ProjectileWeaponController implements IWeaponController {
 
     private _buildPool(): void {
         const material = new StandardMaterial("projectileMat", this.scene);
-        material.diffuseColor = this.config.emissiveColor.scale(0.05);
-        material.emissiveColor = this.config.emissiveColor;
-        material.specularColor = Color3.Black();
+
+        // 🟢 CONFIGURACIÓN DE ENERGÍA Y LUMINOSIDAD
+        material.diffuseColor = Color3.Black(); // No reacciona a las luces ambientales del mapa
+        material.emissiveColor = this.config.emissiveColor; // Brilla con su propio color
+        material.specularColor = Color3.Black(); // Sin reflejos de brillo plásticos
+
+        // 🟢 TRASLUCIDEZ ADITIVA: El secreto para que parezca plasma/láser
+        // Al superponerse con el fondo o con enemigos, sumará los canales de color dando sensación de incandescencia.
+        material.alpha = 0.9;
+        material.alphaMode = 1; // Engine.ALPHA_ADD (Suma de luces, ideal para láseres y fuegos)
 
         for (let i = 0; i < this.config.poolSize; i++) {
             const mesh = MeshBuilder.CreateCylinder(
                 `projectile_${i}`,
-                { diameter: this.config.projectileRadius * 2, height: this.config.projectileLength, tessellation: 8 },
+                {
+                    diameter: this.config.projectileRadius * 2,
+                    height: this.config.projectileLength,
+                    tessellation: 8
+                },
                 this.scene,
             );
-            // La orientación se resuelve al disparar, con lookAt (ver _fireOne).
+
             mesh.material = material;
             mesh.position.copyFrom(PARK_POSITION);
             mesh.isPickable = false;
@@ -119,11 +130,13 @@ export class ProjectileWeaponController implements IWeaponController {
         material.diffuseColor = Color3.Black();
         material.emissiveColor = this.config.muzzleFlashColor;
         material.specularColor = Color3.Black();
+        material.alpha = 0.85;
+        material.alphaMode = 1; // 🟢 Fogonazo aditivo brillante
 
         this.flashMesh = MeshBuilder.CreateSphere("muzzleFlash", { diameter: 1, segments: 6 }, this.scene);
         this.flashMesh.material = material;
         this.flashMesh.isPickable = false;
-        this.flashMesh.parent = this.muzzle; // hereda posición Y orientación del muzzle automáticamente
+        this.flashMesh.parent = this.muzzle;
         this.flashMesh.position.setAll(0);
         this.flashMesh.scaling.setAll(0);
         this.flashMesh.setEnabled(false);
@@ -134,16 +147,20 @@ export class ProjectileWeaponController implements IWeaponController {
         material.diffuseColor = Color3.Black();
         material.emissiveColor = this.config.impactEffectColor;
         material.specularColor = Color3.Black();
+        material.alpha = 0.9;
+        material.alphaMode = 1; // 🟢 Chispazo aditivo brillante al impactar
 
         for (let i = 0; i < this.config.impactPoolSize; i++) {
             const mesh = MeshBuilder.CreateSphere(`impactEffect_${i}`, { diameter: 1, segments: 6 }, this.scene);
+            material.disableLighting = true; // Optimización: no calcula luces para efectos efímeros
             mesh.material = material;
-            mesh.isPickable = false; // el propio efecto no debe ser blanco de otros raycasts
+            mesh.isPickable = false;
             mesh.scaling.setAll(0);
             mesh.setEnabled(false);
             this.impactPool.push({ mesh, elapsed: Infinity });
         }
     }
+
 
     private _triggerImpact(position: Vector3): void {
         const free = this.impactPool.find((entry) => entry.elapsed === Infinity);
@@ -204,7 +221,7 @@ export class ProjectileWeaponController implements IWeaponController {
     private _fireOne(): void {
         const free = this.pool.find((entry) => !entry.isActive);
         if (!free) return;
-
+        console.log(this.muzzle)
         const origin = this.muzzle.getAbsolutePosition();
         const direction = Vector3.TransformNormal(Vector3.Forward(), this.muzzle.getWorldMatrix()).normalize();
 
@@ -258,7 +275,8 @@ export class ProjectileWeaponController implements IWeaponController {
                         point: point.clone(),
                         direction: entry.direction.clone(),
                         damage: this.config.damage,
-                        sourceId: this.options.sourceId,                    });
+                        sourceId: this.options.sourceId,
+                    });
                 }
                 this._deactivate(entry);
                 continue;

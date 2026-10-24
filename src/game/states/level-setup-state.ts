@@ -39,7 +39,8 @@ export class LevelSetupState implements GameState {
   ) {}
 
   async enter(context: GameContext): Promise<void> {
-    const pad = navigator.getGamepads().find(Boolean); console.log(pad?.id, pad?.mapping, pad?.buttons.length, pad?.axes.length)
+    const pad = navigator.getGamepads().find(Boolean);
+    // console.log(pad?.id, pad?.mapping, pad?.buttons.length, pad?.axes.length)
     this.exited = false;
     this.ready = false;
 

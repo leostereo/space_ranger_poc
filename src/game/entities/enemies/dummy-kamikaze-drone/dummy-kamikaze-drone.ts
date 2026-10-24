@@ -17,11 +17,13 @@ import { DummyKamikazeFsm } from "./dummy-kamikaze.fsm";
 import { DummyKamikazeMovementController } from "./dummy-kamikaze-movement.controller";
 import { buildDroneModelKamikaze } from "../drone/drone-model-kamikaze";
 import { ExplosionFX } from "@/game/utils/explosion-fx"
+import { CreateLines } from "@babylonjs/core";
 
 const DETECT_RADIUS = 18.0;
 const FOV_ANGLE_DEGREES = 75.0;
 const VISION_PLANE_Y = 1.0;
 const IMPACT_RAY_LENGTH = 0.5;      // Largo del percutor frontal corto
+// const IMPACT_RAY_LENGTH = 1.5;      // Largo del percutor frontal corto
 const EXPLOSION_DAMAGE = 1;
 const MIN_DAMAGE_DISTANCE = 1.8;     // 🟢 Radio de la explosión esférica para alcanzar al jugador
 
@@ -192,13 +194,33 @@ export class DummyKamikazeDrone extends DroneBase {
     const forwardDirection = new Vector3(this.root.forward.x, this.root.forward.y, this.root.forward.z).normalize().scale(-1);
     const ray = new Ray(this.root.position, forwardDirection, IMPACT_RAY_LENGTH);
 
+    // const hit = scene.pickWithRay(ray, (mesh) => {
+    //   return !this.ownsMesh(mesh) && (mesh.name.includes("shield") || mesh.name.includes("character"));
+    // });
+
     const hit = scene.pickWithRay(ray, (mesh) => {
-      return !this.ownsMesh(mesh) && (mesh.checkCollisions || mesh.name.includes("shield") || mesh.name.includes("character"));
+      // Ignorar mallas del propio dron
+      if (this.ownsMesh(mesh)) return false;
+
+      const meshName = mesh.name.toLowerCase();
+
+      if (meshName.includes("hitbox")) {
+        return true;
+      }
+
+      // Si tiene padre, depende del padre; si no, depende de su propio estado.
+      if (meshName.includes("shield")) {
+        const isParentActive = mesh.parent ? mesh.parent.isEnabled() : true;
+        return isParentActive && mesh.isEnabled() && mesh.isVisible;
+      }
+
+      // Si es el personaje o el entorno
+      return mesh.checkCollisions
     });
+
 
     if (hit && hit.hit && hit.pickedMesh) {
       const meshName = hit.pickedMesh.name.toLowerCase();
-
       if (meshName.includes("shield")) {
         return { hitMesh: hit.pickedMesh, type: "shield" };
       }
@@ -219,9 +241,9 @@ export class DummyKamikazeDrone extends DroneBase {
     // Calculamos la distancia real tridimensional entre el origen del dron y el jugador
     const distanceToPlayer = Vector3.Distance(this.root.position, this.lastKnownPlayerPos);
 
-    if (import.meta.env.DEV) {
-      console.log(`[DummyKamikazeDrone] Detonación iniciada. Distancia al objetivo: ${distanceToPlayer.toFixed(2)}m`);
-    }
+    // if (import.meta.env.DEV) {
+    //   console.log(`[DummyKamikazeDrone] Detonación iniciada. Distancia al objetivo: ${distanceToPlayer.toFixed(2)}m`);
+    // }
 
     // 🟢 VALIDACIÓN DE PROXIMIDAD RADIAL
     if (distanceToPlayer <= MIN_DAMAGE_DISTANCE) {
@@ -241,9 +263,9 @@ export class DummyKamikazeDrone extends DroneBase {
       });
 
     } else {
-      if (import.meta.env.DEV) {
-        console.log(`[DummyKamikazeDrone] Detonación neutralizada de forma remota (Objetivo fuera de rango).`);
-      }
+      // if (import.meta.env.DEV) {
+      //   console.log(`[DummyKamikazeDrone] Detonación neutralizada de forma remota (Objetivo fuera de rango).`);
+      // }
     }
   }
 
@@ -306,17 +328,17 @@ export class DummyKamikazeDrone extends DroneBase {
   }
 
   protected override onDestroyed(): void {
-  // 1. Spawneamos la explosión pasando UNICAMENTE la posición real
-  if (this.root && !this.root.isDisposed()) {
-    ExplosionFX.spawn(this.root.position);
+    // 1. Spawneamos la explosión pasando UNICAMENTE la posición real
+    if (this.root && !this.root.isDisposed()) {
+      ExplosionFX.spawn(this.root.position);
+    }
+
+    // 2. Liberamos los componentes de debug del volumen de navegación
+    this.releaseDebug();
+
+    // 3. Pasamos el control a la clase base
+    super.onDestroyed();
   }
-
-  // 2. Liberamos los componentes de debug del volumen de navegación
-  this.releaseDebug();
-
-  // 3. Pasamos el control a la clase base
-  super.onDestroyed();
-}
 
   protected override onDispose(): void { this.fsm.dispose(); this.releaseDebug(); super.onDispose(); }
 }

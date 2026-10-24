@@ -11,6 +11,6 @@ export function attachLevelDebugKeys(hotkeys: HotkeyService, session: LevelSessi
     hotkeys.onHotkey("Digit1", () => session.current?.strategy?.forceOutcome("completed")),
     hotkeys.onHotkey("Digit2", () => session.current?.strategy?.forceOutcome("failed")),
   ];
-  console.info("[debug] keys: 1 = complete the level, 2 = fail the level, Esc/P = pause");
+  //console.info("[debug] keys: 1 = complete the level, 2 = fail the level, Esc/P = pause");
   return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
 }

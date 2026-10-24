@@ -277,7 +277,8 @@ export default class CharacterBase extends EventSubscriber {
   }
 
   private _onKamikazeImpact(hit: KamikazeImpactPayload) {
-    if (this.combat.isShielding()) return;
+    const implactMesh = hit.hitMesh.name;
+    if (implactMesh.includes('shieldPanel')) return;
     if (!this.fsm.canReceiveHit()) return;
     const alive = this.health.loseLife();
     EventManager.emit(GameEvents.PlayerDamaged, { livesLeft: this.health.lives });
