@@ -60,6 +60,12 @@ export async function buildHoverBoardStrategy(
         weaponMuzzle,
         combat.isAiming, // CAMBIADO
         [boardMesh as AbstractMesh, characterMesh],
+        undefined,
+        {
+            sourceId: "player", // O el ID de tu personaje
+            // 🟢 AQUÍ PASAMOS TU FUNCIÓN OPTIMIZADA BAJO DEMANDA:
+            getEmitterVelocity: () => boardAggregate.body.getLinearVelocity()
+        }
     );
 
     const strategy: IVehicleStrategy = {
@@ -67,6 +73,7 @@ export async function buildHoverBoardStrategy(
         input: inputController,
         animation,
         tick(dt: number) {
+            console.log(boardAggregate.body.getLinearVelocity())
             inputController.tick();
             physics.tick(dt);
             animation.tick(); // NUEVO — antes faltaba, era inofensivo porque tick() era no-op

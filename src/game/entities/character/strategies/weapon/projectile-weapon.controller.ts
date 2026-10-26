@@ -34,6 +34,7 @@ export interface ProjectileWeaponOptions {
     isExtraTarget?: (mesh: AbstractMesh) => boolean;
     /** Segundos que espera antes del primer disparo (para desfasar varias armas). Por defecto, 0. */
     initialDelaySeconds?: number;
+    getEmitterVelocity?: () => Vector3;
 }
 
 export const DEFAULT_PROJECTILE_WEAPON_CONFIG: ProjectileWeaponConfig = {
@@ -61,6 +62,7 @@ interface PoolEntry {
     isActive: boolean;
     direction: Vector3;
     elapsed: number;
+    customSpeed: number; // 👈 Esta es la propiedad que nos faltaba declarar
 }
 
 interface ImpactEntry {
@@ -109,19 +111,21 @@ export class ProjectileWeaponController implements IWeaponController {
         for (let i = 0; i < this.config.poolSize; i++) {
             const mesh = MeshBuilder.CreateCylinder(
                 `projectile_${i}`,
-                {
-                    diameter: this.config.projectileRadius * 2,
-                    height: this.config.projectileLength,
-                    tessellation: 8
-                },
+                { diameter: this.config.projectileRadius * 2, height: this.config.projectileLength, tessellation: 8 },
                 this.scene,
             );
-
             mesh.material = material;
             mesh.position.copyFrom(PARK_POSITION);
             mesh.isPickable = false;
 
-            this.pool.push({ mesh, isActive: false, direction: Vector3.Zero(), elapsed: 0 });
+            // 🟢 INICIALIZA LA PROPIEDAD AQUÍ CON UN VALOR POR DEFECTO:
+            this.pool.push({
+                mesh,
+                isActive: false,
+                direction: Vector3.Zero(),
+                elapsed: 0,
+                customSpeed: 0 // 👈 Sumamos esto para cumplir con la interfaz
+            });
         }
     }
 
@@ -215,25 +219,37 @@ export class ProjectileWeaponController implements IWeaponController {
         if (this.cooldownElapsed < this.fireInterval) return;
 
         this.cooldownElapsed = 0;
-        this._fireOne();
+
+        // 🟢 OPTIMIZACIÓN CENTRAL: Solicitamos la velocidad SOLO en el frame del disparo
+        const emitterVel = this.options.getEmitterVelocity ? this.options.getEmitterVelocity() : Vector3.Zero();
+        this._fireOne(emitterVel);
     }
 
-    private _fireOne(): void {
+    private _fireOne(emitterVelocity: Vector3): void {
         const free = this.pool.find((entry) => !entry.isActive);
         if (!free) return;
-        console.log(this.muzzle)
+
         const origin = this.muzzle.getAbsolutePosition();
         const direction = Vector3.TransformNormal(Vector3.Forward(), this.muzzle.getWorldMatrix()).normalize();
 
         free.mesh.position.copyFrom(origin);
         free.direction.copyFrom(direction);
-        // El cilindro nace con su eje largo en Y: la corrección de pitch de 90° lo alinea con el forward.
         free.mesh.lookAt(origin.add(direction), 0, Math.PI / 2);
         free.elapsed = 0;
         free.isActive = true;
         free.mesh.setEnabled(true);
 
-        this._triggerFlash(); // NUEVO
+        // 🟢 FÍSICA RELATIVISTA BAJO DEMANDA:
+        // Proyectamos la inercia lineal del vehículo sobre el vector frontal de la bala
+        const forwardInertia = Vector3.Dot(emitterVelocity, direction);
+
+        // Evitamos velocidades negativas si el vehículo frena de golpe o va marcha atrás
+        const addedSpeed = Math.max(0, forwardInertia);
+
+        // Asignamos la velocidad combinada final única para esta entidad bala
+        free.customSpeed = this.config.projectileSpeed + addedSpeed;
+
+        this._triggerFlash();
     }
 
     private _triggerFlash(): void {
@@ -252,7 +268,8 @@ export class ProjectileWeaponController implements IWeaponController {
                 continue;
             }
 
-            const step = entry.direction.scale(this.config.projectileSpeed * dt);
+            // 🟢 MOVIMIENTO SUAVIZADO: Usamos la velocidad calculada al nacer la bala
+            const step = entry.direction.scale(entry.customSpeed * dt);
             const stepLength = step.length();
 
             this._ray.origin.copyFrom(entry.mesh.position);
@@ -267,7 +284,7 @@ export class ProjectileWeaponController implements IWeaponController {
             );
 
             if (hit?.hit) {
-                const point = hit.pickedPoint ?? entry.mesh.position; // fallback por si pickedPoint viene null
+                const point = hit.pickedPoint ?? entry.mesh.position;
                 this._triggerImpact(point);
                 if (hit.pickedMesh) {
                     EventManager.emit(GameEvents.ProjectileHit, {
