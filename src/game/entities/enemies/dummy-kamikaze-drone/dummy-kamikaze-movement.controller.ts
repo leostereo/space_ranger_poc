@@ -43,7 +43,7 @@ export class DummyKamikazeMovementController {
   }
 
   /** Hace que el drone se quede flotando a la espera durante un tiempo determinado. */
-  public wait(seconds: number): void {
+  public wait(_seconds: number): void {
     this.stop();
   }
 
