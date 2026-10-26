@@ -170,7 +170,7 @@ const straightControls = (length: number): readonly Control[] => [
 const SPAWN_HEIGHT_MARGIN = 1; // el personaje aparece sobre el plano y cae
 const FALL_MARGIN = 15; // por debajo del punto más bajo del recorrido se da por caído
 const SENTINEL_PATROL_RADIUS = 7;
-const SENTINELS_PER_BRIDGE = 3;
+const SENTINELS_PER_BRIDGE = 10;
 
 // =====================================================================================
 // Layout: datos puros (sin escena). Se calcula una vez; el mapa y los spawns salen de acá.
@@ -229,7 +229,7 @@ interface Level06Layout {
   readonly enemies: {
     readonly dummyTarget: EnemySpawn[];
     readonly staticDrone: EnemySpawn[];
-    readonly sentinelDrone: EnemySpawn[];
+    readonly dummyKamikazeDrone: EnemySpawn[];
   };
   readonly goal: Vector3;
   readonly lowestY: number;
@@ -242,7 +242,7 @@ const createLayout = (): Level06Layout => {
   const enemies = {
     dummyTarget: [] as EnemySpawn[],
     staticDrone: [] as EnemySpawn[],
-    sentinelDrone: [] as EnemySpawn[],
+    dummyKamikazeDrone: [] as EnemySpawn[],
   };
 
   // Cursor: dónde termina el último tramo y hacia dónde mira.
@@ -330,25 +330,39 @@ const createLayout = (): Level06Layout => {
       fireDelaySeconds,
     });
   };
-  /** Sentinel que patrulla una esfera a su altura de vuelo, centrada sobre el camino. */
-  const sentinelAt = (frame: Frame, forward: number, fireDelaySeconds: number): void => {
-    const point = localPoint(frame, forward, 0);
-    const flightCenter = point.add(new Vector3(0, DRONE_HOVER_HEIGHT, 0));
-    enemies.sentinelDrone.push({
-      position: point,
+
+  /** Dummy Kamikaze que patrulla un volumen en caja sobre el puente antes de atacar. */
+  const kamikazeAt = (frame: Frame, forward: number, lateralOffset: number): void => {
+    // El punto de spawn se desfasa lateralmente para que no arranquen todos en fila
+    const point = localPoint(frame, forward, lateralOffset);
+
+    // Elevamos el centro del volumen de patrulla en Y para que la caja no interséquela con el suelo
+    // DRONE_HOVER_HEIGHT suele ser ~4. Con un size.y de 4, el piso de la caja queda 2 metros arriba del puente.
+    const flightCenter = point.add(new Vector3(0, DRONE_HOVER_HEIGHT + 2, 0));
+
+    enemies.dummyKamikazeDrone.push({
+      position: point.add(new Vector3(0, DRONE_HOVER_HEIGHT, 0)), // Spawnearlos ya flotando
       forward: forwardOf(frame.heading).scale(-1),
-      fireDelaySeconds,
       patrol: {
-        volume: { kind: "sphere", center: flightCenter, radius: SENTINEL_PATROL_RADIUS },
-        plane: { point: flightCenter, normal: Vector3.Up() },
+        volume: {
+          kind: "box",
+          center: flightCenter,
+          size: new Vector3(8, 4, 10) // Ajustado: más estrecho y alto para evitar colisiones con el piso
+        },
       },
     });
   };
+
   const guardedBridge = (name: string, length: number): void => {
     const frame = addBridge(name, length, "none");
     for (let i = 0; i < SENTINELS_PER_BRIDGE; i += 1) {
       const fraction = (i + 1) / (SENTINELS_PER_BRIDGE + 1);
-      sentinelAt(frame, length * fraction, 0.5 + i);
+
+      // Alterna posiciones laterales (-3: Izquierda, 0: Centro, 3: Derecha) para espaciarlos en 3D
+      const lateralPositions = [-3, 0, 3];
+      const lateralOffset = lateralPositions[i % lateralPositions.length];
+
+      kamikazeAt(frame, length * fraction, lateralOffset);
     }
   };
 
@@ -460,8 +474,8 @@ export const LEVEL_06_FALL_Y: number = LAYOUT.lowestY - FALL_MARGIN;
 
 const planksClassifier =
   (mode: PlankMode) =>
-  (index: number): SolidKind | undefined =>
-    mode !== "none" && index % 12 === 6 ? mode : undefined;
+    (index: number): SolidKind | undefined =>
+      mode !== "none" && index % 12 === 6 ? mode : undefined;
 
 const buildLevel06Map = ({ scene }: ProceduralMapContext): ProceduralMapResult => {
   const solids: StaticSolid[] = [];
@@ -562,7 +576,7 @@ export const level06Definition: LevelDefinition = {
     enemies: {
       dummyTarget: LAYOUT.enemies.dummyTarget,
       staticDrone: LAYOUT.enemies.staticDrone,
-      sentinelDrone: LAYOUT.enemies.sentinelDrone,
+      dummyKamikazeDrone: LAYOUT.enemies.dummyKamikazeDrone,
     },
     items: [],
     other: [],
