@@ -29,7 +29,8 @@ const MIN_DAMAGE_DISTANCE = 1.8;     // 🟢 Radio de la explosión esférica pa
 
 const DEBUG_CONE_SEGMENTS = 16;
 const DEBUG_CONE_COLOR = new Color3(1, 0.45, 0);
-
+// 🟢 CONTROL GLOBAL DEL CONO DE VISIÓN (Cambiar a false para apagar por completo)
+const DISPLAY_DEBUG_CONE = false;
 export class DummyKamikazeDrone extends DroneBase {
   private readonly navigation: NavigationService;
   private readonly region: PatrolRegion | undefined;
@@ -281,6 +282,9 @@ export class DummyKamikazeDrone extends DroneBase {
   }
 
   private initDebugCone(scene: any): void {
+    // 🟢 Si la constante está apagada o no es entorno de desarrollo, salimos de inmediato
+    if (!DISPLAY_DEBUG_CONE || !import.meta.env.DEV) return;
+
     const totalPoints = DEBUG_CONE_SEGMENTS + 2;
     for (let i = 0; i < totalPoints; i++) this.debugConePoints.push(new Vector3());
 
@@ -294,7 +298,16 @@ export class DummyKamikazeDrone extends DroneBase {
   }
 
   private updateDebugCone(): void {
+    // 🟢 Si el cono no se inicializó, no hacemos ningún cálculo matemático
     if (!this.debugConeMesh) return;
+
+    // Si por alguna razón el dron está oculto/desactivado, apagamos la visibilidad de la línea
+    if (!this.root.isEnabled()) {
+      this.debugConeMesh.isVisible = false;
+      return;
+    }
+
+    this.debugConeMesh.isVisible = true;
 
     const centerOrigin = new Vector3(this.root.position.x, VISION_PLANE_Y, this.root.position.z);
     this.debugConePoints[0].copyFrom(centerOrigin);
@@ -315,11 +328,14 @@ export class DummyKamikazeDrone extends DroneBase {
       this.debugConePoints[i + 1].copyFrom(centerOrigin.add(rotatedDir.scale(DETECT_RADIUS)));
     }
     this.debugConePoints[this.debugConePoints.length - 1].copyFrom(centerOrigin);
+
     MeshBuilder.CreateLines("debugCone_" + this.id, {
       points: this.debugConePoints,
       instance: this.debugConeMesh
     });
   }
+
+
   private releaseDebug(): void {
     this.volumeDebug?.dispose();
     this.volumeDebug = null;
