@@ -24,7 +24,11 @@ export class Level08Strategy extends LevelStrategy {
     console.log("=============================================================");
 
     // Inicialización del controlador
-    this._entitiesController = new EntitiesController(this._managedUnits, this.character);
+    this._entitiesController = new EntitiesController(
+      this._managedUnits,
+      this.character,
+      this.enemies // 👈 Pasado de forma nativa
+    );
   }
 
   protected onTick(deltaTime: number): void {

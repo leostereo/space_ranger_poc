@@ -46,7 +46,29 @@ export function createEnemiesManager(spawns: EnemySpawns, deps: EnemyDeps): Enem
       if (!build) {
         throw new Error(`[createEnemiesManager] there is no builder registered for the enemy "${type}"`);
       }
-      entries.forEach((spawn, index) => manager.add(build(spawn, `${type}-${index + 1}`, deps)));
+
+
+      entries.forEach((spawn, index) => {
+        const enemy = build(spawn, `${type}-${index + 1}`, deps);
+
+        // Asociación del Group ID
+        if ((spawn as any).groupId) {
+          enemy.groupId = (spawn as any).groupId;
+        }
+
+        // 🟢 CORRECCIÓN DE ARRANQUE:
+        // Forzamos a que el dron nazca deshabilitado en Babylon si pertenece a un sector de Culling
+        const rootNode = (enemy as any).root;
+        if (rootNode && enemy.groupId && enemy.groupId === "bridge_zone_1") {
+          rootNode.setEnabled(false);
+
+          const debugCone = (enemy as any).debugConeMesh;
+          if (debugCone) debugCone.isVisible = false;
+        }
+
+        manager.add(enemy);
+      });
+
     }
   } catch (error) {
     manager.dispose(); // no dejar enemigos a medio crear

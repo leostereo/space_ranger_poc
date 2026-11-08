@@ -7,8 +7,8 @@ import type { UnitData, ManagedUnitInstance } from "../unit-builder.types";
 // 1. Configuración págana/lineal del nivel (Metadata)
 export const LEVEL_08_LAYOUT: UnitData[] = [
     { id: "start_zone", kind: "spawn_platform", length: 24, distanceToEnable: 0, enabledDefault: true },
-    { id: "empty_tunnel1", kind: "empty_tunnel", length: 60, distanceToEnable: 45, enabledDefault: true }, // 🟢 Conector intermedio
-    { id: "bridge_zone_1", kind: "kamikaze_bridge", length: 60, distanceToEnable: 45, enabledDefault: false }
+    { id: "empty_tunnel1", kind: "empty_tunnel", length: 60, distanceToEnable: 45, enabledDefault: true }, 
+    { id: "bridge_zone_1", kind: "kamikaze_bridge", length: 60, distanceToEnable: 45, enabledDefault: false },
 ];
 
 // 2. Contenedores de Runtime que usará la Strategy (inicialmente vacíos)
@@ -25,15 +25,14 @@ const createPreCalculatedSpawns = (): Level08PreCalculatedSpawns => {
     let currentZ = 0;
     const forwardDirection = new Vector3(0, 0, 1);
     const droneHoverHeight = 4;
-    const sentinelsPerBridge = 10;
+    const sentinelsPerBridge = 1;
     const dummyKamikazeDrone: EnemySpawn[] = [];
 
-    // Posición inicial del jugador en el centro de la plataforma de spawn
     const characterSpawn = new Vector3(0, 1, 10);
 
     LEVEL_08_LAYOUT.forEach((unit) => {
-
         const actualLength = unit.kind === "empty_tunnel" ? unit.length * 10 : unit.length;
+        
         if (unit.kind === "kamikaze_bridge") {
             for (let i = 0; i < sentinelsPerBridge; i++) {
                 const fraction = (i + 1) / (sentinelsPerBridge + 1);
@@ -53,8 +52,10 @@ const createPreCalculatedSpawns = (): Level08PreCalculatedSpawns => {
                             center: centerVolume,
                             size: new Vector3(8, 4, 10)
                         }
-                    }
-                });
+                    },
+                    // 🟢 ENLACE CON EL GRUPO: Guardamos el ID de la unidad en cada spawn procedural
+                    groupId: unit.id 
+                } as any); // Casteo provisorio para el compilador por si tu interfaz EnemySpawn no tiene el tipado
             }
         }
         currentZ += actualLength;

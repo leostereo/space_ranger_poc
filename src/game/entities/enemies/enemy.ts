@@ -11,6 +11,7 @@ export interface Enemy {
   /** false cuando fue destruido o liberado. */
   readonly isAlive: boolean;
   /** ¿Esta malla pertenece a este enemigo? Sirve para resolver a quién alcanzó un proyectil. */
+  groupId?: string;
   ownsMesh(mesh: AbstractMesh): boolean;
   update(deltaTime: number, playerPosition: Vector3): void;
   takeHit(hit: ProjectileHitPayload): void;
