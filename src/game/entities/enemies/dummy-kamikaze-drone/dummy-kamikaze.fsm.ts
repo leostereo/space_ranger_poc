@@ -1,10 +1,13 @@
+// src/game/entities/enemies/dummy-kamikaze/dummy-kamikaze.fsm.ts
+
 export type DummyKamikazeState =
   | "Patrol"
   | "Spotting"
   | "Chasing"
   | "Charging"
   | "Returning"
-  | "Exploding";
+  | "Exploding"
+  | "Shooted"; 
 
 export interface DummyKamikazeFsmCallbacks {
   readonly onEnterPatrol: () => void;
@@ -13,6 +16,7 @@ export interface DummyKamikazeFsmCallbacks {
   readonly onEnterCharging: () => void;
   readonly onEnterReturning: () => void;
   readonly onEnterExploding: () => void;
+  readonly onEnterShooted: () => void; 
 }
 
 /**
@@ -59,9 +63,9 @@ export class DummyKamikazeFsm {
   public transitionTo(newState: DummyKamikazeState): void {
     if (this._state === newState) return;
 
-    // if (import.meta.env.DEV) {
-    //   console.info(`[DummyKamikazeFsm] Transición: ${this._state} -> ${newState}`);
-    // }
+    if (import.meta.env.DEV) {
+      console.info(`[DummyKamikazeFsm] Transición: ${this._state} -> ${newState}`);
+    }
 
     this._state = newState;
     this._stateTimer = 0;
@@ -73,6 +77,7 @@ export class DummyKamikazeFsm {
       case "Charging":  this.callbacks.onEnterCharging(); break;
       case "Returning": this.callbacks.onEnterReturning(); break;
       case "Exploding": this.callbacks.onEnterExploding(); break;
+      case "Shooted":   this.callbacks.onEnterShooted(); break; // 🟢 Dispara comportamiento de derribo
     }
   }
 

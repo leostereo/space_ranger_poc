@@ -71,7 +71,7 @@ export abstract class DroneBase extends EnemyBase {
   /** Para efectos visuales (flotación, pitch, roll); cuelga de root. */
   protected readonly visual: TransformNode;
   private readonly meshes: Mesh[];
-  private readonly weapon: ProjectileWeaponController;
+  private readonly weapon: ProjectileWeaponController | null;
   private health = DRONE_HEALTH;
   private flashRemaining = 0;
   private released = false;
@@ -84,22 +84,14 @@ export abstract class DroneBase extends EnemyBase {
     const position = options.spawnAtExactPosition
       ? spawn.position.clone()
       : new Vector3(spawn.position.x, spawn.position.y + DRONE_HOVER_HEIGHT, spawn.position.z);
+
     const materials = {
       body: deps.registry.getMaterial(BODY_MATERIAL_KEY),
       accent: deps.registry.getMaterial(options.accentMaterial),
     };
 
-    // Si el drone configuró su propio builder lo usa; si no, cae en el buildDroneModelV2 por defecto
     const builder = options.customModelBuilder ?? buildDroneModelV2;
-
-    const model = builder(
-      deps.scene,
-      id,
-      materials,
-      position,
-      resolveForward(spawn.forward),
-      options.pitchToForward,
-    );
+    const model = builder(deps.scene, id, materials, position, resolveForward(spawn.forward), options.pitchToForward);
 
     this.root = model.root;
     this.visual = model.visual;
@@ -110,14 +102,18 @@ export abstract class DroneBase extends EnemyBase {
       mesh.overlayAlpha = HIT_FLASH_ALPHA;
     }
 
-    this.weapon = new ProjectileWeaponController(
-      deps.scene,
-      model.muzzle,
-      () => true, // el intervalo de 3 s lo marca la cadencia del arma
-      this.meshes, // sus propios meshes no frenan sus proyectiles
-      WEAPON_CONFIG,
-      { sourceId: id, isExtraTarget: deps.isPlayerMesh },
-    );
+    // 🟢 OPTIMIZACIÓN DE DETECCIÓN: 
+    // Solo creamos la infraestructura del pool físico si el dron realmente va a disparar proyectiles
+    if (this.armed) {
+      this.weapon = new ProjectileWeaponController(
+        deps.scene,
+        model.muzzle,
+        () => true,
+        this.meshes,
+        WEAPON_CONFIG,
+        { sourceId: id, isExtraTarget: deps.isPlayerMesh },
+      );
+    }
   }
 
   ownsMesh(mesh: AbstractMesh): boolean {
@@ -129,7 +125,9 @@ export abstract class DroneBase extends EnemyBase {
 
   protected onUpdate(deltaTime: number, playerPosition: Vector3): void {
     this.onThink(deltaTime, playerPosition);
-    if (this.armed) {
+
+    // 🟢 GUARDA DE SEGURIDAD: Solo corre el tick si el arma existe
+    if (this.armed && this.weapon) {
       this.weapon.tick(deltaTime);
     }
 
@@ -163,17 +161,21 @@ export abstract class DroneBase extends EnemyBase {
     this.release();
   }
 
-  /** Suelta arma y mallas una sola vez (puede llamarse al morir y de nuevo al liberar el nivel). */
   private release(): void {
     if (this.released) {
       return;
     }
     this.released = true;
-    this.weapon.dispose(); // primero: el fogonazo es hijo del muzzle
-    this.root.dispose(false, false); // los materiales son compartidos: no se liberan acá
+
+    // 🟢 GUARDA DE SEGURIDAD AL LIBERAR EL NIVEL
+    if (this.weapon) {
+      this.weapon.dispose();
+    }
+
+    this.root.dispose(false, false);
   }
 
-  private setFlash(on: boolean): void {
+  protected setFlash(on: boolean): void {
     for (const mesh of this.meshes) {
       mesh.renderOverlay = on;
     }

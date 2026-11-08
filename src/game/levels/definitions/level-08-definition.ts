@@ -25,7 +25,7 @@ const createPreCalculatedSpawns = (): Level08PreCalculatedSpawns => {
     let currentZ = 0;
     const forwardDirection = new Vector3(0, 0, 1);
     const droneHoverHeight = 4;
-    const sentinelsPerBridge = 1;
+    const sentinelsPerBridge = 10;
     const dummyKamikazeDrone: EnemySpawn[] = [];
 
     const characterSpawn = new Vector3(0, 1, 10);
