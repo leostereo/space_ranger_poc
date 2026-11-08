@@ -134,7 +134,7 @@ export class DummyKamikazeDrone extends DroneBase {
    * 🟢 FILTRO INTERCEPTOR DE DISPAROS DEL JUGADOR
    * Ignoramos el flujo de daño escalable de la clase base: un solo impacto lo derriba.
    */
-  protected override onHit(hit: ProjectileHitPayload): void {
+  protected override onHit(_hit: ProjectileHitPayload): void {
     if (this.fsm.state === "Shooted" || this.fsm.state === "Exploding") return;
 
     if (import.meta.env.DEV) {
