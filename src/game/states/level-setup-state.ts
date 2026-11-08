@@ -1,8 +1,10 @@
+// src/game/states/level-setup-state.ts
 import type { GameState, GameStateTransitioner } from "../fsm/game-state";
 import type { GameContext } from "../game-context";
 import CharacterBase from "../entities/character/character.base";
 import { createGroundPhysics } from "../levels/ground-physics";
-import { createLevelStrategy } from "../levels/level-factory";import type { LevelLoader, LevelLoadPhase } from "../levels/level-loader";
+import { createLevelStrategy } from "../levels/level-factory";
+import type { LevelLoader, LevelLoadPhase } from "../levels/level-loader";
 import type { LevelRepository } from "../levels/level-repository";
 import type { LevelSession } from "../levels/level-session";
 import { LoadingScreen } from "../screens/loading-screen";
@@ -10,6 +12,7 @@ import type { ScreenManager } from "../ui/screens/screen-manager";
 import { createEnemiesManager } from "../entities/enemies/enemy-factory";
 import { VolumePointSampler } from "../navigation/volume-point-sampler";
 import { Skybox } from "../levels/skybox";
+
 const PHASE_LABELS: Record<LevelLoadPhase, string> = {
   downloading: "Downloading map",
   optimizing: "Optimizing map",
@@ -18,9 +21,8 @@ const PHASE_LABELS: Record<LevelLoadPhase, string> = {
 
 /**
  * Estado 3 — Configuración de nivel.
- *  3A: elige el próximo nivel pendiente (si no hay, va al estado 8), libera el anterior y carga
- *      la geometría con progreso real.
- *  3B: arma el strategy del nivel (por ahora sin Character, EnemiesManager ni HUD) y pasa a "playing".
+ *  3A: Elige el próximo nivel pendiente, libera el anterior y carga la geometría.
+ *  3B: Arma el strategy del nivel inyectando de forma nativa mallas, personajes y enemigos.
  */
 export class LevelSetupState implements GameState {
   readonly id = "level-setup" as const;
@@ -39,8 +41,6 @@ export class LevelSetupState implements GameState {
   ) {}
 
   async enter(context: GameContext): Promise<void> {
-    const pad = navigator.getGamepads().find(Boolean);
-    // console.log(pad?.id, pad?.mapping, pad?.buttons.length, pad?.axes.length)
     this.exited = false;
     this.ready = false;
 
@@ -51,7 +51,7 @@ export class LevelSetupState implements GameState {
       return;
     }
 
-    const scope = this.session.begin(definition); // libera el nivel anterior
+    const scope = this.session.begin(definition); // Libera recursos del nivel anterior
     this.screens.show(this.screen);
     this.screen.setProgress(null);
     this.screen.setStatus(`Preparing ${definition.id}`);
@@ -61,10 +61,10 @@ export class LevelSetupState implements GameState {
     });
 
     try {
-      // 3A
+      // 🟢 FASE 3A: Carga e Infraestructura de la Geometría
       const map = await this.loader.load(definition, scope);
       if (!map || this.exited) {
-        return; // cancelada: exit() ya liberó el nivel
+        return; 
       }
 
       if (definition.skybox) {
@@ -75,15 +75,18 @@ export class LevelSetupState implements GameState {
       }
       this.session.complete(map);
 
-      // 3B
+      // 🟢 FASE 3B: Ensamblado Dinámico y Orquestación Core
       createGroundPhysics(map, context.scene, scope);
+      
       const character = await CharacterBase.create(context.scene, context.assets, definition.spawns.character, context.input);
       if (this.exited) {
-        character.dispose(); // la carga se canceló mientras se construía
+        character.dispose();
         return;
       }
-      scope.register(character); // se libera con el nivel, después de los suelos (orden inverso)
-      const navigation = scope.register(new VolumePointSampler()); // luego: servicio con navmesh real
+      scope.register(character); 
+      
+      const navigation = scope.register(new VolumePointSampler()); 
+      
       const enemies = scope.register(
         createEnemiesManager(definition.spawns.enemies, {
           scene: context.scene,
@@ -92,7 +95,21 @@ export class LevelSetupState implements GameState {
           navigation,
         }),
       );
-      this.session.setStrategy(createLevelStrategy({ context, definition, scope, map, character, enemies }));
+
+      // 🟢 FIX DE INYECCIÓN DATA-DRIVEN: 
+      // Se arma la estrategia pasando de forma nativa e incondicional 'managedUnits'.
+      // Si el mapa procedural las creó (Nivel 8), las inyecta en caliente. Si no (Niveles 1-7), manda un array vacío seguro.
+      this.session.setStrategy(
+        createLevelStrategy({ 
+          context, 
+          definition, 
+          scope, 
+          map, 
+          character, 
+          enemies,
+          managedUnits: map.managedUnits ?? []  
+        })
+      );
         
     } catch (error) {
       if (!this.exited) {
@@ -114,14 +131,10 @@ export class LevelSetupState implements GameState {
     this.unsubscribeProgress = null;
     this.screens.hide(this.screen);
     if (!this.ready) {
-      this.session.end(); // carga a medias o fallida: se limpia. Si terminó, el nivel sigue vivo para "playing".
+      this.session.end(); 
     }
   }
 
-  /**
-   * La transición se pide DESPUÉS de que enter() termine (macrotarea): así la FSM alcanza a
-   * activar este estado y el log muestra el tiempo real de carga, en vez de una transición pisada.
-   */
   private goTo(next: "playing" | "game-finished"): void {
     setTimeout(() => {
       if (!this.exited) {

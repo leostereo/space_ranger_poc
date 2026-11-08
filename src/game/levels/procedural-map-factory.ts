@@ -3,12 +3,14 @@ import type { Scene } from "@babylonjs/core/scene";
 
 import type { ProceduralMapSource, StaticShape, StaticSolid } from "./level-definition";
 import type { LevelScope } from "./level-scope";
+import { ManagedUnitInstance } from "./unit-builder.types";
 
 export interface LoadedProceduralMap {
   readonly meshes: readonly Mesh[];
   readonly ground: Mesh | null;
   readonly groundShape: StaticShape;
   readonly solids: readonly StaticSolid[];
+    readonly managedUnits?: readonly ManagedUnitInstance[]; 
 }
 
 /**
@@ -24,12 +26,21 @@ export function createProceduralMap(
     return null;
   }
 
-  const { ground = null, groundShape = "box", meshes = [], solids = [] } = source.build({ scene, scope });
+  // 🟢 CAPTURA: Extraemos 'managedUnits' del destructuring del builder (por defecto un array vacío)
+  const { 
+    ground = null, 
+    groundShape = "box", 
+    meshes = [], 
+    solids = [],
+    managedUnits = [] // 👈 Captura el level08ManagedUnits retornado en tu definición
+  } = source.build({ scene, scope });
+  
   if (ground) {
     scope.adopt(ground);
   }
   meshes.forEach((mesh) => scope.adopt(mesh));
   solids.forEach((solid) => scope.adopt(solid.mesh));
 
-  return { meshes, ground, groundShape, solids };
+  // 🟢 RETORNO CONECTADO: Pasamos la propiedad limpiamente hacia el LevelLoader
+  return { meshes, ground, groundShape, solids, managedUnits };
 }

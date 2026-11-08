@@ -4,6 +4,7 @@ import type { Scene } from "@babylonjs/core/scene";
 
 import type { PatrolRegion } from "../navigation/patrol-region";
 import type { LevelScope } from "./level-scope";
+import { ManagedUnitInstance } from "./unit-builder.types";
 
 /** Tipos de enemigo que un nivel puede pedir. */
 export type EnemyType =
@@ -105,6 +106,7 @@ export interface ProceduralMapResult {
   readonly meshes?: readonly Mesh[];
   /** Mallas que no son suelo pero deben colisionar (paredes, túneles, etc.). */
   readonly solids?: readonly StaticSolid[];
+  managedUnits?: ManagedUnitInstance[];
 }
 
 /** Mapa creado por código con primitivas de Babylon. Las mallas que devuelve las adopta el LevelScope. */

@@ -8,6 +8,7 @@ import type { GlbMapSource, LevelDefinition, MapMeshRole, StaticShape, StaticSol
 import { createGlbMap, type LoadedGlbMap, type LoadedMap } from "./level-map-factory";
 import type { LevelScope } from "./level-scope";
 import { createProceduralMap } from "./procedural-map-factory";
+import { ManagedUnitInstance } from "./unit-builder.types";
 
 /** Qué parte de la barra ocupa la descarga; el resto es el procesamiento (fusión de mallas). */
 const DOWNLOAD_PROGRESS_WEIGHT = 0.8;
@@ -44,6 +45,9 @@ export class LevelLoader {
     const groundShapes = new Map<Mesh, StaticShape>();
     const solids: StaticSolid[] = [];
     const proceduralMeshes: Mesh[] = [];
+
+    // 🟢 ACUMULADOR CORE: Para capturar las unidades de todos los mapas procedurales del nivel
+    const managedUnits: ManagedUnitInstance[] = []; 
     let droppedMeshCount = 0;
 
     for (let index = 0; index < maps.length; index++) {
@@ -55,34 +59,39 @@ export class LevelLoader {
         });
       };
 
-      if (source.kind === "glb") {
-        const loaded = await this.loadGlb(source, scope, report);
-        if (!loaded) {
-          return null;
-        }
-        loaded.merged.forEach((mesh, role) => {
-          if (merged.has(role)) {
-            console.warn(`[LevelLoader] the role "${role}" is defined by more than one map of "${definition.id}"`);
-          }
-          merged.set(role, mesh);
-        });
-        grounds.push(loaded.ground);
-        droppedMeshCount += loaded.droppedMeshCount;
-      } else {
-        report("building", 0);
-        const built = createProceduralMap(source, this.scene, scope);
-        if (!built) {
-          return null;
-        }
-        if (built.ground) {
-          grounds.push(built.ground);
-          groundShapes.set(built.ground, built.groundShape);
-        }
-        proceduralMeshes.push(...built.meshes);
-        solids.push(...built.solids);
-        report("building", 1);
+    if (source.kind === "glb") {
+      const loaded = await this.loadGlb(source, scope, report);
+      if (!loaded) {
+        return null;
       }
+      loaded.merged.forEach((mesh, role) => {
+        if (merged.has(role)) {
+          console.warn(`[LevelLoader] the role "${role}" is defined by more than one map of "${definition.id}"`);
+        }
+        merged.set(role, mesh);
+      });
+      grounds.push(loaded.ground);
+      droppedMeshCount += loaded.droppedMeshCount;
+    } else {
+      report("building", 0);
+      const built = createProceduralMap(source, this.scene, scope);
+      if (!built) {
+        return null;
+      }
+      if (built.ground) {
+        grounds.push(built.ground);
+        groundShapes.set(built.ground, built.groundShape);
+      }
+      proceduralMeshes.push(...built.meshes);
+      solids.push(...built.solids);
+
+      if (built.managedUnits) {
+        managedUnits.push(...built.managedUnits);
+      }
+
+      report("building", 1);
     }
+  }
 
     if (grounds.length === 0) {
       throw new Error(`[LevelLoader] the level "${definition.id}" has no ground in any of its maps`);
@@ -94,7 +103,18 @@ export class LevelLoader {
       mergedGroups: merged.size,
       droppedMeshes: droppedMeshCount,
     });
-    return { merged, ground: grounds[0], grounds, groundShapes, solids, proceduralMeshes, droppedMeshCount };
+
+    // 🟢 RETORNO FINAL CONECTADO: Inyectamos el acumulador nativamente en el objeto LoadedMap
+    return {
+      merged,
+      ground: grounds[0],
+      grounds,
+      groundShapes,
+      solids,
+      proceduralMeshes,
+      droppedMeshCount,
+      managedUnits
+    };
   }
 
   private async loadGlb(

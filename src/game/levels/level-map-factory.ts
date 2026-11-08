@@ -6,6 +6,7 @@ import { Tools } from "@babylonjs/core/Misc/tools";
 import { yieldToBrowser } from "../core/async/yield-to-browser";
 import type { GlbMapSource, MapMeshGroup, MapMeshMatcher, MapMeshRole, StaticShape, StaticSolid } from "./level-definition";
 import type { LevelScope } from "./level-scope";
+import { ManagedUnitInstance } from "./unit-builder.types";
 
 /** Nombre del nodo raíz que el loader de glTF crea alrededor de cada GLB. */
 const GLTF_ROOT_NODE_NAME = "__root__";
@@ -34,6 +35,7 @@ export interface LoadedMap {
   readonly solids: readonly StaticSolid[];
   readonly proceduralMeshes: readonly Mesh[];
   readonly droppedMeshCount: number;
+  readonly managedUnits?: ManagedUnitInstance[]; 
 }
 
 const matches = (name: string, matcher: MapMeshMatcher): boolean =>

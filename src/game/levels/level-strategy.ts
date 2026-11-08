@@ -1,3 +1,4 @@
+// src/game/level-strategy.ts
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { TypedEventEmitter } from "../core/events/typed-event-emitter";
@@ -7,9 +8,12 @@ import type { LevelDefinition } from "./level-definition";
 import type { LoadedMap } from "./level-map-factory";
 import type { LevelScope } from "./level-scope";
 import { createLevelLighting } from "./level-lighting";
-export type LevelOutcome = "completed" | "failed";
 import type { EnemiesManager } from "../entities/enemies/enemies-manager";
 import { PlayerShotDebugEmitter } from "../debug/player-shot-debug-emitter";
+import type { ManagedUnitInstance } from "./unit-builder.types";
+
+export type LevelOutcome = "completed" | "failed";
+
 export interface LevelStrategyEventMap {
   levelFinished: { outcome: LevelOutcome };
 }
@@ -21,21 +25,13 @@ export interface LevelStrategyDeps {
   readonly map: LoadedMap;
   readonly character: CharacterBase;
   readonly enemies: EnemiesManager;
+  readonly managedUnits: ManagedUnitInstance[]; // 🟢 OBLIGATORIO A PARTIR DE AHORA
 }
 
 type Phase = "created" | "playing" | "paused" | "finished" | "disposed";
 
-/**
- * Director del gameplay de un nivel durante el estado 4 (template method).
- * Cada nivel hereda y define sus reglas (onTick / checkWin / checkLose).
- *
- * No conoce la FSM: avisa con el evento `levelFinished` y el estado `playing` decide la transición.
- * Los recursos de nivel los libera el LevelScope; acá se libera lo propio de la partida.
- */
-
-
 export abstract class LevelStrategy {
-  readonly DEATH_TO_GAME_OVER_DELAY_SECONDS = 2.5; // deja ver la animación de muerte antes de la pantalla de derrota
+  readonly DEATH_TO_GAME_OVER_DELAY_SECONDS = 2.5;
   readonly events = new TypedEventEmitter<LevelStrategyEventMap>();
 
   protected readonly context: GameContext;
@@ -44,6 +40,7 @@ export abstract class LevelStrategy {
   protected readonly map: LoadedMap;
   protected readonly character: CharacterBase;
   protected readonly enemies: EnemiesManager;
+  protected readonly _managedUnits: ManagedUnitInstance[]; // 🟢 Visible para subclases
 
   private phase: Phase = "created";
   private pausedAnimationGroups: AnimationGroup[] = [];
@@ -57,28 +54,27 @@ export abstract class LevelStrategy {
     this.map = deps.map;
     this.character = deps.character;
     this.enemies = deps.enemies;
+    this._managedUnits = deps.managedUnits; // 🟢 Inyección core
+    
     createLevelLighting(this.context.scene, this.scope);
     if (import.meta.env.DEV) {
       this.shotDebugEmitter = new PlayerShotDebugEmitter();
     }
   }
 
-  /** Dónde debe aparecer el Character (definido por el nivel). */
   protected get characterSpawn(): Vector3 {
     return this.definition.spawns.character;
   }
 
-  /** Arranque (desde 3B). */
   play(): void {
     if (this.phase !== "created") {
       throw new Error(`[LevelStrategy] play() called in phase "${this.phase}"`);
     }
     this.phase = "playing";
-    this.character.activateCamera(); // la cámara del Character manda sobre cualquier otra que arme el nivel
+    this.character.activateCamera();
     this.onPlay();
   }
 
-  /** Congela la partida: física y animaciones. El render de Babylon sigue activo. */
   pause(): void {
     if (this.phase !== "playing") {
       return;
@@ -99,26 +95,24 @@ export abstract class LevelStrategy {
     }
     this.phase = "playing";
     this.context.scene.physicsEnabled = this.physicsWasEnabled;
-    this.pausedAnimationGroups.forEach((group) => group.restart()); // retoma desde donde quedó
+    this.pausedAnimationGroups.forEach((group) => group.restart());
     this.pausedAnimationGroups = [];
     this.enemies.resume();
     this.onResume();
   }
 
-  /** Un frame de juego. Orden: entidades -> hook del nivel -> reglas de victoria/derrota. */
   tick(deltaTime: number): void {
     if (this.phase !== "playing") {
       return;
     }
     this.character.update(deltaTime);
     
-    // Captura la posición actual del root del personaje (o la prop que exponga tu CharacterBase)
     const currentCharacterPos = this.character.position;
     this.enemies.update(deltaTime, currentCharacterPos);
     
     this.onTick(deltaTime);    
     if (this.phase !== "playing") {
-      return; // onTick pudo terminar el nivel
+      return;
     }
     if (this.checkWin()) {
       this.finish("completed");
@@ -127,14 +121,12 @@ export abstract class LevelStrategy {
     }
   }
 
-  /** SOLO PARA DEPURACIÓN: fuerza el resultado del nivel. */
   forceOutcome(outcome: LevelOutcome): void {
     if (this.phase === "playing") {
       this.finish(outcome);
     }
   }
 
-  /** Idempotente. */
   dispose(): void {
     if (this.phase === "disposed") {
       return;
@@ -153,7 +145,6 @@ export abstract class LevelStrategy {
   protected onResume(): void {}
   protected onDispose(): void {}
 
-  /** Termina el nivel una sola vez y avisa. */
   protected finish(outcome: LevelOutcome): void {
     if (this.phase !== "playing") {
       return;

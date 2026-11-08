@@ -1,28 +1,36 @@
 // src/game/strategies/level-08-strategy.ts
-import { level08ManagedUnits } from "../definitions/level-08-definition";
-import { LevelStrategy } from "../level-strategy"; // Tu import base
+import { EntitiesController } from "../entities-controller";
+import { LevelStrategy, type LevelStrategyDeps } from "../level-strategy";
 
 export class Level08Strategy extends LevelStrategy {
-  
+  private _entitiesController!: EntitiesController;
+
+  constructor(deps: LevelStrategyDeps) {
+    super(deps);
+  }
+
   protected override onPlay(): void {
     super.onPlay();
 
-    // 🟢 AQUÍ TENÉS TODA LA INFO DISPONIBLE DESDE EL PRIMER FRAME:
-    console.log("--- Datos Disponibles para diseñar tu optimización ---");
+    // 🟢 LOG DE VERIFICACIÓN (Imprime las mallas inyectadas desde el Setup)
+    console.log("=== [Level08Strategy] Verificando Managed Units Inyectadas ===");
+    console.log(`Total de unidades gestionadas recibidas: ${this._managedUnits.length}`);
     
-    level08ManagedUnits.forEach((unit) => {
-      console.log(`Unidad ID: ${unit.id} (${unit.kind})`);
-      console.log(`-> Centro Geométrico en 3D:`, unit.centerPosition);
-      console.log(`-> Distancia de activación configurada: ${unit.distanceToEnable} metros`);
-      console.log(`-> Cantidad de mallas físicas en Babylon: ${unit.meshes.length}`);
-      console.log(`-> Cantidad de enemigos pre-calculados: ${unit.enemySpawns.length}`);
-      console.log(`-> ¿Está activa ahora mismo en escena?: ${unit.isCurrentlyActive}`);
+    this._managedUnits.forEach((unit) => {
+      console.log(`- Unidad: [${unit.id}] de tipo (${unit.kind})`);
+      console.log(`  Mallas físicas listas: ${unit.meshes?.length ?? 0}`);
+      console.log(`  Enemigos precalculados: ${unit.enemySpawns?.length ?? 0}`);
     });
+    console.log("=============================================================");
+
+    // Inicialización del controlador
+    this._entitiesController = new EntitiesController(this._managedUnits, this.character);
   }
 
   protected onTick(deltaTime: number): void {
-    // Tu lógica de gameplay limpia.
-    // Cuando quieras diseñar tu controlador, sólo leerás el array `level08ManagedUnits`.
+    if (this._entitiesController) {
+      this._entitiesController.update(deltaTime);
+    }
   }
 
   protected checkWin(): boolean { return false; }

@@ -68,39 +68,32 @@ const PRE_SPAWNS = createPreCalculatedSpawns();
 
 // 4. El constructor procedural del mapa (Invocado por BabylonJS en tiempo de juego)
 const buildLevel08Map = ({ scene }: ProceduralMapContext): ProceduralMapResult => {
-  // Construye las mallas físicas
+    // Construye las mallas físicas en runtime
   level08ManagedUnits = buildLevelUnits(scene, LEVEL_08_LAYOUT);
 
   const solids: StaticSolid[] = [];
 
   level08ManagedUnits.forEach(unit => {
-    unit.meshes.forEach(mesh => {
-      // 🟢 CORRECCIÓN: Si el nombre incluye "-tube", NO lo agregamos a los sólidos colisionables.
-      // De esta forma, el cascarón del túnel se vuelve totalmente traspasable por disparos y por el jugador.
+      unit.meshes.forEach(mesh => {
       if (mesh.name.includes("-tube")) {
-        mesh.checkCollisions = false; // Nos aseguramos a nivel Babylon que no intercepte nada
+          mesh.checkCollisions = false;
         return; 
       }
-
-      // El resto de mallas (plataformas de spawn, tablones del puente, y el piso del túnel "-track") 
-      // sí se registran normalmente como cajas o mallas de colisión rígidas.
-      solids.push({
-        mesh: mesh,
-        shape: "box"
-      });
+        solids.push({ mesh: mesh, shape: "box" });
     });
   });
 
-  // Extraemos la malla de la plataforma de spawn para cumplir el contrato del motor
   const groundMesh = level08ManagedUnits[0]?.meshes[0];
   if (!groundMesh) {
     throw new Error("[Level 08] Error fatal: No se pudo determinar la malla de suelo base.");
   }
 
+    // 🟢 RETORNO REFACTOREADO DINÁMICAMENTE:
   return { 
     ground: groundMesh, 
     groundShape: "mesh", 
-    solids 
+      solids,
+      managedUnits: level08ManagedUnits // 👈 Lo metemos de forma nativa en el mapa cargado
   };
 };
 
