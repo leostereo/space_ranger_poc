@@ -22,7 +22,8 @@ const FUEL_DRAIN_RATE = 1;
 const HOVER_SPRING_STRENGTH = 20;
 const HOVER_DAMPING = 8;
 const HOVER_MAX_FORCE_FACTOR = 8;
-const THRUST_FORCE = 1400;
+const THRUST_FORCE = 2400; // force up
+const ON_DESCEND_SPEED = 5.0;
 
 const BOB_AMPLITUDE = 0.15;
 const BOB_FREQUENCY = 0.5;
@@ -139,6 +140,7 @@ export class JetpackPhysicsController implements IPhysicsController {
       this._updateShootingPitch(dt); // NUEVO — mismo lerp visual, sin fuerza asociada
     }
 
+    const { crouch } = this.getInput(); 
     const cruisePitching = subState === "Cruising" && (forward || backward);
 
     if (cruisePitching) {
@@ -152,8 +154,14 @@ export class JetpackPhysicsController implements IPhysicsController {
         this.characterAggregate.body.setLinearVelocity(new Vector3(velocity.x, clampedY, velocity.z));
         this.wasCruisePitching = false;
       }
-      this._applyHoverSpringDamper();
+
+    // CORRECCIÓN: Usamos crouch en lugar de cruise para modificar la altura objetivo
+    if (crouch && (subState === "On" || subState === "Shooting")) {
+      this.hoverTargetHeight -= ON_DESCEND_SPEED * dt;
     }
+
+    this._applyHoverSpringDamper();
+  }
 
     if (subState === "Cruising") {
       this._applyCruiseForward();

@@ -4,6 +4,8 @@ import { LevelStrategy, type LevelStrategyDeps } from "../level-strategy";
 
 export class Level08Strategy extends LevelStrategy {
   private _entitiesController!: EntitiesController;
+  private secondsDead = 0;
+  private DISPLAY_UNITS_LOGS = false;
 
   constructor(deps: LevelStrategyDeps) {
     super(deps);
@@ -12,16 +14,17 @@ export class Level08Strategy extends LevelStrategy {
   protected override onPlay(): void {
     super.onPlay();
 
-    // 🟢 LOG DE VERIFICACIÓN (Imprime las mallas inyectadas desde el Setup)
-    console.log("=== [Level08Strategy] Verificando Managed Units Inyectadas ===");
-    console.log(`Total de unidades gestionadas recibidas: ${this._managedUnits.length}`);
-    
-    this._managedUnits.forEach((unit) => {
-      console.log(`- Unidad: [${unit.id}] de tipo (${unit.kind})`);
-      console.log(`  Mallas físicas listas: ${unit.meshes?.length ?? 0}`);
-      console.log(`  Enemigos precalculados: ${unit.enemySpawns?.length ?? 0}`);
-    });
-    console.log("=============================================================");
+    if (this.DISPLAY_UNITS_LOGS) {
+      console.log("=== [Level08Strategy] Verificando Managed Units Inyectadas ===");
+      console.log(`Total de unidades gestionadas recibidas: ${this._managedUnits.length}`);
+
+      this._managedUnits.forEach((unit) => {
+        console.log(`- Unidad: [${unit.id}] de tipo (${unit.kind})`);
+        console.log(`  Mallas físicas listas: ${unit.meshes?.length ?? 0}`);
+        console.log(`  Enemigos precalculados: ${unit.enemySpawns?.length ?? 0}`);
+      });
+      console.log("=============================================================");
+    }
 
     // Inicialización del controlador
     this._entitiesController = new EntitiesController(
@@ -38,5 +41,8 @@ export class Level08Strategy extends LevelStrategy {
   }
 
   protected checkWin(): boolean { return false; }
-  protected checkLose(): boolean { return this.character.isDead; }
+  protected checkLose(): boolean {
+    return this.secondsDead >= this.DEATH_TO_GAME_OVER_DELAY_SECONDS;
+  }
+
 }
