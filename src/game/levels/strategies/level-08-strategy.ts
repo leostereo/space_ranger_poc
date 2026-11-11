@@ -33,7 +33,6 @@ export class Level08Strategy extends LevelStrategy {
       this.enemies,
       this.physicsBodies
     );
-    console.log(this.physicsBodies)
   }
 
   protected onTick(deltaTime: number): void {
@@ -52,4 +51,7 @@ export class Level08Strategy extends LevelStrategy {
     return this.secondsDead >= this.DEATH_TO_GAME_OVER_DELAY_SECONDS;
   }
 
+  protected onDispose(): void {
+    this._entitiesController.dispose();
+  }
 }

@@ -29,7 +29,7 @@ export function buildLevelUnits(scene: Scene, layout: UnitData[]): ManagedUnitIn
     const result = builderFn(scene, unit, currentPosition, forwardDirection);
 
     // Babylon desactiva el render/física inicial si no está marcado por defecto
-    result.meshes.forEach(mesh => mesh.setEnabled(unit.enabledDefault));
+    //result.meshes.forEach(mesh => mesh.setEnabled(unit.enabledDefault));
 
     managedUnits.push({
       id: unit.id,

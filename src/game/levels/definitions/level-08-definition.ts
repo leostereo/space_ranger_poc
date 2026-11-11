@@ -7,47 +7,46 @@ import { calculateParametricEndPosition } from "../builders/parametric-path.buil
 
 // 1. Configuración págana/lineal del nivel (Metadata)
 export const LEVEL_08_LAYOUT: UnitData[] = [
-    { 
-        id: "start_zone", 
-        kind: "spawn_platform", 
-        length: 24, 
-        distanceToEnable: 0, 
-        enabledDefault: true 
+    {
+        id: "start_zone",
+        kind: "spawn_platform",
+        length: 24,
+        distanceToEnable: 0,
+        enabledDefault: true
     },
-        { id: "empty_tunnel1", kind: "empty_tunnel", length: 10, distanceToEnable: 0, enabledDefault: true }, 
-    { 
-        id: "pp_test_recto", 
-        kind: "parametric_path", 
-        length: 100, // Largo de referencia
-        distanceToEnable: 120, 
-        enabledDefault: true,
+    {
+        id: "pp_test_recto",
+        kind: "parametric_path",
+        length: 250, // Largo de referencia
+        distanceToEnable: 260,
+        enabledDefault: false,
         parametricConfig: {
             segmentLength: 25,
-            straightSegments: 4,   // 4 tramos de 25m = 100 metros totalmente rectos
+            straightSegments: 10,   // 4 tramos de 25m = 100 metros totalmente rectos
             upSegments: 0,         // Sin subidas
-            downSegments: 0,       // Sin bajadas
+            downSegments: 3,       // Sin bajadas
             curveRightSegments: 0, // Sin curvas a la derecha
             curveLeftSegments: 0,  // Sin curvas a la izquierda
-            includeTunnel: false,  // Sin carcasa de tubo para tener vista despejada
-            
+            includeTunnel: true,  // Sin carcasa de tubo para tener vista despejada
+
             // 1 obstáculo de cada tipo para inspección visual:
-            jumpCount: 1,          // 1 valla de salto (verde)
-            dodgeCount: 2,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
-            breakableCount: 1      // 1 bloque destruible (rojo)
+            jumpCount: 0,          // 1 valla de salto (verde)
+            dodgeCount: 0,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
+            breakableCount: 4      // 1 bloque destruible (rojo)
         }
     },
-    { 
-        id: "bridge_zone_1", 
-        kind: "kamikaze_bridge", 
-        length: 160, 
-        distanceToEnable: 180, 
-        enabledDefault: false 
+    {
+        id: "bridge_zone_1",
+        kind: "kamikaze_bridge",
+        length: 160,
+        distanceToEnable: 180,
+        enabledDefault: false
     },
-    { 
-        id: "speed_tunnel_procedural", 
-        kind: "parametric_path", 
-        length: 200, // Largo total base estimado
-        distanceToEnable: 250, 
+    {
+        id: "speed_tunnel_procedural",
+        kind: "parametric_path",
+        length: 100, // Largo total base estimado
+        distanceToEnable: 160,
         enabledDefault: false,
         parametricConfig: {
             segmentLength: 25,
@@ -60,10 +59,10 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
             dodgeCount: 6,
             jumpCount: 3,
             breakableCount: 5,
-            includeTunnel:false
-            
+            includeTunnel: false
+
         }
-    }, 
+    },
 
 ];
 
@@ -90,11 +89,11 @@ const createPreCalculatedSpawns = (): Level08PreCalculatedSpawns => {
         if (unit.kind === "parametric_path" && unit.parametricConfig) {
             // 🟢 Avanza el cursor 3D al punto exacto donde termina la curva/subida
             currentPos = calculateParametricEndPosition(currentPos, unit.parametricConfig);
-            return; 
+            return;
         }
 
         const actualLength = unit.kind === "empty_tunnel" ? unit.length * 10 : unit.length;
-        
+
         if (unit.kind === "kamikaze_bridge") {
             for (let i = 0; i < sentinelsPerBridge; i++) {
                 const fraction = (i + 1) / (sentinelsPerBridge + 1);
@@ -103,11 +102,11 @@ const createPreCalculatedSpawns = (): Level08PreCalculatedSpawns => {
 
                 // 🟢 Sumamos el desfase sobre el currentPos real (incluyendo X e Y heredados)
                 const spawnPos = currentPos.add(new Vector3(
-                    lateralOffset, 
-                    droneHoverHeight, 
+                    lateralOffset,
+                    droneHoverHeight,
                     actualLength * fraction
                 ));
-                
+
                 const centerVolume = spawnPos.add(new Vector3(0, 2, 0));
 
                 dummyKamikazeDrone.push({
@@ -120,11 +119,11 @@ const createPreCalculatedSpawns = (): Level08PreCalculatedSpawns => {
                             size: new Vector3(8, 4, 10)
                         }
                     },
-                    groupId: unit.id 
+                    groupId: unit.id
                 } as any);
             }
         }
-        
+
         // Avanzamos el cursor lineal para bloques rectos
         currentPos = currentPos.add(forwardDirection.scale(actualLength));
     });
@@ -139,54 +138,57 @@ const PRE_SPAWNS = createPreCalculatedSpawns();
 // 4. El constructor procedural del mapa (Invocado por BabylonJS en tiempo de juego)
 
 const buildLevel08Map = ({ scene }: ProceduralMapContext): ProceduralMapResult => {
-  // Construye las mallas físicas en runtime de forma secuencial
-  level08ManagedUnits = buildLevelUnits(scene, LEVEL_08_LAYOUT);
+    level08ManagedUnits = buildLevelUnits(scene, LEVEL_08_LAYOUT);
 
-  const solids: StaticSolid[] = [];
-  const floorsToMerge: Mesh[] = []; // 🟢 Lote para acumular todas las mallas que serán "suelo útil"
+    const solids: StaticSolid[] = [];
+    let groundMesh: Mesh | undefined;
 
-level08ManagedUnits.forEach(unit => {
-  // 🟢 FIX: Si la unidad nace apagada por culling, no la metemos en los sólidos físicos estáticos del mapa
-  if (!unit.enabledDefault) {
-    return;
-  }
+    level08ManagedUnits.forEach(unit => {
+        unit.meshes.forEach((mesh, index) => {
+            // 1. La plataforma de salida es el ground base permanente del nivel
+            if (unit.kind === "spawn_platform" && index === 0) {
+                mesh.checkCollisions = true;
+                groundMesh = mesh as Mesh;
+                return;
+            }
 
-  unit.meshes.forEach((mesh, index) => {
-    if (mesh.name.includes("-tube")) {
-      mesh.checkCollisions = false;
-      return; 
+            // 2. La pista del parametric_path se registra como sólido poligonal ("mesh") individual
+            if (mesh.name.includes("-track")) {
+                mesh.checkCollisions = true;
+                solids.push({ mesh: mesh as Mesh, shape: "mesh" });
+                return;
+            }
+
+            // 3. El tubo envolvente (si está activo) también usa forma poligonal hueca
+            if (mesh.name.includes("-tube")) {
+                mesh.checkCollisions = true;
+                solids.push({ mesh: mesh as Mesh, shape: "mesh" });
+                return;
+            }
+
+            // 4. Obstáculos individuales y tablones/barandas del puente
+            const isBreakable = mesh.name.includes("-breakable");
+            solids.push({
+                mesh: mesh as Mesh,
+                shape: "box",
+                ...(isBreakable ? { kind: "breakable" } : {})
+            });
+        });
+    });
+
+    if (!groundMesh) {
+        throw new Error("[Level 08] Error fatal: No se pudo determinar la malla de suelo base.");
     }
-    if (mesh.name.includes("-track") || (unit.kind === "spawn_platform" && index === 0)) {
-      mesh.checkCollisions = true;
-      floorsToMerge.push(mesh as Mesh);
-      return;
-    }
-    solids.push({ mesh: mesh, shape: "box" });
-  });
-});
 
-  // 3. FUSIÓN DINÁMICA DE SUELOS DE PUNTA A PUNTA
-  if (floorsToMerge.length === 0) {
-    throw new Error("[Level 08] Error fatal: No se encontraron mallas para conformar el suelo base.");
-  }
-
-  // Combinamos la plataforma inicial y la pista paramétrica en una única entidad 'ground' continua
-  const groundMesh = Mesh.MergeMeshes(floorsToMerge, true, true, undefined, false, true);
-  if (!groundMesh) {
-    throw new Error("[Level 08] Error fatal: Falló la fusión de mallas de suelo (MergeMeshes).");
-  }
-  
-  groundMesh.name = "level08-unified-ground";
-  groundMesh.checkCollisions = true;
-
-  // 🟢 RETORNO REFACTOREADO Y UNIFICADO CON SOPORTE COMPLETO:
-  return { 
-    ground: groundMesh,     // Ahora el ground contiene la plataforma Y la pista curva junta
-    groundShape: "mesh",    // Mantiene colisión poligonal milimétrica para la patineta
-    solids,                 // Obstáculos limpios e independientes
-    managedUnits: level08ManagedUnits 
-  };
+    return {
+        ground: groundMesh,
+        groundShape: "box",
+        solids,
+        managedUnits: level08ManagedUnits
+    };
 };
+
+
 
 
 // 5. Definición final limpia y apta para tu Registro de Niveles

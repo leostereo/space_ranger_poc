@@ -45,6 +45,10 @@ export async function buildJetpackStrategy(
     weaponMuzzle,
     () => characterFsm.jetpackSubFsm.getState() === "Shooting", // CAMBIADO — el predicado ahora vive acá, no adentro del controller
     [characterAggregate.transformNode as AbstractMesh],
+    undefined,
+    {
+      sourceId: 'player'
+    }
   );
 
   const strategy: IVehicleStrategy = {

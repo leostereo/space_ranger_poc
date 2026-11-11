@@ -55,6 +55,10 @@ export async function buildStandAloneStrategy(
     weaponMuzzle,
     combat.isAiming,
     [characterAggregate.transformNode as AbstractMesh],
+    undefined,
+    {
+      sourceId:'player'
+    }
   );
 
   const aim = new StandAloneAimController({
