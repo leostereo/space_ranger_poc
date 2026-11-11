@@ -42,13 +42,27 @@ const createTrackMaterial = (scene: Scene, name: string, color: Color3): Standar
   return material;
 };
 
+/** Calcula el largo individual de cada tramo dividiendo el largo total de la unidad */
+function getSegmentLength(totalLength: number, config: ParametricPathConfig): number {
+  const totalSegments = Math.max(
+    1,
+    config.straightSegments +
+    config.upSegments +
+    config.downSegments +
+    config.curveRightSegments +
+    config.curveLeftSegments
+  );
+  return totalLength / totalSegments;
+}
+
 /** Función pura compartida para calcular el final del camino sin instanciar mallas */
 export function calculateParametricEndPosition(
-  startPosition: Vector3, 
+  startPosition: Vector3,
+  totalLength: number, // 🟢 Ahora recibe unit.length
   config: ParametricPathConfig
 ): Vector3 {
   let lastPoint = startPosition.clone();
-  const segLen = config.segmentLength;
+  const segLen = getSegmentLength(totalLength, config);
 
   lastPoint = lastPoint.add(new Vector3(0, 0, segLen * config.straightSegments));
   lastPoint = lastPoint.add(new Vector3(0, segLen * 0.2 * config.upSegments, segLen * config.upSegments));
@@ -75,7 +89,7 @@ export function buildParametricPath(
   // 1. GENERACIÓN DEL CAMINO 3D (Puntos de control base)
   const controlPoints: Vector3[] = [currentPosition.clone()];
   let lastPoint = currentPosition.clone();
-  const segLen = config.segmentLength;
+  const segLen = getSegmentLength(unit.length, config);
 
   for (let i = 0; i < config.straightSegments; i++) {
     lastPoint = lastPoint.add(new Vector3(0, 0, segLen));

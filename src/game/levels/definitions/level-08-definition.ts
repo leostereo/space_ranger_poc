@@ -17,11 +17,10 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
     {
         id: "pp_test_recto",
         kind: "parametric_path",
-        length: 250, // Largo de referencia
-        distanceToEnable: 260,
+        length: 150, // Largo de referencia
+        distanceToEnable: 160,
         enabledDefault: false,
         parametricConfig: {
-            segmentLength: 25,
             straightSegments: 10,   // 4 tramos de 25m = 100 metros totalmente rectos
             upSegments: 0,         // Sin subidas
             downSegments: 3,       // Sin bajadas
@@ -45,11 +44,10 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
     {
         id: "speed_tunnel_procedural",
         kind: "parametric_path",
-        length: 100, // Largo total base estimado
-        distanceToEnable: 160,
+        length: 50, // Largo total base estimado
+        distanceToEnable: 60,
         enabledDefault: false,
         parametricConfig: {
-            segmentLength: 25,
             straightSegments: 4,
             upSegments: 2,
             downSegments: 2,
@@ -86,9 +84,9 @@ const createPreCalculatedSpawns = (): Level08PreCalculatedSpawns => {
     const characterSpawn = new Vector3(0, 1, 10);
 
     LEVEL_08_LAYOUT.forEach((unit) => {
+
         if (unit.kind === "parametric_path" && unit.parametricConfig) {
-            // 🟢 Avanza el cursor 3D al punto exacto donde termina la curva/subida
-            currentPos = calculateParametricEndPosition(currentPos, unit.parametricConfig);
+            currentPos = calculateParametricEndPosition(currentPos, unit.length, unit.parametricConfig);
             return;
         }
 

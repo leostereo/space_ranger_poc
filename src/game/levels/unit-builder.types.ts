@@ -48,16 +48,13 @@ export type UnitBuilderFn = (
 ) => UnitBuilderResult;
 
 export interface ParametricPathConfig {
-  // Geometría estructural general
-  readonly segmentLength: number;       // Largo de cada sub-tramo individual (ej: 20 metros)
   readonly straightSegments: number;   // Cantidad de bloques rectos
   readonly upSegments: number;         // Cantidad de bloques en subida (+Y)
   readonly downSegments: number;       // Cantidad de bloques en bajada (-Y)
   readonly curveRightSegments: number; // Cantidad de curvas hacia la derecha (+X)
   readonly curveLeftSegments: number;  // Cantidad de curvas hacia la izquierda (-X)
-  readonly includeTunnel: boolean; // 🟢 ¡Agregado!
-  // Densidad de Obstáculos de Gameplay
-  readonly dodgeCount: number;         // Elementos esquivables (columnas / paredes por carril)
-  readonly jumpCount: number;          // Barras de salto transversales completas
-  readonly breakableCount: number;     // Bloques sólidos que se rompen al disparar
+  readonly includeTunnel: boolean;
+  readonly dodgeCount: number;
+  readonly jumpCount: number;
+  readonly breakableCount: number;
 }
