@@ -11,6 +11,7 @@ import { createLevelLighting } from "./level-lighting";
 import type { EnemiesManager } from "../entities/enemies/enemies-manager";
 import { PlayerShotDebugEmitter } from "../debug/player-shot-debug-emitter";
 import type { ManagedUnitInstance } from "./unit-builder.types";
+import { Mesh, PhysicsAggregate } from "@babylonjs/core";
 
 export type LevelOutcome = "completed" | "failed";
 
@@ -25,7 +26,8 @@ export interface LevelStrategyDeps {
   readonly map: LoadedMap;
   readonly character: CharacterBase;
   readonly enemies: EnemiesManager;
-  readonly managedUnits: ManagedUnitInstance[]; // 🟢 OBLIGATORIO A PARTIR DE AHORA
+  readonly managedUnits: ManagedUnitInstance[]; 
+  readonly physicsBodies?: ReadonlyMap<Mesh, PhysicsAggregate>
 }
 
 type Phase = "created" | "playing" | "paused" | "finished" | "disposed";
@@ -41,6 +43,7 @@ export abstract class LevelStrategy {
   protected readonly character: CharacterBase;
   protected readonly enemies: EnemiesManager;
   protected readonly _managedUnits: ManagedUnitInstance[]; // 🟢 Visible para subclases
+  protected readonly physicsBodies?: ReadonlyMap<Mesh, PhysicsAggregate>;
 
   private phase: Phase = "created";
   private pausedAnimationGroups: AnimationGroup[] = [];
@@ -54,8 +57,9 @@ export abstract class LevelStrategy {
     this.map = deps.map;
     this.character = deps.character;
     this.enemies = deps.enemies;
-    this._managedUnits = deps.managedUnits; // 🟢 Inyección core
-    
+    this._managedUnits = deps.managedUnits; 
+    this.physicsBodies = deps.physicsBodies;
+
     createLevelLighting(this.context.scene, this.scope);
     if (import.meta.env.DEV) {
       this.shotDebugEmitter = new PlayerShotDebugEmitter();

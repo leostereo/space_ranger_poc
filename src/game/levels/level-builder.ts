@@ -5,11 +5,13 @@ import type { UnitKind, UnitBuilderFn, ManagedUnitInstance, UnitData } from "./u
 import { buildSpawnPlatform } from "./builders/spawn-platform.builder";
 import { buildKamikazeBridge } from "./builders/kamikaze-bridge.builder";
 import { buildEmptyTunnel } from "./builders/empty-tunnel.builder";
+import { buildParametricPath } from "./builders/parametric-path.builder";
 
 const UNIT_BUILDERS: Record<UnitKind, UnitBuilderFn> = {
   spawn_platform: buildSpawnPlatform,
   kamikaze_bridge: buildKamikazeBridge,
   empty_tunnel: buildEmptyTunnel, // 🟢 Registrado
+  parametric_path: buildParametricPath,
 };
 
 export function buildLevelUnits(scene: Scene, layout: UnitData[]): ManagedUnitInstance[] {

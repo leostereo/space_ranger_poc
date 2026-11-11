@@ -30,11 +30,18 @@ export class Level08Strategy extends LevelStrategy {
     this._entitiesController = new EntitiesController(
       this._managedUnits,
       this.character,
-      this.enemies // 👈 Pasado de forma nativa
+      this.enemies,
+      this.physicsBodies
     );
+    console.log(this.physicsBodies)
   }
 
   protected onTick(deltaTime: number): void {
+    
+    if (this.character.isDead) {
+      this.secondsDead += deltaTime;
+    }
+
     if (this._entitiesController) {
       this._entitiesController.update(deltaTime);
     }

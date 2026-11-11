@@ -96,9 +96,9 @@ export class LevelSetupState implements GameState {
         }),
       );
 
-      // 🟢 FIX DE INYECCIÓN DATA-DRIVEN: 
-      // Se arma la estrategia pasando de forma nativa e incondicional 'managedUnits'.
-      // Si el mapa procedural las creó (Nivel 8), las inyecta en caliente. Si no (Niveles 1-7), manda un array vacío seguro.
+      const physicsBodies = createGroundPhysics(map, context.scene, scope);
+
+
       this.session.setStrategy(
         createLevelStrategy({ 
           context, 
@@ -107,7 +107,8 @@ export class LevelSetupState implements GameState {
           map, 
           character, 
           enemies,
-          managedUnits: map.managedUnits ?? []  
+          managedUnits: map.managedUnits ?? [],
+          physicsBodies   
         })
       );
         

@@ -3,15 +3,15 @@ import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh"; // 🟢 Cambiado a Mesh
 import type { EnemySpawn } from "./level-definition"; 
 // src/game/levels/unit-builder.types.ts
-export type UnitKind = "spawn_platform" | "kamikaze_bridge" | "empty_tunnel";
-
+export type UnitKind = "spawn_platform" | "kamikaze_bridge" | "empty_tunnel" | "parametric_path";
 
 export interface UnitData {
   readonly id: string;
   readonly kind: UnitKind;
-  readonly length: number;
+  readonly length: number;              // En el túnel paramétrico, actuará como multiplicador base o largo estimado
   readonly distanceToEnable: number;
   readonly enabledDefault: boolean;
+  readonly parametricConfig?: ParametricPathConfig; // Configuración opcional inyectada
 }
 
 export interface ManagedUnitInstance {
@@ -32,9 +32,32 @@ export interface BuilderResult {
   readonly nextPosition: Vector3;
 }
 
+export interface UnitBuilderResult {
+  readonly meshes: Mesh[];
+  readonly enemySpawns: EnemySpawn[];
+  readonly centerPosition: Vector3;
+  readonly nextPosition: Vector3;
+}
+
+// Firma común para todas las funciones constructoras
 export type UnitBuilderFn = (
   scene: Scene,
   unit: UnitData,
   currentPosition: Vector3,
   forwardDirection: Vector3
-) => BuilderResult;
+) => UnitBuilderResult;
+
+export interface ParametricPathConfig {
+  // Geometría estructural general
+  readonly segmentLength: number;       // Largo de cada sub-tramo individual (ej: 20 metros)
+  readonly straightSegments: number;   // Cantidad de bloques rectos
+  readonly upSegments: number;         // Cantidad de bloques en subida (+Y)
+  readonly downSegments: number;       // Cantidad de bloques en bajada (-Y)
+  readonly curveRightSegments: number; // Cantidad de curvas hacia la derecha (+X)
+  readonly curveLeftSegments: number;  // Cantidad de curvas hacia la izquierda (-X)
+  readonly includeTunnel: boolean; // 🟢 ¡Agregado!
+  // Densidad de Obstáculos de Gameplay
+  readonly dodgeCount: number;         // Elementos esquivables (columnas / paredes por carril)
+  readonly jumpCount: number;          // Barras de salto transversales completas
+  readonly breakableCount: number;     // Bloques sólidos que se rompen al disparar
+}

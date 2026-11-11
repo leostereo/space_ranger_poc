@@ -73,7 +73,6 @@ export async function buildHoverBoardStrategy(
         input: inputController,
         animation,
         tick(dt: number) {
-            console.log(boardAggregate.body.getLinearVelocity())
             inputController.tick();
             physics.tick(dt);
             animation.tick(); // NUEVO — antes faltaba, era inofensivo porque tick() era no-op
