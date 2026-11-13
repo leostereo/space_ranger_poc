@@ -4,6 +4,7 @@ import type { LevelDefinition, ProceduralMapContext, ProceduralMapResult, Static
 import { buildLevelUnits } from "../level-builder";
 import type { UnitData, ManagedUnitInstance } from "../unit-builder.types";
 import { calculateParametricEndPosition } from "../builders/parametric-path.builder";
+import { calculateRectangularTunnelEndPosition } from "../builders/parametric-tunnel.builder";
 
 // 1. Configuración págana/lineal del nivel (Metadata)
 export const LEVEL_08_LAYOUT: UnitData[] = [
@@ -15,28 +16,46 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
         enabledDefault: true
     },
     {
-        id: "pp_test_recto",
-        kind: "parametric_path",
-        length: 150, // Largo de referencia
-        distanceToEnable: 160,
-        enabledDefault: false,
-        parametricConfig: {
-            straightSegments: 20,   // 4 tramos de 25m = 100 metros totalmente rectos
-            upSegments: 0,         // Sin subidas
-            downSegments: 50,       // Sin bajadas
-            curveRightSegments: 0, // Sin curvas a la derecha
-            curveLeftSegments: 0,  // Sin curvas a la izquierda
-            includeTunnel: true,  // Sin carcasa de tubo para tener vista despejada
-            // obstaculos
-            jumpCount: 0,          // 1 valla de salto (verde)
-            dodgeCount: 0,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
-            breakableCount: 0,      // 1 bloque destruible (rojo)
-            unitBoxCount: 0,
-            matrixWallGapCount: 1,        // 1 pared con hueco libre
-            matrixWallBreakableCount: 1   // 1 pared con celda destruible
-
+        id: "pt_test1",
+        kind: "parametric_tunnel",
+        length: 450,
+        distanceToEnable: 460,
+        enabledDefault: true,
+        tunnelConfig: { // 🟢 Cambiado de parametricConfig a tunnelConfig
+            straightSegments: 140,
+            upSegments: 1,
+            downSegments: 10,
+            curveRightSegments: 10,
+            curveLeftSegments: 10,
+            matrixWallGapCount: 2,
+            matrixWallBreakableCount: 0,
+            breakableHitsRequired: 0,
         }
     },
+
+    // {
+    //     id: "pp_test_recto",
+    //     kind: "parametric_path",
+    //     length: 150, // Largo de referencia
+    //     distanceToEnable: 160,
+    //     enabledDefault: false,
+    //     parametricConfig: {
+    //         straightSegments: 20,   // 4 tramos de 25m = 100 metros totalmente rectos
+    //         upSegments: 0,         // Sin subidas
+    //         downSegments: 50,       // Sin bajadas
+    //         curveRightSegments: 0, // Sin curvas a la derecha
+    //         curveLeftSegments: 0,  // Sin curvas a la izquierda
+    //         includeTunnel: true,  // Sin carcasa de tubo para tener vista despejada
+    //         // obstaculos
+    //         jumpCount: 0,          // 1 valla de salto (verde)
+    //         dodgeCount: 0,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
+    //         breakableCount: 0,      // 1 bloque destruible (rojo)
+    //         unitBoxCount: 0,
+    //         matrixWallGapCount: 1,        // 1 pared con hueco libre
+    //         matrixWallBreakableCount: 1   // 1 pared con celda destruible
+
+    //     }
+    // },
     // {
     //     id: "pp_test_recto_separador",
     //     kind: "parametric_path",
@@ -92,6 +111,11 @@ const createPreCalculatedSpawns = (): Level08PreCalculatedSpawns => {
 
         if (unit.kind === "parametric_path" && unit.parametricConfig) {
             currentPos = calculateParametricEndPosition(currentPos, unit.length, unit.parametricConfig);
+            return;
+        }
+
+        if (unit.kind === "parametric_tunnel" && unit.tunnelConfig) {
+            currentPos = calculateRectangularTunnelEndPosition(currentPos, unit.length, unit.tunnelConfig);
             return;
         }
 
@@ -190,9 +214,6 @@ const buildLevel08Map = ({ scene }: ProceduralMapContext): ProceduralMapResult =
         managedUnits: level08ManagedUnits
     };
 };
-
-
-
 
 // 5. Definición final limpia y apta para tu Registro de Niveles
 export const level08Definition: LevelDefinition = {

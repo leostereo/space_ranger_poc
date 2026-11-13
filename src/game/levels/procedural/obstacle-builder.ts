@@ -17,6 +17,9 @@ const SOLID_OBSTACLE_COLOR = Color3.FromHexString("#1e3a8a");     // Azul marino
 const BREAKABLE_OBSTACLE_COLOR = Color3.FromHexString("#3b82f6"); // Azul acero brillante (destruible)
 const SOLID_EDGE_COLOR = new Color4(0.22, 0.74, 0.97, 0.9);     // Celeste eléctrico (#38bdf8)
 const BREAKABLE_EDGE_COLOR = new Color4(0.93, 0.96, 1.0, 1.0);  // Blanco hielo brillante
+const GRAY_SOLID_COLOR = Color3.FromHexString("#334155");     // Gris grafito medio
+const GRAY_BREAKABLE_COLOR = Color3.FromHexString("#94a3b8"); // Gris acero claro
+const GRAY_EDGE_COLOR = new Color4(0.8, 0.85, 0.9, 0.85);     // Borde gris claro
 
 
 export interface TunnelMatrixWallOptions {
@@ -29,6 +32,7 @@ export interface TunnelMatrixWallOptions {
   readonly mode: "gap" | "breakable"; // Variante 1: hueco libre | Variante 2: bloque destruible
   readonly hitsRequired?: number;
   readonly targetSlotIndex?: number;
+  readonly theme?: "blue" | "gray";
 }
 
 
@@ -154,6 +158,23 @@ const getObstacleMaterial = (scene: Scene, kind: ObstacleKind): StandardMaterial
   const mat = new StandardMaterial(matName, scene);
   mat.diffuseColor = color;
   mat.emissiveColor = color.scale(isBreakable ? 0.35 : 0.25);
+  mat.specularColor = new Color3(0.2, 0.2, 0.2);
+  return mat;
+};
+
+const getMatrixMaterial = (scene: Scene, isBreakable: boolean, theme: "blue" | "gray"): StandardMaterial => {
+  if (theme === "blue") {
+    return getObstacleMaterial(scene, isBreakable ? "breakable" : "wall");
+  }
+
+  const matName = isBreakable ? "shared-gray-obstacle-breakable" : "shared-gray-obstacle-solid";
+  const existing = scene.getMaterialByName(matName) as StandardMaterial;
+  if (existing) return existing;
+
+  const color = isBreakable ? GRAY_BREAKABLE_COLOR : GRAY_SOLID_COLOR;
+  const mat = new StandardMaterial(matName, scene);
+  mat.diffuseColor = color;
+  mat.emissiveColor = color.scale(isBreakable ? 0.35 : 0.2);
   mat.specularColor = new Color3(0.2, 0.2, 0.2);
   return mat;
 };

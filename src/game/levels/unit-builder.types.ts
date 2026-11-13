@@ -3,7 +3,12 @@ import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh"; // 🟢 Cambiado a Mesh
 import type { EnemySpawn } from "./level-definition"; 
 // src/game/levels/unit-builder.types.ts
-export type UnitKind = "spawn_platform" | "kamikaze_bridge" | "empty_tunnel" | "parametric_path";
+export type UnitKind =
+  | "spawn_platform"
+  | "kamikaze_bridge"
+  | "empty_tunnel"
+  | "parametric_path"
+  | "parametric_tunnel";
 
 export interface UnitData {
   readonly id: string;
@@ -11,7 +16,8 @@ export interface UnitData {
   readonly length: number;              // En el túnel paramétrico, actuará como multiplicador base o largo estimado
   readonly distanceToEnable: number;
   readonly enabledDefault: boolean;
-  readonly parametricConfig?: ParametricPathConfig; // Configuración opcional inyectada
+  readonly parametricConfig?: ParametricPathConfig;
+  readonly tunnelConfig?: ParametricTunnelConfig;
 }
 
 export interface ManagedUnitInstance {
@@ -61,4 +67,19 @@ export interface ParametricPathConfig {
   readonly matrixWallGapCount?: number;       // Paredes 2x3 con 1 hueco libre al azar
   readonly matrixWallBreakableCount?: number;
   readonly breakableHitsRequired?: number; 
+}
+
+export interface ParametricTunnelConfig {
+  readonly straightSegments: number;
+  readonly upSegments: number;
+  readonly downSegments: number;
+  readonly curveRightSegments: number;
+  readonly curveLeftSegments: number;
+
+  /** Cantidad de paredes matriz 3x3 con 1 hueco libre */
+  readonly matrixWallGapCount: number;
+  /** Cantidad de paredes matriz 3x3 con 1 celda destruible */
+  readonly matrixWallBreakableCount: number;
+  /** Disparos necesarios para romper las celdas destruibles (por defecto 3) */
+  readonly breakableHitsRequired?: number;
 }
