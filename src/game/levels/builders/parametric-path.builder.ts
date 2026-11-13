@@ -9,13 +9,14 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { UnitData, UnitBuilderResult, ParametricPathConfig } from "../unit-builder.types";
 
 import { createTrackMesh } from "../procedural/track-builder";
-// 🟢 Importamos nuestra nueva fábrica reutilizable de obstáculos
 import {
   UNIT,
+  createUnitBox,
   createJumpBar,
   createDodgePillar,
+  createDodgeWall,
   createBreakableBox,
-  createCoverBox, // Usaremos este formato ancho para las paredes de evasión lateral
+  createTunnelMatrixWall,
 } from "../procedural/obstacle-builder";
 
 const SOLID_GLOW = 0.25;
@@ -26,7 +27,7 @@ const TUBE_ALPHA = 0.2;
 
 const TUBE_WIDTH_SCALE = 1.5;
 const TUBE_RADIUS = 8 * TUBE_WIDTH_SCALE;
-const TUBE_AXIS_OFFSET_Y = 4.8 * TUBE_WIDTH_SCALE; 
+const TUBE_AXIS_OFFSET_Y = 4.8 * TUBE_WIDTH_SCALE;
 const TUBE_TESSELLATION = 20;
 const TRACK_WALL_OVERLAP = 0.15;
 const TRACK_HALF_WIDTH = Math.sqrt(TUBE_RADIUS ** 2 - TUBE_AXIS_OFFSET_Y ** 2) + TRACK_WALL_OVERLAP;
@@ -58,7 +59,7 @@ function getSegmentLength(totalLength: number, config: ParametricPathConfig): nu
 /** Función pura compartida para calcular el final del camino sin instanciar mallas */
 export function calculateParametricEndPosition(
   startPosition: Vector3,
-  totalLength: number, // 🟢 Ahora recibe unit.length
+  totalLength: number,
   config: ParametricPathConfig
 ): Vector3 {
   let lastPoint = startPosition.clone();
@@ -140,43 +141,78 @@ export function buildParametricPath(
         radius: TUBE_RADIUS,
         tessellation: TUBE_TESSELLATION,
         sideOrientation: Mesh.DOUBLESIDE,
+        cap: Mesh.NO_CAP,
         updatable: false,
       },
       scene
     );
-    
+
     const tubeMat = createTrackMaterial(scene, `${unit.id}-tube-mat`, TUBE_COLOR);
     tubeMat.alpha = TUBE_ALPHA;
     tubeMesh.material = tubeMat;
-    tubeMesh.checkCollisions = false;
+    tubeMesh.checkCollisions = true;
     meshes.push(tubeMesh);
   }
 
-  // 4. DISTRIBUCIÓN DE OBSTÁCULOS REUTILIZANDO `obstacle-builder.ts`
-  const totalObstacles = config.dodgeCount + config.jumpCount + config.breakableCount;
-  const indexStep = Math.floor(trackPoints.length / (totalObstacles + 2));
-  let currentPointIndex = indexStep;
+  // 4. DISTRIBUCIÓN EQUIDISTANTE GARANTIZADA DE OBSTÁCULOS
+  const TUNNEL_CLEAR_HEIGHT = TUBE_RADIUS + TUBE_AXIS_OFFSET_Y - 0.5;
+  const MATRIX_TOTAL_WIDTH = TUBE_RADIUS * 2;
 
-  const carriles = [-3, 0, 3]; 
+  const unitBoxCount = config.unitBoxCount ?? 0;
+  const matrixGapCount = config.includeTunnel ? (config.matrixWallGapCount ?? 0) : 0;
+  const matrixBreakableCount = config.includeTunnel ? (config.matrixWallBreakableCount ?? 0) : 0;
+  const hitsRequired = config.breakableHitsRequired ?? 3;
 
-  /** Calcula la posición y rotación sobre la curva en el paso actual */
+  const totalObstacles =
+    unitBoxCount +
+    config.dodgeCount +
+    config.jumpCount +
+    config.breakableCount +
+    matrixGapCount +
+    matrixBreakableCount;
+
+  const carriles = [-3, 0, 3];
+  let obstacleSlot = 1;
+
+  /** Calcula la posición y rotación sobre la curva usando slots equidistantes */
   const getNextCurveTransform = (lateralX: number): { position: Vector3; headingY: number } | null => {
-    if (currentPointIndex >= trackPoints.length - 2) return null;
+    if (totalObstacles === 0 || obstacleSlot > totalObstacles) return null;
 
-    const point = trackPoints[currentPointIndex];
-    const nextPoint = trackPoints[currentPointIndex + 1];
+    const fraction = obstacleSlot / (totalObstacles + 1);
+    const pointIndex = Math.min(
+      trackPoints.length - 2,
+      Math.max(1, Math.floor(fraction * (trackPoints.length - 1)))
+    );
+
+    const point = trackPoints[pointIndex];
+    const nextPoint = trackPoints[pointIndex + 1];
 
     const tangent = nextPoint.subtract(point).normalize();
     const headingY = Math.atan2(tangent.x, tangent.z);
     const rightVector = new Vector3(Math.cos(headingY), 0, -Math.sin(headingY)).normalize();
 
     const position = point.add(rightVector.scale(lateralX));
-    currentPointIndex += indexStep;
+    obstacleSlot++;
 
     return { position, headingY };
   };
 
-  // Vallas de Salto (Verdes)
+  // Cajas Unitarias de Referencia
+  for (let i = 0; i < unitBoxCount; i++) {
+    const carril = carriles[i % carriles.length];
+    const transform = getNextCurveTransform(carril);
+    if (!transform) break;
+
+    meshes.push(
+      createUnitBox(scene, {
+        name: `${unit.id}-unit-${i}`,
+        position: transform.position,
+        headingY: transform.headingY,
+      })
+    );
+  }
+
+  // Vallas de Salto
   for (let i = 0; i < config.jumpCount; i++) {
     const transform = getNextCurveTransform(0);
     if (!transform) break;
@@ -191,10 +227,10 @@ export function buildParametricPath(
     );
   }
 
-  // Columnas/Paredes de Evasión (Violetas)
+  // Columnas y Paredes Laterales de Evasión
   for (let i = 0; i < config.dodgeCount; i++) {
     const carril = carriles[i % carriles.length];
-    
+
     if (i % 2 === 0) {
       const transform = getNextCurveTransform(carril);
       if (!transform) break;
@@ -204,7 +240,7 @@ export function buildParametricPath(
           name: `${unit.id}-pillar-${i}`,
           position: transform.position,
           headingY: transform.headingY,
-          widthUnits: 10, // Equivalente a tus 4 metros anteriores (10 * 0.4)
+          widthUnits: 10,
           depthUnits: 10,
         })
       );
@@ -213,14 +249,12 @@ export function buildParametricPath(
       const wallWidth = wallWidthUnits * UNIT;
       const side = carril === -3 ? -1 : 1;
       const lateralX = side * (TRACK_HALF_WIDTH - wallWidth / 2);
-      
+
       const transform = getNextCurveTransform(lateralX);
       if (!transform) break;
 
-      // Nota: Si querés que las paredes laterales sean violetas en vez de grises,
-      // podemos sumar `createDodgeWall` a `obstacle-builder.ts`
       meshes.push(
-        createCoverBox(scene, {
+        createDodgeWall(scene, {
           name: `${unit.id}-wall-${i}`,
           position: transform.position,
           headingY: transform.headingY,
@@ -231,27 +265,59 @@ export function buildParametricPath(
     }
   }
 
-  // Cajas Destruibles (Rojas)
+  // Cajas Destruibles Individuales
   for (let i = 0; i < config.breakableCount; i++) {
     const carril = carriles[(i + 1) % carriles.length];
     const transform = getNextCurveTransform(carril);
     if (!transform) break;
 
-    meshes.push(
-      createBreakableBox(scene, {
-        name: `${unit.id}-breakable-${i}`,
-        position: transform.position,
-        headingY: transform.headingY,
-        widthUnits: 10,
-        depthUnits: 10,
-      })
-    );
+  meshes.push(
+    createBreakableBox(scene, {
+      name: `${unit.id}-breakable-${i}`,
+      position: transform.position,
+      headingY: transform.headingY,
+      widthUnits: 10,
+      depthUnits: 10,
+      hitsRequired,
+    })
+  );
   }
 
+  // Paredes Matriz 3x3 con Hueco Libre
+  for (let i = 0; i < matrixGapCount; i++) {
+    const transform = getNextCurveTransform(0);
+    if (!transform) break;
+
+    const wallMeshes = createTunnelMatrixWall(scene, {
+      name: `${unit.id}-matrix-gap-${i}`,
+      position: transform.position,
+      headingY: transform.headingY,
+      totalWidth: MATRIX_TOTAL_WIDTH,
+      totalHeight: TUNNEL_CLEAR_HEIGHT,
+      mode: "gap",
+    });
+    meshes.push(...wallMeshes);
+  }
+  // Paredes Matriz 3x3 con Bloque Destruible
+  for (let i = 0; i < matrixBreakableCount; i++) {
+    const transform = getNextCurveTransform(0);
+    if (!transform) break;
+    // En Paredes Matriz 3x3 con Bloque Destruible:
+    const wallMeshes = createTunnelMatrixWall(scene, {
+      name: `${unit.id}-matrix-breakable-${i}`,
+      position: transform.position,
+      headingY: transform.headingY,
+      totalWidth: MATRIX_TOTAL_WIDTH,
+      totalHeight: TUNNEL_CLEAR_HEIGHT,
+      mode: "breakable",
+      hitsRequired,
+    });
+    meshes.push(...wallMeshes);
+  }
   return {
     meshes,
     enemySpawns: [],
     centerPosition,
-    nextPosition
-  };
+  nextPosition,
+};
 }

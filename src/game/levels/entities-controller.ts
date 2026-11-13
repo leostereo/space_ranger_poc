@@ -84,6 +84,7 @@ export class EntitiesController {
   }
 
   private _onProjectileHit(hit: ProjectileHitPayload): void {
+   // if (hit.sourceId !== undefined) return;
 
     const meta = hit.mesh.metadata as BreakableMetadata | undefined;
     if (!meta || meta.kind !== "breakable" || meta.isDestroyed) return;
@@ -91,11 +92,12 @@ export class EntitiesController {
     const ownerUnit = this.managedUnits.find((unit) => unit.meshes?.includes(hit.mesh as Mesh));
     if (!ownerUnit) return;
 
-    meta.hp -= hit.damage;
-    if (meta.hp <= 0) {
+    // 🟢 Descontamos 1 disparo por cada impacto recibido
+    meta.hitsRemaining -= 1;
+
+    if (meta.hitsRemaining <= 0) {
       meta.isDestroyed = true;
       const aggregate = this.physicsBodies?.get(hit.mesh as Mesh);
-      // 🟢 El propio objeto ejecuta su explosión en fragmentos, caída y dispose
       meta.destroy(aggregate);
     }
   }

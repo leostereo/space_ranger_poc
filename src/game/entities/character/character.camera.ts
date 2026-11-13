@@ -6,7 +6,7 @@ import type { Scene } from "@babylonjs/core/scene";
 const CAMERA_NAME = "characterFollowCamera";
 const INITIAL_POSITION = new Vector3(0, 5, 10);
 const RADIUS = 10; // distancia horizontal hacia atrás
-const HEIGHT_OFFSET = 4; // altura sobre el objetivo
+const HEIGHT_OFFSET = 3; // altura sobre el objetivo
 const ROTATION_OFFSET_DEGREES = 180; // 180 = mira desde atrás; 0 = desde el frente
 const CAMERA_ACCELERATION = 0.05; // 0 a 1: qué rápido alcanza al objetivo
 const MAX_CAMERA_SPEED = 20;

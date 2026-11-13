@@ -48,6 +48,7 @@ export type UnitBuilderFn = (
 ) => UnitBuilderResult;
 
 export interface ParametricPathConfig {
+  readonly unitBoxCount: number; // 🟢 Cantidad de cajas unitarias
   readonly straightSegments: number;   // Cantidad de bloques rectos
   readonly upSegments: number;         // Cantidad de bloques en subida (+Y)
   readonly downSegments: number;       // Cantidad de bloques en bajada (-Y)
@@ -57,4 +58,7 @@ export interface ParametricPathConfig {
   readonly dodgeCount: number;
   readonly jumpCount: number;
   readonly breakableCount: number;
+  readonly matrixWallGapCount?: number;       // Paredes 2x3 con 1 hueco libre al azar
+  readonly matrixWallBreakableCount?: number;
+  readonly breakableHitsRequired?: number; 
 }

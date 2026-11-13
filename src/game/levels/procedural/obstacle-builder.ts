@@ -1,23 +1,127 @@
-// En src/game/levels/procedural/obstacle-builder.ts
+// src/game/levels/procedural/obstacle-builder.ts
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
-import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
+import type { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import type { Scene } from "@babylonjs/core/scene";
-import { PhysicsAggregate } from "@babylonjs/core";
 
 export const PLAYER_HEIGHT = 0.8;
 export const UNIT = PLAYER_HEIGHT / 2;
 
-export type ObstacleKind = "jump" | "pillar" | "wall" | "breakable" | "cover";
+export type ObstacleKind = "unit" | "jump" | "pillar" | "wall" | "breakable" | "cover";
 
-const OBSTACLE_COLORS: Record<ObstacleKind, Color3> = {
-  jump: Color3.FromHexString("#00e5ff"),      // Cian energético
-  pillar: Color3.FromHexString("#334155"),    // Pizarra espacial
-  wall: Color3.FromHexString("#1e293b"),      // Azul acero oscuro
-  breakable: Color3.FromHexString("#ff6d00"), // Ámbar láser
-  cover: Color3.FromHexString("#475569"),     // Gris titanio
+// 🟢 Paleta unificada: gris oscuro para todos los sólidos y tono más claro para destruibles
+const SOLID_OBSTACLE_COLOR = Color3.FromHexString("#1e3a8a");     // Azul marino profundo (sólidos)
+const BREAKABLE_OBSTACLE_COLOR = Color3.FromHexString("#3b82f6"); // Azul acero brillante (destruible)
+const SOLID_EDGE_COLOR = new Color4(0.22, 0.74, 0.97, 0.9);     // Celeste eléctrico (#38bdf8)
+const BREAKABLE_EDGE_COLOR = new Color4(0.93, 0.96, 1.0, 1.0);  // Blanco hielo brillante
+
+
+export interface TunnelMatrixWallOptions {
+  readonly name: string;
+  readonly position: Vector3;    // Centro del suelo en ese punto de la curva
+  readonly headingY?: number;    // Rotación tangencial del túnel
+  readonly totalWidth: number;   // Ancho total a cubrir (ej: TRACK_WIDTH + margen)
+  readonly totalHeight: number;  // Alto total desde el piso hasta el techo del tubo
+  readonly depth?: number;       // Espesor del muro en Z (por defecto 2m)
+  readonly mode: "gap" | "breakable"; // Variante 1: hueco libre | Variante 2: bloque destruible
+  readonly hitsRequired?: number;
+}
+
+
+const attachBreakableBehavior = (
+  scene: Scene,
+  mesh: Mesh,
+  hitsRequired = 3
+): void => {
+  const metadata: BreakableMetadata = {
+    kind: "breakable",
+    hitsRemaining: Math.max(1, hitsRequired),
+    isDestroyed: false,
+    destroy: (physicsAggregate?: PhysicsAggregate) => {
+      if (physicsAggregate) {
+        physicsAggregate.dispose();
+      }
+      shatterMeshIntoFragments(scene, mesh, 8, 1.2);
+      mesh.isPickable = false;
+      mesh.checkCollisions = false;
+      mesh.setEnabled(false);
+      mesh.dispose();
+    },
+  };
+
+  mesh.metadata = {
+    ...mesh.metadata,
+    ...metadata,
+  };
+};
+
+export const createTunnelMatrixWall = (
+  scene: Scene,
+  opts: TunnelMatrixWallOptions
+): Mesh[] => {
+  const meshes: Mesh[] = [];
+  const cols = 3;
+  const rows = 3;
+
+  const cellWidth = opts.totalWidth / cols;
+  const cellHeight = opts.totalHeight / rows;
+  
+  // 🟢 El bloque destruible conserva la profundidad base (ej: 2m)
+  // y los bloques sólidos de la pared tienen el triple de profundidad (ej: 6m)
+  const breakableDepth = opts.depth ?? 2.0;
+  const solidWallDepth = breakableDepth * 3;
+  const headingY = opts.headingY ?? 0;
+
+  const rightVector = new Vector3(Math.cos(headingY), 0, -Math.sin(headingY)).normalize();
+  const targetSlotIndex = Math.floor(Math.random() * (cols * rows));
+
+  for (let row = 0; row < rows; row++) {
+    const rowFromBottom = rows - 1 - row;
+    const baseFloorY = opts.position.y + rowFromBottom * cellHeight;
+
+    for (let col = 0; col < cols; col++) {
+      const slotIndex = row * cols + col;
+      const lateralOffset = (col - 1) * cellWidth;
+
+      const cellFloorPos = opts.position
+        .add(rightVector.scale(lateralOffset))
+        .add(new Vector3(0, baseFloorY - opts.position.y, 0));
+
+      const cellName = `${opts.name}-cell-${slotIndex + 1}`;
+
+      if (slotIndex === targetSlotIndex) {
+        if (opts.mode === "gap") {
+          continue;
+        } else {
+          // Bloque destruible con profundidad 1x
+          const breakableMesh = buildBaseBox(
+            scene,
+            "breakable",
+            { name: cellName, position: cellFloorPos, headingY },
+            new Vector3(cellWidth, cellHeight, breakableDepth)
+          );
+
+          attachBreakableBehavior(scene, breakableMesh, opts.hitsRequired ?? 3);
+          meshes.push(breakableMesh);
+          continue;
+        }
+      }
+
+      // Pared sólida con profundidad 3x
+      const solidWallCell = buildBaseBox(
+        scene,
+        "wall",
+        { name: cellName, position: cellFloorPos, headingY },
+        new Vector3(cellWidth, cellHeight, solidWallDepth)
+      );
+      meshes.push(solidWallCell);
+    }
+  }
+
+  return meshes;
 };
 
 export interface ObstacleOptions {
@@ -26,25 +130,29 @@ export interface ObstacleOptions {
   readonly headingY?: number;
   readonly widthUnits?: number;
   readonly depthUnits?: number;
-  readonly hp?: number;
+  readonly hitsRequired?: number;
 }
 
 export interface BreakableMetadata {
   readonly kind: "breakable";
-  hp: number;
+  /** Disparos restantes antes de destruirse */
+  hitsRemaining: number;
   isDestroyed: boolean;
   destroy: (physicsAggregate?: PhysicsAggregate) => void;
 }
 
+/** Devuelve uno de los 2 materiales compartidos (sólido o destruible) */
 const getObstacleMaterial = (scene: Scene, kind: ObstacleKind): StandardMaterial => {
-  const matName = `shared-obstacle-mat-${kind}`;
+  const isBreakable = kind === "breakable";
+  const matName = isBreakable ? "shared-obstacle-mat-breakable" : "shared-obstacle-mat-solid";
+
   const existing = scene.getMaterialByName(matName) as StandardMaterial;
   if (existing) return existing;
 
-  const color = OBSTACLE_COLORS[kind];
+  const color = isBreakable ? BREAKABLE_OBSTACLE_COLOR : SOLID_OBSTACLE_COLOR;
   const mat = new StandardMaterial(matName, scene);
   mat.diffuseColor = color;
-  mat.emissiveColor = color.scale(0.35);
+  mat.emissiveColor = color.scale(isBreakable ? 0.35 : 0.25);
   mat.specularColor = new Color3(0.2, 0.2, 0.2);
   return mat;
 };
@@ -61,7 +169,17 @@ const buildBaseBox = (
   box.material = getObstacleMaterial(scene, kind);
   box.checkCollisions = true;
   box.isPickable = true;
+
+  // 🟢 Resaltado limpio de bordes exteriores (sin diagonales internas)
+  box.enableEdgesRendering();
+  box.edgesWidth = kind === "breakable" ? 3.5 : 2.5;
+  box.edgesColor = kind === "breakable" ? BREAKABLE_EDGE_COLOR : SOLID_EDGE_COLOR;
+
   return box;
+};
+
+export const createUnitBox = (scene: Scene, opts: ObstacleOptions): Mesh => {
+  return buildBaseBox(scene, "unit", opts, new Vector3(UNIT, UNIT, UNIT));
 };
 
 export const createCoverBox = (scene: Scene, opts: ObstacleOptions): Mesh => {
@@ -187,33 +305,10 @@ const shatterMeshIntoFragments = (
 export const createBreakableBox = (scene: Scene, opts: ObstacleOptions): Mesh => {
   const width = (opts.widthUnits ?? 4) * UNIT;
   const depth = (opts.depthUnits ?? 4) * UNIT;
-  const mesh = buildBaseBox(scene, "breakable", opts, new Vector3(width, 4 * UNIT, depth));
+  const mesh = buildBaseBox(scene, "breakable", opts, new Vector3(width, 3 * UNIT, depth));
 
-  const metadata: BreakableMetadata = {
-    kind: "breakable",
-    hp: opts.hp ?? 3,
-    isDestroyed: false,
-    destroy: (physicsAggregate?: PhysicsAggregate) => {
-      // 1. Liberamos el cuerpo físico de Havok al instante para no frenar la patineta
-      if (physicsAggregate) {
-        physicsAggregate.dispose();
-      }
-
-      // 2. Generamos los 8 fragmentos cayendo
-      shatterMeshIntoFragments(scene, mesh, 8, 1.2);
-
-      // 3. Ocultamos y eliminamos la caja original
-      mesh.isPickable = false;
-      mesh.checkCollisions = false;
-      mesh.setEnabled(false);
-      mesh.dispose();
-    },
-  };
-
-  mesh.metadata = {
-    ...mesh.metadata,
-    ...metadata,
-  };
+  attachBreakableBehavior(scene, mesh, opts.hitsRequired ?? 3);
 
   return mesh;
 };
+

@@ -17,13 +17,13 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
     {
         id: "pp_test_recto",
         kind: "parametric_path",
-        length: 150, // Largo de referencia
-        distanceToEnable: 160,
+        length: 350, // Largo de referencia
+        distanceToEnable: 360,
         enabledDefault: false,
         parametricConfig: {
-            straightSegments: 10,   // 4 tramos de 25m = 100 metros totalmente rectos
-            upSegments: 0,         // Sin subidas
-            downSegments: 3,       // Sin bajadas
+            straightSegments: 50,   // 4 tramos de 25m = 100 metros totalmente rectos
+            upSegments: 5,         // Sin subidas
+            downSegments: 30,       // Sin bajadas
             curveRightSegments: 0, // Sin curvas a la derecha
             curveLeftSegments: 0,  // Sin curvas a la izquierda
             includeTunnel: true,  // Sin carcasa de tubo para tener vista despejada
@@ -31,7 +31,11 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
             // 1 obstáculo de cada tipo para inspección visual:
             jumpCount: 0,          // 1 valla de salto (verde)
             dodgeCount: 0,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
-            breakableCount: 4      // 1 bloque destruible (rojo)
+            breakableCount: 0,      // 1 bloque destruible (rojo)
+            unitBoxCount: 0,
+            matrixWallGapCount: 2,        // 1 pared con hueco libre
+            matrixWallBreakableCount: 3   // 1 pared con celda destruible
+
         }
     },
     {
@@ -57,6 +61,7 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
             dodgeCount: 6,
             jumpCount: 3,
             breakableCount: 5,
+            unitBoxCount: 1,
             includeTunnel: false
 
         }
