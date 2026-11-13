@@ -21,8 +21,8 @@ import {
 
 const SOLID_GLOW = 0.25;
 const SOLID_SPECULAR = new Color3(0.1, 0.1, 0.1);
-const TRACK_COLOR = Color3.FromHexString("#2a7fd6");  // Azul pista
-const TUBE_COLOR = Color3.FromHexString("#0a7fa8");   // Azul translúcido
+const TRACK_COLOR = Color3.FromHexString("#2a7fd6");
+const TUBE_COLOR = Color3.FromHexString("#0a7fa8");
 const TUBE_ALPHA = 0.2;
 
 const TUBE_WIDTH_SCALE = 1.5;
@@ -43,7 +43,6 @@ const createTrackMaterial = (scene: Scene, name: string, color: Color3): Standar
   return material;
 };
 
-/** Calcula el largo individual de cada tramo dividiendo el largo total de la unidad */
 function getSegmentLength(totalLength: number, config: ParametricPathConfig): number {
   const totalSegments = Math.max(
     1,
@@ -56,7 +55,6 @@ function getSegmentLength(totalLength: number, config: ParametricPathConfig): nu
   return totalLength / totalSegments;
 }
 
-/** Función pura compartida para calcular el final del camino sin instanciar mallas */
 export function calculateParametricEndPosition(
   startPosition: Vector3,
   totalLength: number,
@@ -74,6 +72,51 @@ export function calculateParametricEndPosition(
   return lastPoint;
 }
 
+function applyJumpRampBeforeIndex(
+  trackPoints: Vector3[],
+  wallPointIndex: number,
+  rampPeakHeight: number,
+  rampLengthMeters = 28
+): void {
+  if (rampPeakHeight <= 0) return;
+
+  // 1. Retrocedemos ~15 metros desde la pared para ubicar el pico de despegue (cresta de la rampa)
+  const gapBeforeWallMeters = 20;
+  let distFromWall = 0;
+  let peakIdx = wallPointIndex;
+  while (peakIdx > 1 && distFromWall < gapBeforeWallMeters) {
+    distFromWall += Vector3.Distance(trackPoints[peakIdx], trackPoints[peakIdx - 1]);
+    peakIdx--;
+  }
+
+  // 2. Calculamos el inicio de la subida hacia atrás desde la cresta
+  let accumulatedDist = 0;
+  let startIdx = peakIdx;
+  while (startIdx > 1 && accumulatedDist < rampLengthMeters) {
+    accumulatedDist += Vector3.Distance(trackPoints[startIdx], trackPoints[startIdx - 1]);
+    startIdx--;
+  }
+
+  // 3. Calculamos el final de la bajada justo antes de llegar a la pared (así la pared queda en el piso plano)
+  let forwardDist = 0;
+  let endIdx = peakIdx;
+  const landingLengthMeters = 12;
+  while (endIdx < wallPointIndex && forwardDist < landingLengthMeters) {
+    forwardDist += Vector3.Distance(trackPoints[endIdx], trackPoints[endIdx + 1]);
+    endIdx++;
+  }
+
+  const totalSpan = endIdx - startIdx;
+  if (totalSpan <= 2) return;
+
+  // Aplicamos la curva de elevación solo entre startIdx y endIdx (dejando el piso de la pared intacto)
+  for (let i = startIdx; i <= endIdx; i++) {
+    const t = (i - startIdx) / totalSpan;
+    const elevation = Math.pow(Math.sin(Math.PI * t), 1.5) * rampPeakHeight;
+    trackPoints[i].y += elevation;
+  }
+}
+
 export function buildParametricPath(
   scene: Scene,
   unit: UnitData,
@@ -87,7 +130,7 @@ export function buildParametricPath(
     throw new Error(`[ParametricPath] Falta parametricConfig en la unidad ${unit.id}`);
   }
 
-  // 1. GENERACIÓN DEL CAMINO 3D (Puntos de control base)
+  // 1. GENERACIÓN DEL CAMINO 3D BASE
   const controlPoints: Vector3[] = [currentPosition.clone()];
   let lastPoint = currentPosition.clone();
   const segLen = getSegmentLength(unit.length, config);
@@ -113,13 +156,72 @@ export function buildParametricPath(
     controlPoints.push(lastPoint.clone());
   }
 
-  const spline = Curve3.CreateCatmullRomSpline(controlPoints, 24, false);
+  const spline = Curve3.CreateCatmullRomSpline(controlPoints, 14, false);
   const trackPoints = spline.getPoints();
 
+  // 2. PRE-CÁLCULO DE OBSTÁCULOS Y RAMPAS DE IMPULSO (Antes de construir las mallas del suelo)
+  const TUNNEL_CLEAR_HEIGHT = TUBE_RADIUS + TUBE_AXIS_OFFSET_Y - 0.5;
+  const MATRIX_TOTAL_WIDTH = TUBE_RADIUS * 2;
+  const hitsRequired = config.breakableHitsRequired ?? 3;
+
+  const unitBoxCount = config.unitBoxCount ?? 0;
+  const matrixGapCount = config.includeTunnel ? (config.matrixWallGapCount ?? 0) : 0;
+  const matrixBreakableCount = config.includeTunnel ? (config.matrixWallBreakableCount ?? 0) : 0;
+
+  const totalObstacles =
+    unitBoxCount +
+    config.dodgeCount +
+    config.jumpCount +
+    config.breakableCount +
+    matrixGapCount +
+    matrixBreakableCount;
+
+  const getPointIndexForSlot = (slot: number): number => {
+    const fraction = slot / (totalObstacles + 1);
+    return Math.min(
+      trackPoints.length - 2,
+      Math.max(1, Math.floor(fraction * (trackPoints.length - 1)))
+    );
+  };
+
+  // Sorteamos de antemano las celdas objetivo de cada matriz 3x3 y generamos su rampa si hace falta
+  const basicObstaclesCount = unitBoxCount + config.jumpCount + config.dodgeCount + config.breakableCount;
+  const matrixPlans: Array<{ mode: "gap" | "breakable"; slot: number; targetCellIndex: number }> = [];
+
+  for (let i = 0; i < matrixGapCount; i++) {
+    matrixPlans.push({
+      mode: "gap",
+      slot: basicObstaclesCount + i + 1,
+      targetCellIndex: Math.floor(Math.random() * 9),
+    });
+  }
+  for (let i = 0; i < matrixBreakableCount; i++) {
+    matrixPlans.push({
+      mode: "breakable",
+      slot: basicObstaclesCount + matrixGapCount + i + 1,
+      targetCellIndex: Math.floor(Math.random() * 9),
+    });
+  }
+
+  // Aplicamos la rampa de elevación sobre `trackPoints` antes de extruir el piso y el tubo
+  for (const plan of matrixPlans) {
+    const targetRow = Math.floor(plan.targetCellIndex / 3); // 0 = arriba, 1 = medio, 2 = abajo
+    const wallIndex = getPointIndexForSlot(plan.slot);
+
+    if (targetRow === 1) {
+      // Fila media: rampa suave de ~3.8m para entrar saltando cómodo
+      applyJumpRampBeforeIndex(trackPoints, wallIndex, 3.8, 28);
+    } else if (targetRow === 0) {
+      // Fila superior: rampa pronunciada de ~8.2m para alcanzar el nivel alto
+      applyJumpRampBeforeIndex(trackPoints, wallIndex, 8.2, 38);
+    }
+  }
+
+  // Capturamos extremos tras deformar las rampas
   const nextPosition = trackPoints[trackPoints.length - 1].clone();
   const centerPosition = trackPoints[Math.floor(trackPoints.length / 2)].clone();
 
-  // 2. CONSTRUCCIÓN DEL SUELO (Pista colisionable)
+  // 3. CONSTRUCCIÓN DEL SUELO (Ya incluye las rampas integradas de forma fluida)
   const trackMaterial = createTrackMaterial(scene, `${unit.id}-track-mat`, TRACK_COLOR);
   trackMaterial.twoSidedLighting = true;
 
@@ -131,16 +233,27 @@ export function buildParametricPath(
   floorMesh.checkCollisions = true;
   meshes.push(floorMesh);
 
-  // 3. INCLUSIÓN CONDICIONAL DEL TÚNEL
+  // 4. INCLUSIÓN CONDICIONAL DEL TÚNEL (Sigue las rampas manteniendo la altura libre)
   if (config.includeTunnel) {
-    const tubePath = trackPoints.map((point) => new Vector3(point.x, point.y + TUBE_AXIS_OFFSET_Y, point.z));
+    const isStraight =
+      config.upSegments === 0 &&
+      config.downSegments === 0 &&
+      config.curveRightSegments === 0 &&
+      config.curveLeftSegments === 0 &&
+      matrixPlans.every((p) => Math.floor(p.targetCellIndex / 3) === 2); // Sin rampas de salto
+
+    const TUBE_PATH_STEP = isStraight ? 12 : 4;
+    const tubePath = trackPoints
+      .filter((_, index) => index % TUBE_PATH_STEP === 0 || index === trackPoints.length - 1)
+      .map((point) => new Vector3(point.x, point.y + TUBE_AXIS_OFFSET_Y, point.z));
+
     const tubeMesh = CreateTube(
       `${unit.id}-tube`,
       {
         path: tubePath,
         radius: TUBE_RADIUS,
-        tessellation: TUBE_TESSELLATION,
-        sideOrientation: Mesh.DOUBLESIDE,
+        tessellation: 12, // 🟢 Límite visual redondo óptimo
+        sideOrientation: Mesh.BACKSIDE,
         cap: Mesh.NO_CAP,
         updatable: false,
       },
@@ -149,95 +262,64 @@ export function buildParametricPath(
 
     const tubeMat = createTrackMaterial(scene, `${unit.id}-tube-mat`, TUBE_COLOR);
     tubeMat.alpha = TUBE_ALPHA;
+    tubeMat.backFaceCulling = true; // 🟢 No renderiza caras exteriores innecesarias
     tubeMesh.material = tubeMat;
     tubeMesh.checkCollisions = true;
     meshes.push(tubeMesh);
   }
 
-  // 4. DISTRIBUCIÓN EQUIDISTANTE GARANTIZADA DE OBSTÁCULOS
-  const TUNNEL_CLEAR_HEIGHT = TUBE_RADIUS + TUBE_AXIS_OFFSET_Y - 0.5;
-  const MATRIX_TOTAL_WIDTH = TUBE_RADIUS * 2;
-
-  const unitBoxCount = config.unitBoxCount ?? 0;
-  const matrixGapCount = config.includeTunnel ? (config.matrixWallGapCount ?? 0) : 0;
-  const matrixBreakableCount = config.includeTunnel ? (config.matrixWallBreakableCount ?? 0) : 0;
-  const hitsRequired = config.breakableHitsRequired ?? 3;
-
-  const totalObstacles =
-    unitBoxCount +
-    config.dodgeCount +
-    config.jumpCount +
-    config.breakableCount +
-    matrixGapCount +
-    matrixBreakableCount;
-
+  // 5. INSTANCIACIÓN DE OBSTÁCULOS SOBRE LA PISTA FINAL
   const carriles = [-3, 0, 3];
   let obstacleSlot = 1;
 
-  /** Calcula la posición y rotación sobre la curva usando slots equidistantes */
-  const getNextCurveTransform = (lateralX: number): { position: Vector3; headingY: number } | null => {
-    if (totalObstacles === 0 || obstacleSlot > totalObstacles) return null;
+  const getTransformAtSlot = (slot: number, lateralX: number): { position: Vector3; headingY: number } | null => {
+    if (totalObstacles === 0 || slot > totalObstacles) return null;
 
-    const fraction = obstacleSlot / (totalObstacles + 1);
-    const pointIndex = Math.min(
-      trackPoints.length - 2,
-      Math.max(1, Math.floor(fraction * (trackPoints.length - 1)))
-    );
-
+    const pointIndex = getPointIndexForSlot(slot);
     const point = trackPoints[pointIndex];
     const nextPoint = trackPoints[pointIndex + 1];
 
     const tangent = nextPoint.subtract(point).normalize();
     const headingY = Math.atan2(tangent.x, tangent.z);
     const rightVector = new Vector3(Math.cos(headingY), 0, -Math.sin(headingY)).normalize();
-
     const position = point.add(rightVector.scale(lateralX));
-    obstacleSlot++;
-
     return { position, headingY };
   };
-
-  // Cajas Unitarias de Referencia
+  // Cajas Unitarias
   for (let i = 0; i < unitBoxCount; i++) {
     const carril = carriles[i % carriles.length];
-    const transform = getNextCurveTransform(carril);
+    const transform = getTransformAtSlot(obstacleSlot++, carril);
     if (!transform) break;
-
     meshes.push(
       createUnitBox(scene, {
-        name: `${unit.id}-unit-${i}`,
+        name: `${unit.id} - unit - ${i}`,
         position: transform.position,
         headingY: transform.headingY,
       })
     );
   }
-
   // Vallas de Salto
   for (let i = 0; i < config.jumpCount; i++) {
-    const transform = getNextCurveTransform(0);
+    const transform = getTransformAtSlot(obstacleSlot++, 0);
     if (!transform) break;
-
     meshes.push(
       createJumpBar(scene, {
-        name: `${unit.id}-jump-${i}`,
+        name: `${unit.id} - jump - ${i}`,
         position: transform.position,
         headingY: transform.headingY,
         trackWidth: TRACK_WIDTH,
       })
     );
   }
-
-  // Columnas y Paredes Laterales de Evasión
+  // Columnas y Paredes Laterales
   for (let i = 0; i < config.dodgeCount; i++) {
     const carril = carriles[i % carriles.length];
-
     if (i % 2 === 0) {
-      const transform = getNextCurveTransform(carril);
+      const transform = getTransformAtSlot(obstacleSlot++, carril);
       if (!transform) break;
-
       meshes.push(
         createDodgePillar(scene, {
-          name: `${unit.id}-pillar-${i}`,
+          name: `${unit.id} - pillar - ${i}`,
           position: transform.position,
           headingY: transform.headingY,
           widthUnits: 10,
@@ -249,13 +331,11 @@ export function buildParametricPath(
       const wallWidth = wallWidthUnits * UNIT;
       const side = carril === -3 ? -1 : 1;
       const lateralX = side * (TRACK_HALF_WIDTH - wallWidth / 2);
-
-      const transform = getNextCurveTransform(lateralX);
+      const transform = getTransformAtSlot(obstacleSlot++, lateralX);
       if (!transform) break;
-
       meshes.push(
         createDodgeWall(scene, {
-          name: `${unit.id}-wall-${i}`,
+          name: `${unit.id} - wall - ${i}`,
           position: transform.position,
           headingY: transform.headingY,
           widthUnits: wallWidthUnits,
@@ -264,60 +344,42 @@ export function buildParametricPath(
       );
     }
   }
-
   // Cajas Destruibles Individuales
   for (let i = 0; i < config.breakableCount; i++) {
     const carril = carriles[(i + 1) % carriles.length];
-    const transform = getNextCurveTransform(carril);
+    const transform = getTransformAtSlot(obstacleSlot++, carril);
     if (!transform) break;
-
-  meshes.push(
-    createBreakableBox(scene, {
-      name: `${unit.id}-breakable-${i}`,
-      position: transform.position,
-      headingY: transform.headingY,
-      widthUnits: 10,
-      depthUnits: 10,
-      hitsRequired,
-    })
-  );
+    meshes.push(
+      createBreakableBox(scene, {
+        name: `${unit.id} - breakable - ${i}`,
+        position: transform.position,
+        headingY: transform.headingY,
+        widthUnits: 10,
+        depthUnits: 10,
+        hitsRequired,
+      })
+    );
   }
-
-  // Paredes Matriz 3x3 con Hueco Libre
-  for (let i = 0; i < matrixGapCount; i++) {
-    const transform = getNextCurveTransform(0);
-    if (!transform) break;
-
+  // Paredes Matriz 3x3 alineadas con las rampas generadas
+  matrixPlans.forEach((plan, index) => {
+    const transform = getTransformAtSlot(plan.slot, 0);
+    if (!transform) return;
     const wallMeshes = createTunnelMatrixWall(scene, {
-      name: `${unit.id}-matrix-gap-${i}`,
+      name: ` ${unit.id} - matrix - ${plan.mode} - ${index}`,
       position: transform.position,
       headingY: transform.headingY,
       totalWidth: MATRIX_TOTAL_WIDTH,
       totalHeight: TUNNEL_CLEAR_HEIGHT,
-      mode: "gap",
-    });
-    meshes.push(...wallMeshes);
-  }
-  // Paredes Matriz 3x3 con Bloque Destruible
-  for (let i = 0; i < matrixBreakableCount; i++) {
-    const transform = getNextCurveTransform(0);
-    if (!transform) break;
-    // En Paredes Matriz 3x3 con Bloque Destruible:
-    const wallMeshes = createTunnelMatrixWall(scene, {
-      name: `${unit.id}-matrix-breakable-${i}`,
-      position: transform.position,
-      headingY: transform.headingY,
-      totalWidth: MATRIX_TOTAL_WIDTH,
-      totalHeight: TUNNEL_CLEAR_HEIGHT,
-      mode: "breakable",
+      mode: plan.mode,
       hitsRequired,
+      targetSlotIndex: plan.targetCellIndex,
     });
     meshes.push(...wallMeshes);
-  }
+  });
   return {
     meshes,
     enemySpawns: [],
     centerPosition,
-  nextPosition,
-};
+    nextPosition,
+  };
 }

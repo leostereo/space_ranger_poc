@@ -17,54 +17,54 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
     {
         id: "pp_test_recto",
         kind: "parametric_path",
-        length: 350, // Largo de referencia
-        distanceToEnable: 360,
+        length: 150, // Largo de referencia
+        distanceToEnable: 160,
         enabledDefault: false,
         parametricConfig: {
-            straightSegments: 50,   // 4 tramos de 25m = 100 metros totalmente rectos
-            upSegments: 5,         // Sin subidas
-            downSegments: 30,       // Sin bajadas
+            straightSegments: 20,   // 4 tramos de 25m = 100 metros totalmente rectos
+            upSegments: 0,         // Sin subidas
+            downSegments: 50,       // Sin bajadas
             curveRightSegments: 0, // Sin curvas a la derecha
             curveLeftSegments: 0,  // Sin curvas a la izquierda
             includeTunnel: true,  // Sin carcasa de tubo para tener vista despejada
-
-            // 1 obstáculo de cada tipo para inspección visual:
+            // obstaculos
             jumpCount: 0,          // 1 valla de salto (verde)
             dodgeCount: 0,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
             breakableCount: 0,      // 1 bloque destruible (rojo)
             unitBoxCount: 0,
-            matrixWallGapCount: 2,        // 1 pared con hueco libre
-            matrixWallBreakableCount: 3   // 1 pared con celda destruible
+            matrixWallGapCount: 1,        // 1 pared con hueco libre
+            matrixWallBreakableCount: 1   // 1 pared con celda destruible
 
         }
     },
+    // {
+    //     id: "pp_test_recto_separador",
+    //     kind: "parametric_path",
+    //     length: 50, // Largo de referencia
+    //     distanceToEnable: 60,
+    //     enabledDefault: false,
+    //     parametricConfig: {
+    //         straightSegments: 20,   // 4 tramos de 25m = 100 metros totalmente rectos
+    //         upSegments: 0,         // Sin subidas
+    //         downSegments: 50,       // Sin bajadas
+    //         curveRightSegments: 0, // Sin curvas a la derecha
+    //         curveLeftSegments: 0,  // Sin curvas a la izquierda
+    //         includeTunnel: true,  // Sin carcasa de tubo para tener vista despejada
+    //         jumpCount: 0,          // 1 valla de salto (verde)
+    //         dodgeCount: 0,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
+    //         breakableCount: 0,      // 1 bloque destruible (rojo)
+    //         unitBoxCount: 0,
+    //         matrixWallGapCount: 0,        // 1 pared con hueco libre
+    //         matrixWallBreakableCount: 0   // 1 pared con celda destruible
+
+    //     }
+    // },
     {
         id: "bridge_zone_1",
         kind: "kamikaze_bridge",
-        length: 160,
-        distanceToEnable: 180,
+        length: 180,
+        distanceToEnable: 190,
         enabledDefault: false
-    },
-    {
-        id: "speed_tunnel_procedural",
-        kind: "parametric_path",
-        length: 50, // Largo total base estimado
-        distanceToEnable: 60,
-        enabledDefault: false,
-        parametricConfig: {
-            straightSegments: 4,
-            upSegments: 2,
-            downSegments: 2,
-            curveRightSegments: 2,
-            curveLeftSegments: 2,
-            // Obstáculos sembrados proceduralmente bajo reglas de seguridad
-            dodgeCount: 6,
-            jumpCount: 3,
-            breakableCount: 5,
-            unitBoxCount: 1,
-            includeTunnel: false
-
-        }
     },
 
 ];

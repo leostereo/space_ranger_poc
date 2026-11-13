@@ -28,6 +28,7 @@ export interface TunnelMatrixWallOptions {
   readonly depth?: number;       // Espesor del muro en Z (por defecto 2m)
   readonly mode: "gap" | "breakable"; // Variante 1: hueco libre | Variante 2: bloque destruible
   readonly hitsRequired?: number;
+  readonly targetSlotIndex?: number;
 }
 
 
@@ -76,7 +77,7 @@ export const createTunnelMatrixWall = (
   const headingY = opts.headingY ?? 0;
 
   const rightVector = new Vector3(Math.cos(headingY), 0, -Math.sin(headingY)).normalize();
-  const targetSlotIndex = Math.floor(Math.random() * (cols * rows));
+  const targetSlotIndex = opts.targetSlotIndex ?? Math.floor(Math.random() * (cols * rows));
 
   for (let row = 0; row < rows; row++) {
     const rowFromBottom = rows - 1 - row;

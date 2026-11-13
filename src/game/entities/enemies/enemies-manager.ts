@@ -224,9 +224,9 @@ export class EnemiesManager extends EventSubscriber {
     if (this.paused || this.disposed) {
       return;
     }
-    if (hit.sourceId !== undefined) {
-      return; 
-    }
+    // if (hit.sourceId !== undefined) {
+    //   return; 
+    // }
     this.enemies.find((enemy) => enemy.ownsMesh(hit.mesh))?.takeHit(hit);
   }
 }
