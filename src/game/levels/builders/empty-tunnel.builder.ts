@@ -21,8 +21,8 @@ const TUBE_COLOR = Color3.FromHexString("#0a7fa8");  // Celeste del tubo
 const TUBE_ALPHA = 0.2;
 
 export const buildEmptyTunnel: UnitBuilderFn = (scene, unit, currentPosition, forwardDirection) => {
-  // Aplicamos el multiplicador x10 de longitud que definiste
-  const realLength = unit.length * 10; 
+  
+  const realLength = unit.length; 
   const halfLengthVector = forwardDirection.scale(realLength / 2);
   const centerPosition = currentPosition.add(halfLengthVector);
 

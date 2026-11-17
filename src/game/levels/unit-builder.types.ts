@@ -8,7 +8,8 @@ export type UnitKind =
   | "kamikaze_bridge"
   | "empty_tunnel"
   | "parametric_path"
-  | "parametric_tunnel";
+  | "parametric_tunnel"
+  | "shooting_playground";
 
 export interface UnitData {
   readonly id: string;
@@ -18,6 +19,7 @@ export interface UnitData {
   readonly enabledDefault: boolean;
   readonly parametricConfig?: ParametricPathConfig;
   readonly tunnelConfig?: ParametricTunnelConfig;
+  readonly playgroundConfig?: ShootingPlaygroundConfig;
 }
 
 export interface ManagedUnitInstance {
@@ -83,3 +85,12 @@ export interface ParametricTunnelConfig {
   /** Disparos necesarios para romper las celdas destruibles (por defecto 3) */
   readonly breakableHitsRequired?: number;
 }
+export interface ShootingPlaygroundConfig {
+  readonly width: number;               // Ej: 30
+  readonly coverRows: number;           // Ej: 3 filas de avance
+  readonly coversPerRow: number;        // Ej: 4 bloques por fila
+  readonly breakableRatio?: number;     // 0 a 1 (ej: 0.3 para que 30% sean destruibles)
+  readonly staticDroneCount: number;    // Ej: 4 drones al fondo
+  readonly dummyTargetCount?: number;   // Opcional: blancos estáticos
+}
+
