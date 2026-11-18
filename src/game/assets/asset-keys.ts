@@ -7,4 +7,7 @@ export type MaterialAssetKey =
   | "dummy-target"
   | "static-drone-body"
   | "static-drone-accent"
-  | "sentinel-drone-accent";
+  | "sentinel-drone-accent"
+  | "solid-obstacle"
+  | "breakable-obstacle"
+  | "arena-floor";

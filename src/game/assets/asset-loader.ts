@@ -11,6 +11,7 @@ import { createDummyTargetMaterial } from "./materials/dummy-target-material-fac
 import { createSentinelDroneAccentMaterial } from "./materials/sentinel-drone-material-factory";
 import { createStaticDroneAccentMaterial, createStaticDroneBodyMaterial } from "./materials/static-drone-materials-factory";
 import type { AssetRegistry } from "./asset-registry";
+import { createArenaFloorMaterial, createBreakableObstacleMaterial, createSolidObstacleMaterial } from "./materials/level-materials-factory";
 
 const FLARE_TEXTURE_URL = "texture/flare.png";
 const KEYMAP_IMAGE_URL = "images/keymap.jpg";
@@ -115,6 +116,9 @@ export class AssetLoader {
           this.registry.registerMaterial("static-drone-body", createStaticDroneBodyMaterial(this.scene));
           this.registry.registerMaterial("static-drone-accent", createStaticDroneAccentMaterial(this.scene));
           this.registry.registerMaterial("sentinel-drone-accent", createSentinelDroneAccentMaterial(this.scene));
+          this.registry.registerMaterial("solid-obstacle", createSolidObstacleMaterial(this.scene));
+          this.registry.registerMaterial("breakable-obstacle", createBreakableObstacleMaterial(this.scene));
+          this.registry.registerMaterial("arena-floor", createArenaFloorMaterial(this.scene));
         } catch (error) {
           reject(error);
           return;

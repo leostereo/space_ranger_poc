@@ -1,14 +1,22 @@
-import { Scene, MeshBuilder, Vector3, Mesh } from "@babylonjs/core";
-import { UnitData, UnitBuilderResult } from "../unit-builder.types";
+import { Scene } from "@babylonjs/core/scene";
+import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Color4 } from "@babylonjs/core/Maths/math.color";
+import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+
+import type { AssetRegistry } from "../../assets/asset-registry"; // Ajustar ruta relativa si hace falta
+import type { UnitData, UnitBuilderResult } from "../unit-builder.types";
 import { createCoverBox, createBreakableBox } from "../procedural/obstacle-builder";
 
 const FLOOR_THICKNESS = 0.4;
+const FLOOR_EDGE_COLOR = new Color4(0.22, 0.74, 0.97, 0.6); // Celeste sutil para delimitar el borde de la plaza
 
 export function buildShootingPlayground(
   scene: Scene,
   unit: UnitData,
   currentPosition: Vector3,
-  forwardDirection: Vector3
+  forwardDirection: Vector3,
+  registry: AssetRegistry
 ): UnitBuilderResult {
   const meshes: Mesh[] = [];
   const config = unit.playgroundConfig ?? {
@@ -19,12 +27,12 @@ export function buildShootingPlayground(
     staticDroneCount: 3,
   };
 
-  // 1. Calcular centros y salida
+  // 1. Calcular centros y punto de salida hacia la siguiente unidad
   const centerPosition = currentPosition.add(forwardDirection.scale(unit.length * 0.5));
   const nextPosition = currentPosition.add(forwardDirection.scale(unit.length));
 
-  // 2. Construir el piso (cara superior alineada a currentPosition.y)
-  const floor = MeshBuilder.CreateBox(
+  // 2. Construir el piso de la plaza (cara superior exactamente en currentPosition.y)
+  const floor = CreateBox(
     `${unit.id}-floor`,
     {
       width: config.width,
@@ -33,19 +41,28 @@ export function buildShootingPlayground(
     },
     scene
   );
-  floor.position = new Vector3(
+  floor.position.set(
     centerPosition.x,
     currentPosition.y - FLOOR_THICKNESS * 0.5,
     centerPosition.z
   );
+  floor.material = registry.getMaterial("arena-floor");
+  floor.checkCollisions = true;
+  floor.isPickable = true;
+
+  // Resaltado sutil de bordes para que se distinga el límite del vacío
+  floor.enableEdgesRendering();
+  floor.edgesWidth = 2.0;
+  floor.edgesColor = FLOOR_EDGE_COLOR;
+
   floor.setEnabled(true); // Regla crítica de Havok
   meshes.push(floor);
 
-  // 3. Distribuir coberturas en los primeros dos tercios de la arena
+  // 3. Distribuir coberturas en los primeros dos tercios de la arena (deja el fondo libre para los drones)
   const combatZoneLength = unit.length * 0.65;
   const startZ = currentPosition.z + unit.length * 0.15;
   const rowSpacing = combatZoneLength / Math.max(1, config.coverRows);
-  const usableWidth = config.width * 0.8; // Margen lateral de seguridad
+  const usableWidth = config.width * 0.8;
 
   for (let row = 0; row < config.coverRows; row++) {
     const zPos = startZ + row * rowSpacing;
@@ -61,15 +78,18 @@ export function buildShootingPlayground(
         rowOffset;
 
       const spawnPos = new Vector3(xPos, currentPosition.y, zPos);
-      const isBreakable = Math.random() < (config.breakableRatio ?? 0.3);
+
+      // Patrón determinista según breakableRatio (evita aleatoriedad distinta entre recargas)
+      const ratio = config.breakableRatio ?? 0.3;
+      const isBreakable = ratio > 0 && ((row * 3 + col) % Math.round(1 / ratio)) === 0;
 
       const obstacle = isBreakable
-        ? createBreakableBox(scene, {
+        ? createBreakableBox(scene, registry, {
             name: `${unit.id}-breakable-${row}-${col}`,
             position: spawnPos,
             hitsRequired: 3,
           })
-        : createCoverBox(scene, {
+        : createCoverBox(scene, registry, {
             name: `${unit.id}-cover-${row}-${col}`,
             position: spawnPos,
           });
@@ -81,7 +101,7 @@ export function buildShootingPlayground(
 
   return {
     meshes,
-    enemySpawns: [], // Se manejan en createPreCalculatedSpawns() según tu arquitectura
+    enemySpawns: [], // Se calculan previamente en createPreCalculatedSpawns()
     centerPosition,
     nextPosition,
   };

@@ -324,8 +324,9 @@ const PRE_SPAWNS = createPreCalculatedSpawns();
 
 // 4. El constructor procedural del mapa (Invocado por BabylonJS en tiempo de juego)
 
-const buildLevel08Map = ({ scene }: ProceduralMapContext): ProceduralMapResult => {
-    level08ManagedUnits = buildLevelUnits(scene, LEVEL_08_LAYOUT);
+// 4. El constructor procedural del mapa (Invocado por BabylonJS en tiempo de juego)
+const buildLevel08Map = ({ scene, registry }: ProceduralMapContext): ProceduralMapResult => {
+    level08ManagedUnits = buildLevelUnits(scene, LEVEL_08_LAYOUT, registry);
 
     const solids: StaticSolid[] = [];
     let groundMesh: Mesh | undefined;
@@ -353,8 +354,10 @@ const buildLevel08Map = ({ scene }: ProceduralMapContext): ProceduralMapResult =
                 return;
             }
 
-            // 4. Obstáculos individuales y tablones/barandas del puente
+            // 4. Obstáculos individuales, piso de shooting_playground y tablones/barandas
+            // Todo lo que venga de shooting_playground (-floor, -cover, -breakable) entra acá como "box"
             const isBreakable = mesh.name.includes("-breakable");
+            mesh.checkCollisions = true;
             solids.push({
                 mesh: mesh as Mesh,
                 shape: "box",
@@ -374,6 +377,7 @@ const buildLevel08Map = ({ scene }: ProceduralMapContext): ProceduralMapResult =
         managedUnits: level08ManagedUnits
     };
 };
+
 
 // 5. Definición final limpia y apta para tu Registro de Niveles
 export const level08Definition: LevelDefinition = {

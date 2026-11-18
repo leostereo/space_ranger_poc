@@ -5,6 +5,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { PatrolRegion } from "../navigation/patrol-region";
 import type { LevelScope } from "./level-scope";
 import { ManagedUnitInstance } from "./unit-builder.types";
+import { AssetRegistry } from "../assets/asset-registry";
 
 /** Tipos de enemigo que un nivel puede pedir. */
 export type EnemyType =
@@ -79,8 +80,8 @@ export interface GlbMapSource {
 
 export interface ProceduralMapContext {
   readonly scene: Scene;
-  /** Para registrar lo que no sea una malla (cuerpos de física, observers, etc.). */
   readonly scope: LevelScope;
+  readonly registry: AssetRegistry;
 }
 
 /** Forma del cuerpo físico estático: "box" sirve para planos; "mesh" sigue la geometría (curvas, relieve). */

@@ -2,6 +2,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh"; // 🟢 Cambiado a Mesh
 import type { EnemySpawn } from "./level-definition"; 
+import { AssetRegistry } from "../assets/asset-registry";
 // src/game/levels/unit-builder.types.ts
 export type UnitKind =
   | "spawn_platform"
@@ -47,12 +48,12 @@ export interface UnitBuilderResult {
   readonly nextPosition: Vector3;
 }
 
-// Firma común para todas las funciones constructoras
 export type UnitBuilderFn = (
   scene: Scene,
   unit: UnitData,
   currentPosition: Vector3,
-  forwardDirection: Vector3
+  forwardDirection: Vector3,
+  registry: AssetRegistry
 ) => UnitBuilderResult;
 
 export interface ParametricPathConfig {

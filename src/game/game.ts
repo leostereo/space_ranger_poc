@@ -58,7 +58,7 @@ export class Game {
     this.assetLoader = new AssetLoader(scene, this.assets);
     this.levels = new LevelRepository(LEVEL_DEFINITIONS, createSafeStorage());
     this.levelSession = new LevelSession(scene);
-    this.levelLoader = new LevelLoader(scene);
+    this.levelLoader = new LevelLoader(scene,this.assets);
     this.fsm = new GameFsm(context);
     this.fsm.register(
       new SplashState(this.screens, this.input, this.fsm),

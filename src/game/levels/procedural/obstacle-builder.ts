@@ -6,10 +6,10 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import type { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import type { Scene } from "@babylonjs/core/scene";
+import type { AssetRegistry } from "../../assets/asset-registry"; // Ajustar ruta relativa si hace falta
 
 export const PLAYER_HEIGHT = 0.8;
 export const UNIT = PLAYER_HEIGHT / 2;
-
 export type ObstacleKind = "unit" | "jump" | "pillar" | "wall" | "breakable" | "cover";
 
 // 🟢 Paleta unificada: gris oscuro para todos los sólidos y tono más claro para destruibles
@@ -34,7 +34,6 @@ export interface TunnelMatrixWallOptions {
   readonly targetSlotIndex?: number;
   readonly theme?: "blue" | "gray";
 }
-
 
 const attachBreakableBehavior = (
   scene: Scene,
@@ -62,170 +61,6 @@ const attachBreakableBehavior = (
     ...metadata,
   };
 };
-
-export const createTunnelMatrixWall = (
-  scene: Scene,
-  opts: TunnelMatrixWallOptions
-): Mesh[] => {
-  const meshes: Mesh[] = [];
-  const cols = 3;
-  const rows = 3;
-
-  const cellWidth = opts.totalWidth / cols;
-  const cellHeight = opts.totalHeight / rows;
-  
-  // 🟢 El bloque destruible conserva la profundidad base (ej: 2m)
-  // y los bloques sólidos de la pared tienen el triple de profundidad (ej: 6m)
-  const breakableDepth = opts.depth ?? 2.0;
-  const solidWallDepth = breakableDepth * 3;
-  const headingY = opts.headingY ?? 0;
-
-  const rightVector = new Vector3(Math.cos(headingY), 0, -Math.sin(headingY)).normalize();
-  const targetSlotIndex = opts.targetSlotIndex ?? Math.floor(Math.random() * (cols * rows));
-
-  for (let row = 0; row < rows; row++) {
-    const rowFromBottom = rows - 1 - row;
-    const baseFloorY = opts.position.y + rowFromBottom * cellHeight;
-
-    for (let col = 0; col < cols; col++) {
-      const slotIndex = row * cols + col;
-      const lateralOffset = (col - 1) * cellWidth;
-
-      const cellFloorPos = opts.position
-        .add(rightVector.scale(lateralOffset))
-        .add(new Vector3(0, baseFloorY - opts.position.y, 0));
-
-      const cellName = `${opts.name}-cell-${slotIndex + 1}`;
-
-      if (slotIndex === targetSlotIndex) {
-        if (opts.mode === "gap") {
-          continue;
-        } else {
-          // Bloque destruible con profundidad 1x
-          const breakableMesh = buildBaseBox(
-            scene,
-            "breakable",
-            { name: cellName, position: cellFloorPos, headingY },
-            new Vector3(cellWidth, cellHeight, breakableDepth)
-          );
-
-          attachBreakableBehavior(scene, breakableMesh, opts.hitsRequired ?? 3);
-          meshes.push(breakableMesh);
-          continue;
-        }
-      }
-
-      // Pared sólida con profundidad 3x
-      const solidWallCell = buildBaseBox(
-        scene,
-        "wall",
-        { name: cellName, position: cellFloorPos, headingY },
-        new Vector3(cellWidth, cellHeight, solidWallDepth)
-      );
-      meshes.push(solidWallCell);
-    }
-  }
-
-  return meshes;
-};
-
-export interface ObstacleOptions {
-  readonly name: string;
-  readonly position: Vector3;
-  readonly headingY?: number;
-  readonly widthUnits?: number;
-  readonly depthUnits?: number;
-  readonly hitsRequired?: number;
-}
-
-export interface BreakableMetadata {
-  readonly kind: "breakable";
-  /** Disparos restantes antes de destruirse */
-  hitsRemaining: number;
-  isDestroyed: boolean;
-  destroy: (physicsAggregate?: PhysicsAggregate) => void;
-}
-
-/** Devuelve uno de los 2 materiales compartidos (sólido o destruible) */
-const getObstacleMaterial = (scene: Scene, kind: ObstacleKind): StandardMaterial => {
-  const isBreakable = kind === "breakable";
-  const matName = isBreakable ? "shared-obstacle-mat-breakable" : "shared-obstacle-mat-solid";
-
-  const existing = scene.getMaterialByName(matName) as StandardMaterial;
-  if (existing) return existing;
-
-  const color = isBreakable ? BREAKABLE_OBSTACLE_COLOR : SOLID_OBSTACLE_COLOR;
-  const mat = new StandardMaterial(matName, scene);
-  mat.diffuseColor = color;
-  mat.emissiveColor = color.scale(isBreakable ? 0.35 : 0.25);
-  mat.specularColor = new Color3(0.2, 0.2, 0.2);
-  return mat;
-};
-
-const getMatrixMaterial = (scene: Scene, isBreakable: boolean, theme: "blue" | "gray"): StandardMaterial => {
-  if (theme === "blue") {
-    return getObstacleMaterial(scene, isBreakable ? "breakable" : "wall");
-  }
-
-  const matName = isBreakable ? "shared-gray-obstacle-breakable" : "shared-gray-obstacle-solid";
-  const existing = scene.getMaterialByName(matName) as StandardMaterial;
-  if (existing) return existing;
-
-  const color = isBreakable ? GRAY_BREAKABLE_COLOR : GRAY_SOLID_COLOR;
-  const mat = new StandardMaterial(matName, scene);
-  mat.diffuseColor = color;
-  mat.emissiveColor = color.scale(isBreakable ? 0.35 : 0.2);
-  mat.specularColor = new Color3(0.2, 0.2, 0.2);
-  return mat;
-};
-
-const buildBaseBox = (
-  scene: Scene,
-  kind: ObstacleKind,
-  opts: ObstacleOptions,
-  size: Vector3
-): Mesh => {
-  const box = CreateBox(opts.name, { width: size.x, height: size.y, depth: size.z }, scene);
-  box.position.set(opts.position.x, opts.position.y + size.y / 2, opts.position.z);
-  box.rotation.y = opts.headingY ?? 0;
-  box.material = getObstacleMaterial(scene, kind);
-  box.checkCollisions = true;
-  box.isPickable = true;
-
-  // 🟢 Resaltado limpio de bordes exteriores (sin diagonales internas)
-  box.enableEdgesRendering();
-  box.edgesWidth = kind === "breakable" ? 3.5 : 2.5;
-  box.edgesColor = kind === "breakable" ? BREAKABLE_EDGE_COLOR : SOLID_EDGE_COLOR;
-
-  return box;
-};
-
-export const createUnitBox = (scene: Scene, opts: ObstacleOptions): Mesh => {
-  return buildBaseBox(scene, "unit", opts, new Vector3(UNIT, UNIT, UNIT));
-};
-
-export const createCoverBox = (scene: Scene, opts: ObstacleOptions): Mesh => {
-  const width = (opts.widthUnits ?? 8) * UNIT;
-  const depth = (opts.depthUnits ?? 3) * UNIT;
-  return buildBaseBox(scene, "cover", opts, new Vector3(width, 3 * UNIT, depth));
-};
-
-export const createDodgePillar = (scene: Scene, opts: ObstacleOptions): Mesh => {
-  const width = (opts.widthUnits ?? 4) * UNIT;
-  const depth = (opts.depthUnits ?? 4) * UNIT;
-  return buildBaseBox(scene, "pillar", opts, new Vector3(width, 4 * UNIT, depth));
-};
-
-export const createDodgeWall = (scene: Scene, opts: ObstacleOptions): Mesh => {
-  const width = (opts.widthUnits ?? 15) * UNIT;
-  const depth = (opts.depthUnits ?? 5) * UNIT;
-  return buildBaseBox(scene, "wall", opts, new Vector3(width, 4 * UNIT, depth));
-};
-
-export const createJumpBar = (scene: Scene, opts: ObstacleOptions & { trackWidth: number }): Mesh => {
-  return buildBaseBox(scene, "jump", opts, new Vector3(opts.trackWidth - 1.5, 3 * UNIT, 2));
-};
-
 
 const shatterMeshIntoFragments = (
   scene: Scene,
@@ -323,14 +158,208 @@ const shatterMeshIntoFragments = (
   });
 };
 
+export const createTunnelMatrixWall = (
+  scene: Scene,
+  registry: AssetRegistry,
+  opts: TunnelMatrixWallOptions
+): Mesh[] => {
+  const meshes: Mesh[] = [];
+  const cols = 3;
+  const rows = 3;
 
-export const createBreakableBox = (scene: Scene, opts: ObstacleOptions): Mesh => {
+  const cellWidth = opts.totalWidth / cols;
+  const cellHeight = opts.totalHeight / rows;
+  
+  // 🟢 El bloque destruible conserva la profundidad base (ej: 2m)
+  // y los bloques sólidos de la pared tienen el triple de profundidad (ej: 6m)
+  const breakableDepth = opts.depth ?? 2.0;
+  const solidWallDepth = breakableDepth * 3;
+  const headingY = opts.headingY ?? 0;
+
+  const rightVector = new Vector3(Math.cos(headingY), 0, -Math.sin(headingY)).normalize();
+  const targetSlotIndex = opts.targetSlotIndex ?? Math.floor(Math.random() * (cols * rows));
+
+  for (let row = 0; row < rows; row++) {
+    const rowFromBottom = rows - 1 - row;
+    const baseFloorY = opts.position.y + rowFromBottom * cellHeight;
+
+    for (let col = 0; col < cols; col++) {
+      const slotIndex = row * cols + col;
+      const lateralOffset = (col - 1) * cellWidth;
+
+      const cellFloorPos = opts.position
+        .add(rightVector.scale(lateralOffset))
+        .add(new Vector3(0, baseFloorY - opts.position.y, 0));
+
+      const cellName = `${opts.name}-cell-${slotIndex + 1}`;
+
+      if (slotIndex === targetSlotIndex) {
+        if (opts.mode === "gap") {
+          continue;
+        } else {
+          // Bloque destruible con profundidad 1x
+          const breakableMesh = buildBaseBox(
+            scene,
+            registry,
+            "breakable",
+            { name: cellName, position: cellFloorPos, headingY },
+            new Vector3(cellWidth, cellHeight, breakableDepth)
+          );
+
+          attachBreakableBehavior(scene, breakableMesh, opts.hitsRequired ?? 3);
+          meshes.push(breakableMesh);
+          continue;
+        }
+      }
+
+      // Pared sólida con profundidad 3x
+      const solidWallCell = buildBaseBox(
+        scene,
+        registry,
+        "wall",
+        { name: cellName, position: cellFloorPos, headingY },
+        new Vector3(cellWidth, cellHeight, solidWallDepth)
+      );
+      meshes.push(solidWallCell);
+    }
+  }
+
+  return meshes;
+};
+
+export interface ObstacleOptions {
+  readonly name: string;
+  readonly position: Vector3;
+  readonly headingY?: number;
+  readonly widthUnits?: number;
+  readonly depthUnits?: number;
+  readonly hitsRequired?: number;
+}
+
+export interface BreakableMetadata {
+  readonly kind: "breakable";
+  /** Disparos restantes antes de destruirse */
+  hitsRemaining: number;
+  isDestroyed: boolean;
+  destroy: (physicsAggregate?: PhysicsAggregate) => void;
+}
+
+const buildBaseBox = (
+  scene: Scene,
+  registry: AssetRegistry,
+  kind: ObstacleKind,
+  opts: ObstacleOptions,
+  size: Vector3
+): Mesh => {
+  const box = CreateBox(opts.name, { width: size.x, height: size.y, depth: size.z }, scene);
+  box.position.set(opts.position.x, opts.position.y + size.y / 2, opts.position.z);
+  box.rotation.y = opts.headingY ?? 0;
+
+  // Consumo directo y tipado desde AssetRegistry
+  box.material = registry.getMaterial(
+    kind === "breakable" ? "breakable-obstacle" : "solid-obstacle"
+  );
+
+  box.checkCollisions = true;
+  box.isPickable = true;
+
+  box.enableEdgesRendering();
+  box.edgesWidth = kind === "breakable" ? 3.5 : 2.5;
+  box.edgesColor = kind === "breakable" ? BREAKABLE_EDGE_COLOR : SOLID_EDGE_COLOR;
+
+  return box;
+};
+
+export const createUnitBox = (scene: Scene, registry: AssetRegistry, opts: ObstacleOptions): Mesh => {
+  return buildBaseBox(scene, registry, "unit", opts, new Vector3(UNIT, UNIT, UNIT));
+};
+
+export const createCoverBox = (scene: Scene, registry: AssetRegistry, opts: ObstacleOptions): Mesh => {
+  const width = (opts.widthUnits ?? 8) * UNIT;
+  const depth = (opts.depthUnits ?? 3) * UNIT;
+  return buildBaseBox(scene, registry, "cover", opts, new Vector3(width, 3 * UNIT, depth));
+};
+
+export const createDodgePillar = (scene: Scene, registry: AssetRegistry, opts: ObstacleOptions): Mesh => {
   const width = (opts.widthUnits ?? 4) * UNIT;
   const depth = (opts.depthUnits ?? 4) * UNIT;
-  const mesh = buildBaseBox(scene, "breakable", opts, new Vector3(width, 3 * UNIT, depth));
+  return buildBaseBox(scene, registry, "pillar", opts, new Vector3(width, 4 * UNIT, depth));
+};
+
+export const createDodgeWall = (scene: Scene, registry: AssetRegistry, opts: ObstacleOptions): Mesh => {
+  const width = (opts.widthUnits ?? 15) * UNIT;
+  const depth = (opts.depthUnits ?? 5) * UNIT;
+  return buildBaseBox(scene, registry, "wall", opts, new Vector3(width, 4 * UNIT, depth));
+};
+
+export const createJumpBar = (
+  scene: Scene,
+  registry: AssetRegistry,
+  opts: ObstacleOptions & { trackWidth: number }
+): Mesh => {
+  return buildBaseBox(scene, registry, "jump", opts, new Vector3(opts.trackWidth - 1.5, 3 * UNIT, 2));
+};
+
+export const createBreakableBox = (scene: Scene, registry: AssetRegistry, opts: ObstacleOptions): Mesh => {
+  const width = (opts.widthUnits ?? 4) * UNIT;
+  const depth = (opts.depthUnits ?? 4) * UNIT;
+  const mesh = buildBaseBox(scene, registry, "breakable", opts, new Vector3(width, 3 * UNIT, depth));
 
   attachBreakableBehavior(scene, mesh, opts.hitsRequired ?? 3);
-
   return mesh;
 };
 
+
+/////////
+
+type DebugBlockRole = "low-cover" | "high-platform" | "step-block" | "breakable";
+
+const DEBUG_COLORS: Record<DebugBlockRole, string> = {
+  "low-cover": "#10b981",     // Verde: cobertura baja (agachado)
+  "high-platform": "#8b5cf6", // Violeta: plataforma elevada
+  "step-block": "#f59e0b",    // Amarillo: escalón de subida
+  "breakable": "#ef4444",     // Rojo: caja destruible
+};
+const getDebugMaterial = (scene: Scene, role: DebugBlockRole): StandardMaterial => {
+  const matName = `debug-obstacle-mat-${role}`;
+  const existing = scene.getMaterialByName(matName) as StandardMaterial;
+  if (existing) return existing;
+
+  const mat = new StandardMaterial(matName, scene);
+  const color = Color3.FromHexString(DEBUG_COLORS[role]);
+  mat.diffuseColor = color;
+  mat.emissiveColor = color.scale(0.25);
+  mat.specularColor = new Color3(0.15, 0.15, 0.15);
+  return mat;
+};
+// --- FIN MATERIALES TEMPORALES ---
+
+/** Cobertura baja (Verde): cubre al jugador agachado (0.4m) y libera tiro de pie (0.8m) */
+export const createLowCoverBox = (scene: Scene, _registry: AssetRegistry, opts: ObstacleOptions): Mesh => {
+  const width = (opts.widthUnits ?? 7) * UNIT;   // 2.8m
+  const height = 1.35 * UNIT;                    // 0.54m
+  const depth = (opts.depthUnits ?? 2) * UNIT;   // 0.8m
+  const mesh = buildBaseBox(scene, _registry, "cover", opts, new Vector3(width, height, depth));
+  mesh.material = getDebugMaterial(scene, "low-cover");
+  return mesh;
+};
+
+/** Plataforma elevada (Violeta): posición alta para disparar hacia abajo */
+export const createHighPlatform = (scene: Scene, _registry: AssetRegistry, opts: ObstacleOptions): Mesh => {
+  const width = (opts.widthUnits ?? 9) * UNIT;   // 3.6m
+  const height = 3.5 * UNIT;                     // 1.40m
+  const depth = (opts.depthUnits ?? 9) * UNIT;   // 3.6m
+  const mesh = buildBaseBox(scene, _registry, "wall", opts, new Vector3(width, height, depth));
+  mesh.material = getDebugMaterial(scene, "high-platform");
+  return mesh;
+};
+
+/** Escalón (Amarillo): peldaño intermedio para subir a la plataforma */
+export const createStepBlock = (scene: Scene, _registry: AssetRegistry, opts: ObstacleOptions): Mesh => {
+  const width = (opts.widthUnits ?? 4) * UNIT;   // 1.6m
+  const height = 1.75 * UNIT;                    // 0.70m
+  const depth = (opts.depthUnits ?? 4) * UNIT;   // 1.6m
+  const mesh = buildBaseBox(scene, _registry, "cover", opts, new Vector3(width, height, depth));
+  mesh.material = getDebugMaterial(scene, "step-block");
+  return mesh;
+};

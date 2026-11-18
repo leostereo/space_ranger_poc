@@ -9,6 +9,7 @@ import { createGlbMap, type LoadedGlbMap, type LoadedMap } from "./level-map-fac
 import type { LevelScope } from "./level-scope";
 import { createProceduralMap } from "./procedural-map-factory";
 import { ManagedUnitInstance } from "./unit-builder.types";
+import { AssetRegistry } from "../assets/asset-registry";
 
 /** Qué parte de la barra ocupa la descarga; el resto es el procesamiento (fusión de mallas). */
 const DOWNLOAD_PROGRESS_WEIGHT = 0.8;
@@ -28,7 +29,10 @@ export interface LevelLoaderEventMap {
 export class LevelLoader {
   readonly events = new TypedEventEmitter<LevelLoaderEventMap>();
 
-  constructor(private readonly scene: Scene) {}
+  constructor(
+    private readonly scene: Scene,
+    private readonly registry: AssetRegistry,
+  ) {}
 
   /** Devuelve null si el scope se liberó durante la carga (cancelada). Rechaza si algo falla. */
   /**
@@ -74,7 +78,7 @@ export class LevelLoader {
       droppedMeshCount += loaded.droppedMeshCount;
     } else {
       report("building", 0);
-      const built = createProceduralMap(source, this.scene, scope);
+      const built = createProceduralMap(source, this.scene, scope, this.registry);
       if (!built) {
         return null;
       }
