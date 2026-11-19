@@ -234,6 +234,8 @@ export interface ObstacleOptions {
   readonly widthUnits?: number;
   readonly depthUnits?: number;
   readonly hitsRequired?: number;
+  readonly isBreakable?: boolean; // Permite que cualquier forma sea destruible
+  readonly vertical?: boolean;    // Permite colocar el bloque "parado"
 }
 
 export interface BreakableMetadata {
@@ -314,52 +316,60 @@ export const createBreakableBox = (scene: Scene, registry: AssetRegistry, opts: 
 
 type DebugBlockRole = "low-cover" | "high-platform" | "step-block" | "breakable";
 
-const DEBUG_COLORS: Record<DebugBlockRole, string> = {
-  "low-cover": "#10b981",     // Verde: cobertura baja (agachado)
-  "high-platform": "#8b5cf6", // Violeta: plataforma elevada
-  "step-block": "#f59e0b",    // Amarillo: escalón de subida
-  "breakable": "#ef4444",     // Rojo: caja destruible
-};
-const getDebugMaterial = (scene: Scene, role: DebugBlockRole): StandardMaterial => {
-  const matName = `debug-obstacle-mat-${role}`;
-  const existing = scene.getMaterialByName(matName) as StandardMaterial;
-  if (existing) return existing;
 
-  const mat = new StandardMaterial(matName, scene);
-  const color = Color3.FromHexString(DEBUG_COLORS[role]);
-  mat.diffuseColor = color;
-  mat.emissiveColor = color.scale(0.25);
-  mat.specularColor = new Color3(0.15, 0.15, 0.15);
-  return mat;
-};
-// --- FIN MATERIALES TEMPORALES ---
+/** Cobertura táctica: horizontal (0.54m alto) o parada/vertical (2.8m alto) */
+export const createLowCoverBox = (scene: Scene, registry: AssetRegistry, opts: ObstacleOptions): Mesh => {
+  const span = (opts.widthUnits ?? 7) * UNIT;      // 2.8m
+  const thickness = 1.35 * UNIT;                   // 0.54m
+  const depth = (opts.depthUnits ?? 2) * UNIT;     // 0.8m
 
-/** Cobertura baja (Verde): cubre al jugador agachado (0.4m) y libera tiro de pie (0.8m) */
-export const createLowCoverBox = (scene: Scene, _registry: AssetRegistry, opts: ObstacleOptions): Mesh => {
-  const width = (opts.widthUnits ?? 7) * UNIT;   // 2.8m
-  const height = 1.35 * UNIT;                    // 0.54m
-  const depth = (opts.depthUnits ?? 2) * UNIT;   // 0.8m
-  const mesh = buildBaseBox(scene, _registry, "cover", opts, new Vector3(width, height, depth));
-  mesh.material = getDebugMaterial(scene, "low-cover");
+  const size = opts.vertical
+    ? new Vector3(thickness, span, depth)          // Parado como pilar/muro angosto
+    : new Vector3(span, thickness, depth);         // Acostado como parapeto bajo
+
+  const kind: ObstacleKind = opts.isBreakable ? "breakable" : "cover";
+  const mesh = buildBaseBox(scene, registry, kind, opts, size);
+
+  if (opts.isBreakable) {
+    attachBreakableBehavior(scene, mesh, opts.hitsRequired ?? 3);
+  }
   return mesh;
 };
 
-/** Plataforma elevada (Violeta): posición alta para disparar hacia abajo */
-export const createHighPlatform = (scene: Scene, _registry: AssetRegistry, opts: ObstacleOptions): Mesh => {
-  const width = (opts.widthUnits ?? 9) * UNIT;   // 3.6m
-  const height = 3.5 * UNIT;                     // 1.40m
-  const depth = (opts.depthUnits ?? 9) * UNIT;   // 3.6m
-  const mesh = buildBaseBox(scene, _registry, "wall", opts, new Vector3(width, height, depth));
-  mesh.material = getDebugMaterial(scene, "high-platform");
+/** Plataforma elevada amplia (o muro alto si va parada) */
+export const createHighPlatform = (scene: Scene, registry: AssetRegistry, opts: ObstacleOptions): Mesh => {
+  const width = (opts.widthUnits ?? 9) * UNIT;     // 3.6m
+  const height = 3.5 * UNIT;                       // 1.4m
+  const depth = (opts.depthUnits ?? 9) * UNIT;     // 3.6m
+
+  const size = opts.vertical
+    ? new Vector3(height, width, depth)            // Parado como monolito alto
+    : new Vector3(width, height, depth);
+
+  const kind: ObstacleKind = opts.isBreakable ? "breakable" : "wall";
+  const mesh = buildBaseBox(scene, registry, kind, opts, size);
+
+  if (opts.isBreakable) {
+    attachBreakableBehavior(scene, mesh, opts.hitsRequired ?? 3);
+  }
   return mesh;
 };
 
-/** Escalón (Amarillo): peldaño intermedio para subir a la plataforma */
-export const createStepBlock = (scene: Scene, _registry: AssetRegistry, opts: ObstacleOptions): Mesh => {
-  const width = (opts.widthUnits ?? 4) * UNIT;   // 1.6m
-  const height = 1.75 * UNIT;                    // 0.70m
-  const depth = (opts.depthUnits ?? 4) * UNIT;   // 1.6m
-  const mesh = buildBaseBox(scene, _registry, "cover", opts, new Vector3(width, height, depth));
-  mesh.material = getDebugMaterial(scene, "step-block");
+/** Escalón / bloque medio */
+export const createStepBlock = (scene: Scene, registry: AssetRegistry, opts: ObstacleOptions): Mesh => {
+  const width = (opts.widthUnits ?? 4) * UNIT;     // 1.6m
+  const height = 1.75 * UNIT;                      // 0.70m
+  const depth = (opts.depthUnits ?? 4) * UNIT;     // 1.6m
+
+  const size = opts.vertical
+    ? new Vector3(height, width, depth)
+    : new Vector3(width, height, depth);
+
+  const kind: ObstacleKind = opts.isBreakable ? "breakable" : "cover";
+  const mesh = buildBaseBox(scene, registry, kind, opts, size);
+
+  if (opts.isBreakable) {
+    attachBreakableBehavior(scene, mesh, opts.hitsRequired ?? 3);
+  }
   return mesh;
 };

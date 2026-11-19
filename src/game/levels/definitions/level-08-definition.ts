@@ -15,155 +15,156 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
         distanceToEnable: 0,
         enabledDefault: true
     },
-    
     {
-        id: "shooting_playground_1",
-        kind: "shooting_playground",
-        length: 20,
-        distanceToEnable: 20,
-        enabledDefault: true,
-        playgroundConfig:{
-            coverRows: 1,
-            width: 10,
-            coversPerRow: 1,
-            staticDroneCount: 1
+        id: "pp_libre_tramo_recto_sinTunel",
+        kind: "parametric_path",
+        length: 250, // Largo de referencia
+        distanceToEnable: 270,
+        enabledDefault: false,
+        parametricConfig: {
+            straightSegments: 1,   // 4 tramos de 25m = 100 metros totalmente rectos
+            upSegments: 0,         // Sin subidas
+            downSegments: 0,       // Sin bajadas
+            curveRightSegments: 0, // Sin curvas a la derecha
+            curveLeftSegments: 0,  // Sin curvas a la izquierda
+            includeTunnel: false,  // Sin carcasa de tubo para tener vista despejada
+            jumpCount: 0,          // 1 valla de salto (verde)
+            dodgeCount: 0,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
+            breakableCount: 0,      // 1 bloque destruible (rojo)
+            unitBoxCount: 0,
+            matrixWallGapCount: 0,        // 1 pared con hueco libre
+            matrixWallBreakableCount: 0   // 1 pared con celda destruible
+
         }
     },
-    
-    // {
-    //     id: "pp_libre_",
-    //     kind: "parametric_path",
-    //     length: 250, // Largo de referencia
-    //     distanceToEnable: 270,
-    //     enabledDefault: false,
-    //     parametricConfig: {
-    //         straightSegments: 1,   // 4 tramos de 25m = 100 metros totalmente rectos
-    //         upSegments: 0,         // Sin subidas
-    //         downSegments: 0,       // Sin bajadas
-    //         curveRightSegments: 0, // Sin curvas a la derecha
-    //         curveLeftSegments: 0,  // Sin curvas a la izquierda
-    //         includeTunnel: false,  // Sin carcasa de tubo para tener vista despejada
-    //         jumpCount: 0,          // 1 valla de salto (verde)
-    //         dodgeCount: 0,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
-    //         breakableCount: 0,      // 1 bloque destruible (rojo)
-    //         unitBoxCount: 0,
-    //         matrixWallGapCount: 0,        // 1 pared con hueco libre
-    //         matrixWallBreakableCount: 0   // 1 pared con celda destruible
+    {
+        id: "pp_test_recta_obstaculo",
+        kind: "parametric_path",
+        length: 250, // Largo de referencia
+        distanceToEnable: 270,
+        enabledDefault: false,
+        parametricConfig: {
+            straightSegments: 1,   // 4 tramos de 25m = 100 metros totalmente rectos
+            upSegments: 0,         // Sin subidas
+            downSegments: 0,       // Sin bajadas
+            curveRightSegments: 0, // Sin curvas a la derecha
+            curveLeftSegments: 0,  // Sin curvas a la izquierda
+            includeTunnel: true,  // Sin carcasa de tubo para tener vista despejada
+            jumpCount: 0,          // 1 valla de salto (verde)
+            dodgeCount: 0,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
+            breakableCount: 0,      // 1 bloque destruible (rojo)
+            unitBoxCount: 0,
+            matrixWallGapCount: 1,        // 1 pared con hueco libre
+            matrixWallBreakableCount: 0   // 1 pared con celda destruible
 
-    //     }
-    // },
-    // {
-    //     id: "pp_test_recta_obstaculo",
-    //     kind: "parametric_path",
-    //     length: 250, // Largo de referencia
-    //     distanceToEnable: 270,
-    //     enabledDefault: false,
-    //     parametricConfig: {
-    //         straightSegments: 1,   // 4 tramos de 25m = 100 metros totalmente rectos
-    //         upSegments: 0,         // Sin subidas
-    //         downSegments: 0,       // Sin bajadas
-    //         curveRightSegments: 0, // Sin curvas a la derecha
-    //         curveLeftSegments: 0,  // Sin curvas a la izquierda
-    //         includeTunnel: true,  // Sin carcasa de tubo para tener vista despejada
-    //         jumpCount: 0,          // 1 valla de salto (verde)
-    //         dodgeCount: 0,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
-    //         breakableCount: 0,      // 1 bloque destruible (rojo)
-    //         unitBoxCount: 0,
-    //         matrixWallGapCount: 1,        // 1 pared con hueco libre
-    //         matrixWallBreakableCount: 0   // 1 pared con celda destruible
+        }
+    },
+    {
+        id: "pp_test_recta_obstaculo2",
+        kind: "parametric_path",
+        length: 250, // Largo de referencia
+        distanceToEnable: 270,
+        enabledDefault: false,
+        parametricConfig: {
+            straightSegments: 1,   // 4 tramos de 25m = 100 metros totalmente rectos
+            upSegments: 0,         // Sin subidas
+            downSegments: 0,       // Sin bajadas
+            curveRightSegments: 0, // Sin curvas a la derecha
+            curveLeftSegments: 0,  // Sin curvas a la izquierda
+            includeTunnel: true,  // Sin carcasa de tubo para tener vista despejada
+            jumpCount: 0,          // 1 valla de salto (verde)
+            dodgeCount: 0,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
+            breakableCount: 0,      // 1 bloque destruible (rojo)
+            unitBoxCount: 0,
+            matrixWallGapCount: 1,        // 1 pared con hueco libre
+            matrixWallBreakableCount: 0   // 1 pared con celda destruible
 
-    //     }
-    // },
-    // {
-    //     id: "pp_test_recta_obstaculo2",
-    //     kind: "parametric_path",
-    //     length: 250, // Largo de referencia
-    //     distanceToEnable: 270,
-    //     enabledDefault: false,
-    //     parametricConfig: {
-    //         straightSegments: 1,   // 4 tramos de 25m = 100 metros totalmente rectos
-    //         upSegments: 0,         // Sin subidas
-    //         downSegments: 0,       // Sin bajadas
-    //         curveRightSegments: 0, // Sin curvas a la derecha
-    //         curveLeftSegments: 0,  // Sin curvas a la izquierda
-    //         includeTunnel: true,  // Sin carcasa de tubo para tener vista despejada
-    //         jumpCount: 0,          // 1 valla de salto (verde)
-    //         dodgeCount: 0,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
-    //         breakableCount: 0,      // 1 bloque destruible (rojo)
-    //         unitBoxCount: 0,
-    //         matrixWallGapCount: 1,        // 1 pared con hueco libre
-    //         matrixWallBreakableCount: 0   // 1 pared con celda destruible
+        }
+    },
+    {
+        id: "pp_test_recta_obstaculo_destruir",
+        kind: "parametric_path",
+        length: 250, // Largo de referencia
+        distanceToEnable: 270,
+        enabledDefault: false,
+        parametricConfig: {
+            straightSegments: 1,   // 4 tramos de 25m = 100 metros totalmente rectos
+            upSegments: 0,         // Sin subidas
+            downSegments: 0,       // Sin bajadas
+            curveRightSegments: 0, // Sin curvas a la derecha
+            curveLeftSegments: 0,  // Sin curvas a la izquierda
+            includeTunnel: true,  // Sin carcasa de tubo para tener vista despejada
+            jumpCount: 0,          // 1 valla de salto (verde)
+            dodgeCount: 0,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
+            breakableCount: 0,      // 1 bloque destruible (rojo)
+            unitBoxCount: 0,
+            matrixWallGapCount: 0,        // 1 pared con hueco libre
+            matrixWallBreakableCount: 1   // 1 pared con celda destruible
 
-    //     }
-    // },
-    // {
-    //     id: "pp_test_recta_obstaculo_destruir",
-    //     kind: "parametric_path",
-    //     length: 250, // Largo de referencia
-    //     distanceToEnable: 270,
-    //     enabledDefault: false,
-    //     parametricConfig: {
-    //         straightSegments: 1,   // 4 tramos de 25m = 100 metros totalmente rectos
-    //         upSegments: 0,         // Sin subidas
-    //         downSegments: 0,       // Sin bajadas
-    //         curveRightSegments: 0, // Sin curvas a la derecha
-    //         curveLeftSegments: 0,  // Sin curvas a la izquierda
-    //         includeTunnel: true,  // Sin carcasa de tubo para tener vista despejada
-    //         jumpCount: 0,          // 1 valla de salto (verde)
-    //         dodgeCount: 0,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
-    //         breakableCount: 0,      // 1 bloque destruible (rojo)
-    //         unitBoxCount: 0,
-    //         matrixWallGapCount: 0,        // 1 pared con hueco libre
-    //         matrixWallBreakableCount: 1   // 1 pared con celda destruible
+        }
+    },
+    {
+        id: "bridge_zone_1",
+        kind: "kamikaze_bridge",
+        length: 180,
+        distanceToEnable: 190,
+        enabledDefault: false
+    },
+    {
+        id: "pp_test_recto_separador1",
+        kind: "parametric_path",
+        length: 150, // Largo de referencia
+        distanceToEnable: 200,
+        enabledDefault: false,
+        parametricConfig: {
+            straightSegments: 1,   // 4 tramos de 25m = 100 metros totalmente rectos
+            upSegments: 0,         // Sin subidas
+            downSegments: 0,       // Sin bajadas
+            curveRightSegments: 0, // Sin curvas a la derecha
+            curveLeftSegments: 0,  // Sin curvas a la izquierda
+            includeTunnel: true,  // Sin carcasa de tubo para tener vista despejada
+            jumpCount: 0,          // 1 valla de salto (verde)
+            dodgeCount: 0,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
+            breakableCount: 0,      // 1 bloque destruible (rojo)
+            unitBoxCount: 0,
+            matrixWallGapCount: 0,        // 1 pared con hueco libre
+            matrixWallBreakableCount: 0   // 1 pared con celda destruible
 
-    //     }
-    // },
-    // {
-    //     id: "bridge_zone_1",
-    //     kind: "kamikaze_bridge",
-    //     length: 180,
-    //     distanceToEnable: 190,
-    //     enabledDefault: false
-    // },
-    // {
-    //     id: "pp_test_recto_separador1",
-    //     kind: "parametric_path",
-    //     length: 150, // Largo de referencia
-    //     distanceToEnable: 200,
-    //     enabledDefault: false,
-    //     parametricConfig: {
-    //         straightSegments: 1,   // 4 tramos de 25m = 100 metros totalmente rectos
-    //         upSegments: 0,         // Sin subidas
-    //         downSegments: 0,       // Sin bajadas
-    //         curveRightSegments: 0, // Sin curvas a la derecha
-    //         curveLeftSegments: 0,  // Sin curvas a la izquierda
-    //         includeTunnel: true,  // Sin carcasa de tubo para tener vista despejada
-    //         jumpCount: 0,          // 1 valla de salto (verde)
-    //         dodgeCount: 0,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
-    //         breakableCount: 0,      // 1 bloque destruible (rojo)
-    //         unitBoxCount: 0,
-    //         matrixWallGapCount: 0,        // 1 pared con hueco libre
-    //         matrixWallBreakableCount: 0   // 1 pared con celda destruible
+        }
+    },
+    {
+        id: "pt_test1",
+        kind: "parametric_tunnel",
+        length: 150,
+        distanceToEnable: 200,
+        enabledDefault: false,
+        tunnelConfig: {
+            straightSegments: 1,
+            upSegments: 0,
+            downSegments: 0,
+            curveRightSegments: 0,
+            curveLeftSegments: 0,
+            matrixWallGapCount: 0,
+            matrixWallBreakableCount: 0,
+            breakableHitsRequired: 0,
+        }
+    },
 
-    //     }
-    // },
-    // {
-    //     id: "pt_test1",
-    //     kind: "parametric_tunnel",
-    //     length: 150,
-    //     distanceToEnable: 200,
-    //     enabledDefault: false,
-    //     tunnelConfig: {
-    //         straightSegments: 1,
-    //         upSegments: 0,
-    //         downSegments: 0,
-    //         curveRightSegments: 0,
-    //         curveLeftSegments: 0,
-    //         matrixWallGapCount: 0,
-    //         matrixWallBreakableCount: 0,
-    //         breakableHitsRequired: 0,
-    //     }
-    // },
+        {
+        id: "shooting_playground_1",
+        kind: "shooting_playground",
+        length: 32,
+        distanceToEnable: 60,
+        enabledDefault: true,
+        playgroundConfig: {
+            width: 100,
+            groupingMin: 10,
+            groupingMax: 15,
+            breakablePercent: 0.25,
+            freeResultingSpace: 0.9,
+            staticDroneCount: 5,
+        }
+    }
     // {
     //     id: "pp_test_curva_bajada",
     //     kind: "parametric_path",
@@ -293,23 +294,52 @@ const createPreCalculatedSpawns = (): Level08PreCalculatedSpawns => {
 
         if (unit.kind === "shooting_playground" && unit.playgroundConfig) {
             const { width, staticDroneCount } = unit.playgroundConfig;
-            const usableWidth = width * 0.8;
-            const droneZ = currentPos.z + actualLength * 0.85; // Ubicados en el último 15% de la plaza
-            const droneY = currentPos.y + 1.5;                 // Altura de flotación / tiro
+
+            // Márgenes de seguridad para que no queden en el borde del vacío ni pegados a la entrada
+            const lateralMargin = 1.5;
+            const entrySafeMargin = 4.0; // Primeros 4m libres para que el jugador pueda entrar
+            const exitMargin = 1.5;
+
+            const minX = currentPos.x - (width * 0.5) + lateralMargin;
+            const maxX = currentPos.x + (width * 0.5) - lateralMargin;
+            const minZ = currentPos.z + entrySafeMargin;
+            const maxZ = currentPos.z + actualLength - exitMargin;
+
+            // Nacen a +5m (por encima de la pila máxima de 3 bloques) para que el raycast los baje a la superficie exacta
+            const initialProbeY = currentPos.y + 5.0;
+            const minSeparation = 2.5; // Evita que dos drones nazcan encimados
+            const placedPositions: Vector3[] = [];
 
             for (let i = 0; i < staticDroneCount; i++) {
-                const fraction = (i + 1) / (staticDroneCount + 1);
-                const xOffset = -usableWidth * 0.5 + usableWidth * fraction;
-                const spawnPos = new Vector3(currentPos.x + xOffset, droneY, droneZ);
+        let candidatePos = new Vector3(currentPos.x, initialProbeY, (minZ + maxZ) * 0.5);
 
-                staticDrone.push({
-                    position: spawnPos,
-                    forward: forwardDirection.scale(-1), // Mirando hacia el jugador (-Z)
-                    fireDelaySeconds: 0.5 + i * 0.4,     // Disparo escalonado
-                    groupId: unit.id
-                } as any);
+        // Hasta 20 intentos para encontrar un punto que respete la distancia mínima con otros drones
+        for (let attempt = 0; attempt < 20; attempt++) {
+            const randX = minX + Math.random() * Math.max(0.1, maxX - minX);
+            const randZ = minZ + Math.random() * Math.max(0.1, maxZ - minZ);
+            const testPos = new Vector3(randX, initialProbeY, randZ);
+
+            const tooClose = placedPositions.some(
+                (existing) => Vector3.DistanceSquared(existing, testPos) < minSeparation * minSeparation
+            );
+
+            if (!tooClose) {
+                candidatePos = testPos;
+                break;
             }
         }
+
+        placedPositions.push(candidatePos);
+
+        staticDrone.push({
+            position: candidatePos,
+            forward: forwardDirection.scale(-1),
+            fireDelaySeconds: 0.4 + i * 0.35,
+            groupId: unit.id,
+        } as any);
+            }
+        }
+
 
         // Avanzamos el cursor lineal para bloques rectos
         currentPos = currentPos.add(forwardDirection.scale(actualLength));

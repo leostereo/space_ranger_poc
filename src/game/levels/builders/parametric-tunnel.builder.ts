@@ -8,6 +8,7 @@ import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import type { Scene } from "@babylonjs/core/scene";
 import type { UnitData, UnitBuilderResult, ParametricTunnelConfig } from "../unit-builder.types";
 import { createTunnelMatrixWall } from "../procedural/obstacle-builder";
+import { AssetRegistry } from "@/game/assets/asset-registry";
 
 // 🟢 Constantes parametrizables para la extrusión de las paredes matriz 3x3 en dirección forward
 const MIN_WALL_EXTRUDE_DEPTH = 3;
@@ -77,7 +78,8 @@ export function buildParametricTunnel(
   scene: Scene,
   unit: UnitData,
   currentPosition: Vector3,
-  forwardDirection: Vector3
+  forwardDirection: Vector3,
+  registry: AssetRegistry
 ): UnitBuilderResult {
   const meshes: Mesh[] = [];
   const config = unit.tunnelConfig;
@@ -212,7 +214,7 @@ export function buildParametricTunnel(
     const extrudeDepth =
       MIN_WALL_EXTRUDE_DEPTH + Math.random() * (MAX_WALL_EXTRUDE_DEPTH - MIN_WALL_EXTRUDE_DEPTH);
 
-    const wallMeshes = createTunnelMatrixWall(scene, {
+    const wallMeshes = createTunnelMatrixWall(scene,registry, {
       name: `${unit.id}-matrix-${mode}-${idx}`,
       position: point,
       headingY,

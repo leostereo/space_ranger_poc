@@ -18,6 +18,7 @@ import {
   createBreakableBox,
   createTunnelMatrixWall,
 } from "../procedural/obstacle-builder";
+import { AssetRegistry } from "@/game/assets/asset-registry";
 
 const SOLID_GLOW = 0.25;
 const SOLID_SPECULAR = new Color3(0.1, 0.1, 0.1);
@@ -121,7 +122,8 @@ export function buildParametricPath(
   scene: Scene,
   unit: UnitData,
   currentPosition: Vector3,
-  forwardDirection: Vector3
+  forwardDirection: Vector3,
+  registry: AssetRegistry
 ): UnitBuilderResult {
   const meshes: Mesh[] = [];
   const config = unit.parametricConfig;
@@ -291,7 +293,7 @@ export function buildParametricPath(
     const transform = getTransformAtSlot(obstacleSlot++, carril);
     if (!transform) break;
     meshes.push(
-      createUnitBox(scene, {
+      createUnitBox(scene, registry, {
         name: `${unit.id} - unit - ${i}`,
         position: transform.position,
         headingY: transform.headingY,
@@ -303,7 +305,7 @@ export function buildParametricPath(
     const transform = getTransformAtSlot(obstacleSlot++, 0);
     if (!transform) break;
     meshes.push(
-      createJumpBar(scene, {
+      createJumpBar(scene, registry, {
         name: `${unit.id} - jump - ${i}`,
         position: transform.position,
         headingY: transform.headingY,
@@ -318,7 +320,7 @@ export function buildParametricPath(
       const transform = getTransformAtSlot(obstacleSlot++, carril);
       if (!transform) break;
       meshes.push(
-        createDodgePillar(scene, {
+        createDodgePillar(scene, registry, {
           name: `${unit.id} - pillar - ${i}`,
           position: transform.position,
           headingY: transform.headingY,
@@ -334,7 +336,7 @@ export function buildParametricPath(
       const transform = getTransformAtSlot(obstacleSlot++, lateralX);
       if (!transform) break;
       meshes.push(
-        createDodgeWall(scene, {
+        createDodgeWall(scene, registry, {
           name: `${unit.id} - wall - ${i}`,
           position: transform.position,
           headingY: transform.headingY,
@@ -350,7 +352,7 @@ export function buildParametricPath(
     const transform = getTransformAtSlot(obstacleSlot++, carril);
     if (!transform) break;
     meshes.push(
-      createBreakableBox(scene, {
+      createBreakableBox(scene, registry, {
         name: `${unit.id} - breakable - ${i}`,
         position: transform.position,
         headingY: transform.headingY,
@@ -364,7 +366,7 @@ export function buildParametricPath(
   matrixPlans.forEach((plan, index) => {
     const transform = getTransformAtSlot(plan.slot, 0);
     if (!transform) return;
-    const wallMeshes = createTunnelMatrixWall(scene, {
+    const wallMeshes = createTunnelMatrixWall(scene, registry, {
       name: ` ${unit.id} - matrix - ${plan.mode} - ${index}`,
       position: transform.position,
       headingY: transform.headingY,

@@ -87,11 +87,35 @@ export interface ParametricTunnelConfig {
   readonly breakableHitsRequired?: number;
 }
 export interface ShootingPlaygroundConfig {
-  readonly width: number;               // Ej: 30
-  readonly coverRows: number;           // Ej: 3 filas de avance
-  readonly coversPerRow: number;        // Ej: 4 bloques por fila
-  readonly breakableRatio?: number;     // 0 a 1 (ej: 0.3 para que 30% sean destruibles)
-  readonly staticDroneCount: number;    // Ej: 4 drones al fondo
-  readonly dummyTargetCount?: number;   // Opcional: blancos estáticos
+  readonly width: number;
+  readonly groupingMin: number;         // Ej: 2
+  readonly groupingMax: number;         // Ej: 5
+  readonly breakablePercent: number;    // 0 a 1 (ej: 0.25 = 25% destruibles)
+  readonly freeResultingSpace: number;  // 0 a 1 (ej: 0.70 = 70% de superficie caminable libre)
+  readonly staticDroneCount: number;
+  readonly seed?: number;               // Opcional para depuración determinista
+}
+
+export interface NavCell {
+  readonly col: number;
+  readonly row: number;
+  readonly worldCenter: Vector3;
+  readonly isWalkable: boolean;
+}
+
+export interface PlaygroundNavGrid {
+  readonly cellSize: number;
+  readonly cols: number;
+  readonly rows: number;
+  readonly origin: Vector3;
+  readonly cells: readonly NavCell[];
+}
+
+export interface UnitBuilderResult {
+  readonly meshes: Mesh[];
+  readonly enemySpawns: EnemySpawn[];
+  readonly centerPosition: Vector3;
+  readonly nextPosition: Vector3;
+  readonly navGrid?: PlaygroundNavGrid; // Metadata espacial para NavMesh (Punto 5)
 }
 

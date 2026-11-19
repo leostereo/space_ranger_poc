@@ -56,6 +56,8 @@ export interface DroneOptions {
     forward: Vector3,
     pitchToForward: boolean
   ) => any;
+  readonly canFire?: () => boolean;
+  readonly weaponConfig?: Partial<ProjectileWeaponConfig>;
 }
 
 const resolveForward = (forward: Vector3 | undefined): Vector3 =>
@@ -76,7 +78,7 @@ export abstract class DroneBase extends EnemyBase {
   private flashRemaining = 0;
   private released = false;
   private readonly armed: boolean;
-
+  protected readonly muzzle: TransformNode; 
   constructor(id: string, type: EnemyType, spawn: EnemySpawn, deps: EnemyDeps, options: DroneOptions) {
     super(id, type);
     this.armed = options.armed ?? true;
@@ -104,13 +106,19 @@ export abstract class DroneBase extends EnemyBase {
 
     // 🟢 OPTIMIZACIÓN DE DETECCIÓN: 
     // Solo creamos la infraestructura del pool físico si el dron realmente va a disparar proyectiles
+    this.muzzle = model.muzzle;
     if (this.armed) {
+      const finalWeaponConfig: ProjectileWeaponConfig = {
+        ...WEAPON_CONFIG,
+        ...options.weaponConfig,
+      };
+
       this.weapon = new ProjectileWeaponController(
         deps.scene,
         model.muzzle,
-        () => true,
+        options.canFire ?? (() => true),
         this.meshes,
-        WEAPON_CONFIG,
+        finalWeaponConfig,
         { sourceId: id, isExtraTarget: deps.isPlayerMesh },
       );
     }

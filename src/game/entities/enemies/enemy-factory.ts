@@ -9,7 +9,7 @@ import { EnemiesManager } from "./enemies-manager";
 import type { NavigationService } from "../../navigation/navigation-service";
 import { FlyingSentinelDrone } from "./flying-sentinel/flying-sentinel-drone";
 import { SentinelDrone } from "./sentinel/sentinel-drone";
-import { StaticDrone } from "./static-drone";
+import { StaticDrone } from "./drone/static-drone/static-drone";
 import { RaycastDummy } from "./raycast-dummy";
 import { DummyKamikazeDrone } from "./dummy-kamikaze-drone/dummy-kamikaze-drone";
 

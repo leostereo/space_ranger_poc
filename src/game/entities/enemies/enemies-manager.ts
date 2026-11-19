@@ -9,7 +9,7 @@ import { AssetRegistry } from "@/game/assets/asset-registry";
 import { NavigationService } from "@/game/navigation/navigation-service";
 import { EnemySpawn, EnemySpawns, EnemyType } from "@/game/levels/level-definition";
 import { DummyTarget } from "./dummy-target";
-import { StaticDrone } from "./static-drone";
+import { StaticDrone } from "./drone/static-drone/static-drone";
 import { SentinelDrone } from "./sentinel/sentinel-drone";
 import { FlyingSentinelDrone } from "./flying-sentinel/flying-sentinel-drone";
 import { RaycastDummy } from "./raycast-dummy";
