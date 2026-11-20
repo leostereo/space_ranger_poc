@@ -9,13 +9,16 @@ import type {
 } from "./unit-builder.types";
 
 // Importación de tus builders existentes + el nuevo
-import { buildSpawnPlatform } from "./builders/spawn-platform.builder";
 import { buildParametricPath } from "./builders/parametric-path.builder";
 import { buildParametricTunnel } from "./builders/parametric-tunnel.builder";
 import { buildKamikazeBridge } from "./builders/kamikaze-bridge.builder";
 import { buildEmptyTunnel } from "./builders/empty-tunnel.builder";
 import { buildShootingPlayground } from "./builders/shooting-playground.builder";
-import { buildEmptyPlatform, buildFinishPlatform } from "./builders/platform.builder";
+import {
+  buildSpawnPlatform,
+  buildEmptyPlatform,
+  buildFinishPlatform,
+} from "./builders/platform.builder";
 
 const UNIT_BUILDERS: Record<UnitKind, UnitBuilderFn> = {
   spawn_platform: buildSpawnPlatform,

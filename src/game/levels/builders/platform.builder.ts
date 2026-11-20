@@ -10,6 +10,7 @@ import type { UnitData, UnitBuilderResult } from "../unit-builder.types";
 const PLATFORM_THICKNESS = 0.4;
 const DEFAULT_PLATFORM_WIDTH = 14;
 
+const SPAWN_EDGE_COLOR = new Color4(0.22, 0.74, 0.97, 0.95);  // Celeste eléctrico brillante (Inicio)
 const EMPTY_EDGE_COLOR = new Color4(0.22, 0.74, 0.97, 0.55);  // Celeste estándar
 const FINISH_EDGE_COLOR = new Color4(0.06, 0.73, 0.51, 0.95); // Verde esmeralda para la meta
 
@@ -57,6 +58,24 @@ function buildBasePlatform(
     centerPosition,
     nextPosition,
   };
+}
+
+export function buildSpawnPlatform(
+    scene: Scene,
+    unit: UnitData,
+    currentPosition: Vector3,
+    forwardDirection: Vector3,
+    registry: AssetRegistry
+): UnitBuilderResult {
+    return buildBasePlatform(
+        scene,
+        unit,
+        currentPosition,
+        forwardDirection,
+        registry,
+        SPAWN_EDGE_COLOR,
+        "spawn-platform"
+    );
 }
 
 export function buildEmptyPlatform(

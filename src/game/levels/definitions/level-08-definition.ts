@@ -11,7 +11,7 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
     {
         id: "start_zone",
         kind: "spawn_platform",
-        length: 24,
+        length: 20,
         distanceToEnable: 0,
         enabledDefault: true
     },
@@ -107,14 +107,14 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
         id: "bridge_zone_1",
         kind: "kamikaze_bridge",
         length: 100,
-        distanceToEnable: 110,
+        distanceToEnable: 150,
         enabledDefault: false
     },
     {
         id: "pp_bajada_curva_stunel",
         kind: "parametric_path",
         length: 250, // Largo de referencia
-        distanceToEnable: 260,
+        distanceToEnable: 300,
         enabledDefault: false,
         parametricConfig: {
             straightSegments: 0,   // 4 tramos de 25m = 100 metros totalmente rectos
@@ -136,7 +136,7 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
         id: "pt_solo_curva",
         kind: "parametric_tunnel",
         length: 250,
-        distanceToEnable: 260,
+        distanceToEnable: 300,
         enabledDefault: false,
         tunnelConfig: {
             straightSegments: 3,
@@ -153,7 +153,7 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
         id: "pt_recto_obstaculo",
         kind: "parametric_tunnel",
         length: 350,
-        distanceToEnable: 360,
+        distanceToEnable: 400,
         enabledDefault: false,
         tunnelConfig: {
             straightSegments: 10,
@@ -170,7 +170,7 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
         id: "pt_recto_obstaculo2",
         kind: "parametric_tunnel",
         length: 350,
-        distanceToEnable: 360,
+        distanceToEnable: 400,
         enabledDefault: false,
         tunnelConfig: {
             straightSegments: 10,
@@ -187,7 +187,7 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
         id: "shooting_playground_1",
         kind: "shooting_playground",
         length: 150,
-        distanceToEnable: 160,
+        distanceToEnable: 200,
         enabledDefault: false,
         playgroundConfig: {
             width: 50,
@@ -195,14 +195,14 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
             groupingMax: 25,
             breakablePercent: 0.25,
             freeResultingSpace: 0.9,
-            staticDroneCount: 5,
+            staticDroneCount: 10,
         }
     },
     {
         id: "pp_curva_subida_corta_stunel",
         kind: "parametric_path",
         length: 250, // Largo de referencia
-        distanceToEnable: 260,
+        distanceToEnable: 300,
         enabledDefault: false,
         parametricConfig: {
             straightSegments: 5,   // 4 tramos de 25m = 100 metros totalmente rectos
@@ -267,7 +267,7 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
     {
         id: "finish_zone",
         kind: "finish_platform",
-        length: 24,
+        length: 40,
         distanceToEnable: 60,
         enabledDefault: false,
         platformConfig: { width: 18 }

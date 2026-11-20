@@ -201,7 +201,7 @@ export function buildParametricPath(
     matrixPlans.push({
       mode: "breakable",
       slot: basicObstaclesCount + matrixGapCount + i + 1,
-      targetCellIndex: Math.floor(Math.random() * 9),
+      targetCellIndex: 6 + Math.floor(Math.random() * 3), // Siempre fila inferior (6, 7 u 8)
     });
   }
 
