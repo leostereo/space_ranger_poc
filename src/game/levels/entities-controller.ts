@@ -55,27 +55,29 @@ export class EntitiesController {
         this._applyUnitState(unit, shouldBeActive);
         unit.isCurrentlyActive = shouldBeActive;
 
-        if (unit.enemySpawns && unit.enemySpawns.length > 0) {
-          this.enemiesManager.setGroupStatus(unit.id, shouldBeActive);
-        }
+        // 🟢 Siempre notificamos al EnemiesManager por unit.id (los spawns vienen pre-calculados)
+        this.enemiesManager.setGroupStatus(unit.id, shouldBeActive);
       }
     });
   }
 
   private _applyUnitState(unit: ManagedUnitInstance, isActive: boolean): void {
     unit.meshes?.forEach((mesh) => {
+      // 🟢 Guarda crítica: ignorar mallas destruidas (ej. bloques breakable) cuyo aggregate ya hizo dispose()
+      if (!mesh || mesh.isDisposed()) return;
+
       mesh.setEnabled(isActive);
       mesh.isPickable = isActive;
       mesh.checkCollisions = mesh.name.includes("-tube") ? false : isActive;
 
       const aggregate = this.physicsBodies?.get(mesh);
       if (aggregate) {
-        if (aggregate.shape) {
-        aggregate.shape.filterCollideMask = isActive ? 0xFFFFFFFF : 0;
+        // Verificamos que el shape de Havok siga vivo en memoria WASM
+        if (aggregate.shape && (aggregate.shape as any)._pluginData) {
+          aggregate.shape.filterCollideMask = isActive ? 0xFFFFFFFF : 0;
           aggregate.shape.filterMembershipMask = isActive ? 0xFFFFFFFF : 0;
         }
-        if (aggregate.body) {
-          // 🟢 Forzamos a Havok a sincronizar la posición y habilitar la física al encender
+        if (aggregate.body && (aggregate.body as any)._pluginData) {
           aggregate.body.disablePreStep = false;
           aggregate.body.setCollisionCallbackEnabled(isActive);
         }
@@ -101,21 +103,6 @@ export class EntitiesController {
       meta.destroy(aggregate);
     }
   }
-
-  private _destroyBreakableMesh(mesh: Mesh): void {
-    // 1. Liberamos el agregado físico en Havok
-    const aggregate = this.physicsBodies?.get(mesh);
-    if (aggregate) {
-      aggregate.dispose();
-    }
-
-    // 2. Apagamos y liberamos la malla visual
-    mesh.isPickable = false;
-    mesh.checkCollisions = false;
-    mesh.setEnabled(false);
-    mesh.dispose();
-  }
-
 
   public dispose(): void {
     this.unsubscribeHit();

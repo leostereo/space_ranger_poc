@@ -177,7 +177,14 @@ export const createTunnelMatrixWall = (
   const headingY = opts.headingY ?? 0;
 
   const rightVector = new Vector3(Math.cos(headingY), 0, -Math.sin(headingY)).normalize();
-  const targetSlotIndex = opts.targetSlotIndex ?? Math.floor(Math.random() * (cols * rows));
+  const bottomRowStartIndex = (rows - 1) * cols;      // solo las filas bajas tienen bloques destruibles
+  const targetSlotIndex =
+    opts.mode === "breakable"
+      ? bottomRowStartIndex +
+      (opts.targetSlotIndex !== undefined
+        ? opts.targetSlotIndex % cols
+        : Math.floor(Math.random() * cols))
+      : (opts.targetSlotIndex ?? Math.floor(Math.random() * (cols * rows)));
 
   for (let row = 0; row < rows; row++) {
     const rowFromBottom = rows - 1 - row;

@@ -16,7 +16,7 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
         enabledDefault: true
     },
     {
-        id: "pp_libre_tramo_recto_sinTunel",
+        id: "pp_stunel_curva_bajada",
         kind: "parametric_path",
         length: 250, // Largo de referencia
         distanceToEnable: 270,
@@ -24,9 +24,9 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
         parametricConfig: {
             straightSegments: 1,   // 4 tramos de 25m = 100 metros totalmente rectos
             upSegments: 0,         // Sin subidas
-            downSegments: 0,       // Sin bajadas
-            curveRightSegments: 0, // Sin curvas a la derecha
-            curveLeftSegments: 0,  // Sin curvas a la izquierda
+            downSegments: 2,       // Sin bajadas
+            curveRightSegments: 1, // Sin curvas a la derecha
+            curveLeftSegments: 1,  // Sin curvas a la izquierda
             includeTunnel: false,  // Sin carcasa de tubo para tener vista despejada
             jumpCount: 0,          // 1 valla de salto (verde)
             dodgeCount: 0,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
@@ -38,7 +38,7 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
         }
     },
     {
-        id: "pp_test_recta_obstaculo",
+        id: "pp_recta_obstaculo_1",
         kind: "parametric_path",
         length: 250, // Largo de referencia
         distanceToEnable: 270,
@@ -60,7 +60,7 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
         }
     },
     {
-        id: "pp_test_recta_obstaculo2",
+        id: "pp_recta_obstaculo_2",
         kind: "parametric_path",
         length: 250, // Largo de referencia
         distanceToEnable: 270,
@@ -82,7 +82,7 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
         }
     },
     {
-        id: "pp_test_recta_obstaculo_destruir",
+        id: "pp_recta_obstaculoDestruir_1",
         kind: "parametric_path",
         length: 250, // Largo de referencia
         distanceToEnable: 270,
@@ -106,15 +106,147 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
     {
         id: "bridge_zone_1",
         kind: "kamikaze_bridge",
-        length: 180,
-        distanceToEnable: 190,
+        length: 100,
+        distanceToEnable: 110,
         enabledDefault: false
     },
     {
-        id: "pp_test_recto_separador1",
+        id: "pp_bajada_curva_stunel",
         kind: "parametric_path",
-        length: 150, // Largo de referencia
+        length: 250, // Largo de referencia
+        distanceToEnable: 260,
+        enabledDefault: false,
+        parametricConfig: {
+            straightSegments: 0,   // 4 tramos de 25m = 100 metros totalmente rectos
+            upSegments: 0,         // Sin subidas
+            downSegments: 5,       // Sin bajadas
+            curveRightSegments: 2, // Sin curvas a la derecha
+            curveLeftSegments: 0,  // Sin curvas a la izquierda
+            includeTunnel: false,  // Sin carcasa de tubo para tener vista despejada
+            jumpCount: 0,          // 1 valla de salto (verde)
+            dodgeCount: 0,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
+            breakableCount: 0,      // 1 bloque destruible (rojo)
+            unitBoxCount: 0,
+            matrixWallGapCount: 0,        // 1 pared con hueco libre
+            matrixWallBreakableCount: 0   // 1 pared con celda destruible
+
+        }
+    },
+    {
+        id: "pt_solo_curva",
+        kind: "parametric_tunnel",
+        length: 250,
+        distanceToEnable: 260,
+        enabledDefault: false,
+        tunnelConfig: {
+            straightSegments: 3,
+            upSegments: 0,
+            downSegments: 0,
+            curveRightSegments: 1,
+            curveLeftSegments: 0,
+            matrixWallGapCount: 0,
+            matrixWallBreakableCount: 0,
+            breakableHitsRequired: 0,
+        }
+    },
+    {
+        id: "pt_recto_obstaculo",
+        kind: "parametric_tunnel",
+        length: 350,
+        distanceToEnable: 360,
+        enabledDefault: false,
+        tunnelConfig: {
+            straightSegments: 10,
+            upSegments: 0,
+            downSegments: 0,
+            curveRightSegments: 0,
+            curveLeftSegments: 0,
+            matrixWallGapCount: 1,
+            matrixWallBreakableCount: 0,
+            breakableHitsRequired: 0,
+        }
+    },
+    {
+        id: "pt_recto_obstaculo2",
+        kind: "parametric_tunnel",
+        length: 350,
+        distanceToEnable: 360,
+        enabledDefault: false,
+        tunnelConfig: {
+            straightSegments: 10,
+            upSegments: 0,
+            downSegments: 0,
+            curveRightSegments: 0,
+            curveLeftSegments: 0,
+            matrixWallGapCount: 1,
+            matrixWallBreakableCount: 0,
+            breakableHitsRequired: 0,
+        }
+    },
+    {
+        id: "shooting_playground_1",
+        kind: "shooting_playground",
+        length: 150,
+        distanceToEnable: 160,
+        enabledDefault: false,
+        playgroundConfig: {
+            width: 50,
+            groupingMin: 10,
+            groupingMax: 25,
+            breakablePercent: 0.25,
+            freeResultingSpace: 0.9,
+            staticDroneCount: 5,
+        }
+    },
+    {
+        id: "pp_curva_subida_corta_stunel",
+        kind: "parametric_path",
+        length: 250, // Largo de referencia
+        distanceToEnable: 260,
+        enabledDefault: false,
+        parametricConfig: {
+            straightSegments: 5,   // 4 tramos de 25m = 100 metros totalmente rectos
+            upSegments: 10,         // Sin subidas
+            downSegments: 0,       // Sin bajadas
+            curveRightSegments: 5, // Sin curvas a la derecha
+            curveLeftSegments: 0,  // Sin curvas a la izquierda
+            includeTunnel: false,  // Sin carcasa de tubo para tener vista despejada
+            jumpCount: 0,          // 1 valla de salto (verde)
+            dodgeCount: 0,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
+            breakableCount: 0,      // 1 bloque destruible (rojo)
+            unitBoxCount: 0,
+            matrixWallGapCount: 0,        // 1 pared con hueco libre
+            matrixWallBreakableCount: 0   // 1 pared con celda destruible
+
+        }
+    },
+    {
+        id: "empty_tunnel1",
+        kind: "empty_tunnel",
+        length: 150,
         distanceToEnable: 200,
+        enabledDefault: false
+    },
+    // {
+    //     id: "empty_plat_1",
+    //     kind: "empty_platform",
+    //     length: 20,
+    //     distanceToEnable: 60,
+    //     enabledDefault: false,
+    //     platformConfig: { width: 16 }
+    // },
+    // {
+    //     id: "empty_plat_2",
+    //     kind: "empty_platform",
+    //     length: 20,
+    //     distanceToEnable: 60,
+    //     enabledDefault: false
+    // },
+    {
+        id: "pp_recto_obstaculoDestruir",
+        kind: "parametric_path",
+        length: 450, // Largo de referencia
+        distanceToEnable: 500,
         enabledDefault: false,
         parametricConfig: {
             straightSegments: 1,   // 4 tramos de 25m = 100 metros totalmente rectos
@@ -128,101 +260,18 @@ export const LEVEL_08_LAYOUT: UnitData[] = [
             breakableCount: 0,      // 1 bloque destruible (rojo)
             unitBoxCount: 0,
             matrixWallGapCount: 0,        // 1 pared con hueco libre
-            matrixWallBreakableCount: 0   // 1 pared con celda destruible
+            matrixWallBreakableCount: 2   // 1 pared con celda destruible
 
         }
     },
     {
-        id: "pt_test1",
-        kind: "parametric_tunnel",
-        length: 150,
-        distanceToEnable: 200,
-        enabledDefault: false,
-        tunnelConfig: {
-            straightSegments: 1,
-            upSegments: 0,
-            downSegments: 0,
-            curveRightSegments: 0,
-            curveLeftSegments: 0,
-            matrixWallGapCount: 0,
-            matrixWallBreakableCount: 0,
-            breakableHitsRequired: 0,
-        }
-    },
-
-        {
-        id: "shooting_playground_1",
-        kind: "shooting_playground",
-        length: 32,
+        id: "finish_zone",
+        kind: "finish_platform",
+        length: 24,
         distanceToEnable: 60,
-        enabledDefault: true,
-        playgroundConfig: {
-            width: 100,
-            groupingMin: 10,
-            groupingMax: 15,
-            breakablePercent: 0.25,
-            freeResultingSpace: 0.9,
-            staticDroneCount: 5,
-        }
+        enabledDefault: false,
+        platformConfig: { width: 18 }
     }
-    // {
-    //     id: "pp_test_curva_bajada",
-    //     kind: "parametric_path",
-    //     length: 150, // Largo de referencia
-    //     distanceToEnable: 200,
-    //     enabledDefault: false,
-    //     parametricConfig: {
-    //         straightSegments: 50,   // 4 tramos de 25m = 100 metros totalmente rectos
-    //         upSegments: 0,         // Sin subidas
-    //         downSegments: 50,       // Sin bajadas
-    //         curveRightSegments: 50, // Sin curvas a la derecha
-    //         curveLeftSegments: 0,  // Sin curvas a la izquierda
-    //         includeTunnel: true,  // Sin carcasa de tubo para tener vista despejada
-    //         jumpCount: 0,          // 1 valla de salto (verde)
-    //         dodgeCount: 0,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
-    //         breakableCount: 0,      // 1 bloque destruible (rojo)
-    //         unitBoxCount: 0,
-    //         matrixWallGapCount: 0,        // 1 pared con hueco libre
-    //         matrixWallBreakableCount: 0   // 1 pared con celda destruible
-
-    //     }
-    // },
-    // {
-    //     id: "empty_tunnel1",
-    //     kind: "empty_tunnel",
-    //     length: 150,              // En empty-tunnel.builder esto se multiplica x10 = 600 metros reales
-    //     distanceToEnable: 200,   // 🟢 Debe superar la mitad del largo real (300m) para prenderse al entrar
-    //     enabledDefault: false
-    // },
-    // {
-    //     id: "pp_test_recto_separador",
-    //     kind: "parametric_path",
-    //     length: 150, // Largo de referencia
-    //     distanceToEnable: 200,
-    //     enabledDefault: false,
-    //     parametricConfig: {
-    //         straightSegments: 1,   // 4 tramos de 25m = 100 metros totalmente rectos
-    //         upSegments: 0,         // Sin subidas
-    //         downSegments: 0,       // Sin bajadas
-    //         curveRightSegments: 0, // Sin curvas a la derecha
-    //         curveLeftSegments: 0,  // Sin curvas a la izquierda
-    //         includeTunnel: false,  // Sin carcasa de tubo para tener vista despejada
-    //         jumpCount: 0,          // 1 valla de salto (verde)
-    //         dodgeCount: 0,         // 1 pilar central (violeta) + 1 pared lateral (violeta/gris)
-    //         breakableCount: 0,      // 1 bloque destruible (rojo)
-    //         unitBoxCount: 0,
-    //         matrixWallGapCount: 0,        // 1 pared con hueco libre
-    //         matrixWallBreakableCount: 0   // 1 pared con celda destruible
-
-    //     }
-    // },
-    // {
-    //     id: "bridge_zone_2",
-    //     kind: "kamikaze_bridge",
-    //     length: 180,
-    //     distanceToEnable: 190,
-    //     enabledDefault: false
-    // },
 ];
 
 // 2. Contenedores de Runtime que usará la Strategy (inicialmente vacíos)
@@ -311,32 +360,32 @@ const createPreCalculatedSpawns = (): Level08PreCalculatedSpawns => {
             const placedPositions: Vector3[] = [];
 
             for (let i = 0; i < staticDroneCount; i++) {
-        let candidatePos = new Vector3(currentPos.x, initialProbeY, (minZ + maxZ) * 0.5);
+                let candidatePos = new Vector3(currentPos.x, initialProbeY, (minZ + maxZ) * 0.5);
 
-        // Hasta 20 intentos para encontrar un punto que respete la distancia mínima con otros drones
-        for (let attempt = 0; attempt < 20; attempt++) {
-            const randX = minX + Math.random() * Math.max(0.1, maxX - minX);
-            const randZ = minZ + Math.random() * Math.max(0.1, maxZ - minZ);
-            const testPos = new Vector3(randX, initialProbeY, randZ);
+                // Hasta 20 intentos para encontrar un punto que respete la distancia mínima con otros drones
+                for (let attempt = 0; attempt < 20; attempt++) {
+                    const randX = minX + Math.random() * Math.max(0.1, maxX - minX);
+                    const randZ = minZ + Math.random() * Math.max(0.1, maxZ - minZ);
+                    const testPos = new Vector3(randX, initialProbeY, randZ);
 
-            const tooClose = placedPositions.some(
-                (existing) => Vector3.DistanceSquared(existing, testPos) < minSeparation * minSeparation
-            );
+                    const tooClose = placedPositions.some(
+                        (existing) => Vector3.DistanceSquared(existing, testPos) < minSeparation * minSeparation
+                    );
 
-            if (!tooClose) {
-                candidatePos = testPos;
-                break;
-            }
-        }
+                    if (!tooClose) {
+                        candidatePos = testPos;
+                        break;
+                    }
+                }
 
-        placedPositions.push(candidatePos);
+                placedPositions.push(candidatePos);
 
-        staticDrone.push({
-            position: candidatePos,
-            forward: forwardDirection.scale(-1),
-            fireDelaySeconds: 0.4 + i * 0.35,
-            groupId: unit.id,
-        } as any);
+                staticDrone.push({
+                    position: candidatePos,
+                    forward: forwardDirection.scale(-1),
+                    fireDelaySeconds: 0.4 + i * 0.35,
+                    groupId: unit.id,
+                } as any);
             }
         }
 

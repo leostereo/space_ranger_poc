@@ -6,21 +6,28 @@ import { AssetRegistry } from "../assets/asset-registry";
 // src/game/levels/unit-builder.types.ts
 export type UnitKind =
   | "spawn_platform"
-  | "kamikaze_bridge"
-  | "empty_tunnel"
   | "parametric_path"
   | "parametric_tunnel"
-  | "shooting_playground";
+  | "kamikaze_bridge"
+  | "empty_tunnel"
+  | "shooting_playground"
+  | "empty_platform"
+  | "finish_platform";
+
+export interface PlatformUnitConfig {
+  readonly width?: number; // Ancho opcional (por defecto 14m)
+}
 
 export interface UnitData {
   readonly id: string;
   readonly kind: UnitKind;
-  readonly length: number;              // En el túnel paramétrico, actuará como multiplicador base o largo estimado
+  readonly length: number;
   readonly distanceToEnable: number;
   readonly enabledDefault: boolean;
   readonly parametricConfig?: ParametricPathConfig;
   readonly tunnelConfig?: ParametricTunnelConfig;
   readonly playgroundConfig?: ShootingPlaygroundConfig;
+  readonly platformConfig?: PlatformUnitConfig;
 }
 
 export interface ManagedUnitInstance {

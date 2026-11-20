@@ -122,7 +122,7 @@ export function buildParametricPath(
   scene: Scene,
   unit: UnitData,
   currentPosition: Vector3,
-  forwardDirection: Vector3,
+  _forwardDirection: Vector3,
   registry: AssetRegistry
 ): UnitBuilderResult {
   const meshes: Mesh[] = [];

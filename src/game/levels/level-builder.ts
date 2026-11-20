@@ -15,6 +15,7 @@ import { buildParametricTunnel } from "./builders/parametric-tunnel.builder";
 import { buildKamikazeBridge } from "./builders/kamikaze-bridge.builder";
 import { buildEmptyTunnel } from "./builders/empty-tunnel.builder";
 import { buildShootingPlayground } from "./builders/shooting-playground.builder";
+import { buildEmptyPlatform, buildFinishPlatform } from "./builders/platform.builder";
 
 const UNIT_BUILDERS: Record<UnitKind, UnitBuilderFn> = {
   spawn_platform: buildSpawnPlatform,
@@ -23,6 +24,8 @@ const UNIT_BUILDERS: Record<UnitKind, UnitBuilderFn> = {
   kamikaze_bridge: buildKamikazeBridge,
   empty_tunnel: buildEmptyTunnel,
   shooting_playground: buildShootingPlayground,
+  empty_platform: buildEmptyPlatform,
+  finish_platform: buildFinishPlatform,
 };
 
 export function buildLevelUnits(
